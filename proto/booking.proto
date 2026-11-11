@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+package booking;
+
+option go_package = "./bookingpb";
+
+service BookingService {
+  rpc HoldRoom (HoldRoomRequest) returns (HoldRoomResponse);
+  rpc ConfirmBooking (ConfirmBookingRequest) returns (ConfirmBookingResponse);
+  rpc GetBooking (GetBookingRequest) returns (BookingDetails);
+  rpc GetBookedRoomCount (GetBookedRoomCountRequest) returns (GetBookedRoomCountResponse);
+}
+
+message HoldRoomRequest {
+  string hotelId = 1;
+  string roomTypeId = 2;
+  string userId = 3;
+  string checkInDate = 4;
+  string checkOutDate = 5;
+  int32 guestsCount = 6;
+  int32 roomCount = 7;
+  string guestFirstName = 8;
+  string guestLastName = 9;
+  string guestEmail = 10;
+  string guestPhone = 11;
+  string specialRequests = 12;
+}
+
+message HoldRoomResponse {
+  bool success = 1;
+  string bookingId = 2;
+  string bookingCode = 3;
+  string expiresAt = 4;
+  int32 holdSeconds = 5;
+  double totalPrice = 6;
+  string message = 7;
+}
+
+message ConfirmBookingRequest {
+  string bookingId = 1;
+  string paymentId = 2;
+}
+
+message ConfirmBookingResponse {
+  bool success = 1;
+  string status = 2;
+  string message = 3;
+}
+
+message GetBookingRequest {
+  string bookingId = 1;
+  string bookingCode = 2;
+}
+
+message BookingDetails {
+  string id = 1;
+  string bookingCode = 2;
+  string hotelId = 3;
+  string roomTypeId = 4;
+  string checkInDate = 5;
+  string checkOutDate = 6;
+  string status = 7;
+  double totalPrice = 8;
+  string guestEmail = 9;
+}
+
+message GetBookedRoomCountRequest {
+  string roomTypeId = 1;
+  string checkInDate = 2;
+  string checkOutDate = 3;
+}
+
+message GetBookedRoomCountResponse {
+  int32 count = 1;
+}
+

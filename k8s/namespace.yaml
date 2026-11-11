@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hotel-platform
+  labels:
+    environment: production
+    app: hotel-management
+

@@ -1,0 +1,42 @@
+// Prisma schema for Payment Service
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Payment {
+  id             String   @id @default(uuid())
+  bookingId      String   @unique
+  bookingCode    String
+  userId         String?
+  amount         Float
+  currency       String   @default("INR")
+  status         String   @default("PENDING") // PENDING | SUCCESS | FAILED | REFUNDED
+  provider       String   @default("STRIPE")
+  stripeIntentId String?  @unique
+  paymentMethod  String?
+  receiptUrl     String?
+  metadata       Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  refunds        Refund[]
+
+  @@map("payments")
+}
+
+model Refund {
+  id             String   @id @default(uuid())
+  paymentId      String
+  amount         Float
+  reason         String?
+  stripeRefundId String?
+  status         String   @default("PENDING")
+  createdAt      DateTime @default(now())
+  payment        Payment  @relation(fields: [paymentId], references: [id])
+
+  @@map("refunds")
+}

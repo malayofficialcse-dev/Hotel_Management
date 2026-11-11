@@ -1,0 +1,279 @@
+version: "3.9"
+
+services:
+  # ═════════════════════════════════════════════════════════════
+  # 1. CORE DATA STORES & MESSAGE BROKER
+  # ═════════════════════════════════════════════════════════════
+  postgres:
+    image: postgres:16-alpine
+    container_name: hotel-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/init-databases.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mongo:
+    image: mongo:7-jammy
+    container_name: hotel-mongo
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: hotel-redis
+    restart: always
+    command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: hotel-rabbitmq
+    restart: always
+    ports:
+      - "5672:5672"    # AMQP protocol
+      - "15672:15672"  # Management Dashboard UI
+    environment:
+      RABBITMQ_DEFAULT_USER: hotel_admin
+      RABBITMQ_DEFAULT_PASS: hotel_rabbit_pass
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  # ═════════════════════════════════════════════════════════════
+  # 2. NESTJS SERVICES (Prisma / Mongoose)
+  # ═════════════════════════════════════════════════════════════
+
+  # API Gateway [NestJS]
+  api-gateway:
+    build: ./api-gateway
+    container_name: hotel-api-gateway
+    restart: always
+    ports: ["8000:8000"]
+    environment:
+      PORT: 8000
+      JWT_ACCESS_SECRET: hotel-jwt-secret-key-2026
+      CLIENT_URL: http://localhost:3000
+      AUTH_SERVICE_URL: http://auth-service:8001
+      USER_SERVICE_URL: http://user-service:8002
+      HOTEL_SERVICE_URL: http://hotel-service:8003
+      ROOM_SERVICE_URL: http://room-service:8004
+      BOOKING_SERVICE_URL: http://booking-service:8005
+      PAYMENT_SERVICE_URL: http://payment-service:8006
+      EMPLOYEE_SERVICE_URL: http://employee-service:8007
+      HOUSEKEEPING_SERVICE_URL: http://housekeeping-service:8008
+      REVIEW_SERVICE_URL: http://review-service:8009
+      NOTIFICATION_SERVICE_URL: http://notification-service:8010
+      ANALYTICS_SERVICE_URL: http://analytics-service:8011
+    depends_on:
+      - auth-service
+      - hotel-service
+      - booking-service
+
+  # Authentication Service [NestJS + PostgreSQL (Prisma)]
+  auth-service:
+    build: ./auth-service
+    container_name: hotel-auth-service
+    restart: always
+    ports: ["8001:8001"]
+    environment:
+      PORT: 8001
+      DATABASE_URL: postgresql://postgres:postgrespassword@postgres:5432/hotel_auth_db?schema=public
+      JWT_ACCESS_SECRET: hotel-jwt-access-secret-2026
+      JWT_REFRESH_SECRET: hotel-jwt-refresh-secret-2026
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://hotel_admin:hotel_rabbit_pass@rabbitmq:5672
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  # Guest / User Management Service [NestJS + PostgreSQL]
+  user-service:
+    build: ./user-service
+    container_name: hotel-user-service
+    restart: always
+    ports: ["8002:8002"]
+    environment:
+      PORT: 8002
+      DATABASE_URL: postgresql://postgres:postgrespassword@postgres:5432/hotel_users_db?schema=public
+      AUTH_SERVICE_URL: http://auth-service:8001
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  # Hotel Management Service [NestJS + MongoDB (Mongoose)]
+  hotel-service:
+    build: ./hotel-service
+    container_name: hotel-management-service
+    restart: always
+    ports: ["8003:8003"]
+    environment:
+      PORT: 8003
+      MONGODB_URI: mongodb://mongo:27017/hotel_catalog
+      REDIS_URL: redis://redis:6379
+      AUTH_SERVICE_URL: http://auth-service:8001
+    depends_on:
+      mongo: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  # Room Management Service [NestJS + MongoDB (Mongoose)]
+  room-service:
+    build: ./room-service
+    container_name: hotel-room-service
+    restart: always
+    ports: ["8004:8004"]
+    environment:
+      PORT: 8004
+      MONGODB_URI: mongodb://mongo:27017/hotel_catalog
+      BOOKING_SERVICE_URL: http://booking-service:8005
+    depends_on:
+      mongo: { condition: service_healthy }
+
+  # Payment Service [NestJS + PostgreSQL (Prisma)]
+  payment-service:
+    build: ./payment-service
+    container_name: hotel-payment-service
+    restart: always
+    ports: ["8006:8006"]
+    environment:
+      PORT: 8006
+      DATABASE_URL: postgresql://postgres:postgrespassword@postgres:5432/hotel_payments_db?schema=public
+      RABBITMQ_URL: amqp://hotel_admin:hotel_rabbit_pass@rabbitmq:5672
+      BOOKING_SERVICE_URL: http://booking-service:8005
+      STRIPE_SECRET_KEY: sk_test_mock_stripe_key
+    depends_on:
+      postgres: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+
+  # Employee & Department Service [NestJS + PostgreSQL]
+  employee-service:
+    build: ./employee-service
+    container_name: hotel-employee-service
+    restart: always
+    ports: ["8007:8007"]
+    environment:
+      PORT: 8007
+      DATABASE_URL: postgresql://postgres:postgrespassword@postgres:5432/hotel_operations_db?schema=public
+      AUTH_SERVICE_URL: http://auth-service:8001
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  # Housekeeping Service [NestJS + MongoDB]
+  housekeeping-service:
+    build: ./housekeeping-service
+    container_name: hotel-housekeeping-service
+    restart: always
+    ports: ["8008:8008"]
+    environment:
+      PORT: 8008
+      MONGODB_URI: mongodb://mongo:27017/hotel_housekeeping
+      RABBITMQ_URL: amqp://hotel_admin:hotel_rabbit_pass@rabbitmq:5672
+    depends_on:
+      mongo: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+
+  # Review Service [NestJS + MongoDB]
+  review-service:
+    build: ./review-service
+    container_name: hotel-review-service
+    restart: always
+    ports: ["8009:8009"]
+    environment:
+      PORT: 8009
+      MONGODB_URI: mongodb://mongo:27017/hotel_reviews
+      BOOKING_SERVICE_URL: http://booking-service:8005
+    depends_on:
+      mongo: { condition: service_healthy }
+
+  # ═════════════════════════════════════════════════════════════
+  # 3. GO MICROSERVICES (pgx / gRPC / Concurrency)
+  # ═════════════════════════════════════════════════════════════
+
+  # Booking Service [Go + PostgreSQL + Redis (Distributed Lock & 10-Min Hold)]
+  booking-service:
+    build: ./booking-service
+    container_name: hotel-booking-service-go
+    restart: always
+    ports:
+      - "8005:8005"   # HTTP REST
+      - "50051:50051" # gRPC
+    environment:
+      PORT: 8005
+      GRPC_PORT: 50051
+      DATABASE_URL: postgres://postgres:postgrespassword@postgres:5432/hotel_bookings_db?sslmode=disable
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://hotel_admin:hotel_rabbit_pass@rabbitmq:5672
+      HOTEL_SERVICE_URL: http://hotel-service:8003
+      AUTH_SERVICE_URL: http://auth-service:8001
+      PAYMENT_SERVICE_URL: http://payment-service:8006
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+
+  # Notification Service [Go + RabbitMQ Consumer + Mongo/Postgres]
+  notification-service:
+    build: ./notification-service
+    container_name: hotel-notification-service-go
+    restart: always
+    ports:
+      - "8010:8010"
+      - "50052:50052" # gRPC
+    environment:
+      PORT: 8010
+      GRPC_PORT: 50052
+      RABBITMQ_URL: amqp://hotel_admin:hotel_rabbit_pass@rabbitmq:5672
+      DATABASE_URL: postgres://postgres:postgrespassword@postgres:5432/hotel_notifications_db?sslmode=disable
+      MONGODB_URI: mongodb://mongo:27017/hotel_notifications
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+
+  # Analytics Service [Go + Postgres/Redis]
+  analytics-service:
+    build: ./analytics-service
+    container_name: hotel-analytics-service-go
+    restart: always
+    ports:
+      - "8011:8011"
+    environment:
+      PORT: 8011
+      DATABASE_URL: postgres://postgres:postgrespassword@postgres:5432/hotel_analytics_db?sslmode=disable
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://hotel_admin:hotel_rabbit_pass@rabbitmq:5672
+    depends_on:
+      postgres: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+
+volumes:
+  postgres_data:
+  mongo_data:
+  redis_data:
+  rabbitmq_data:

@@ -1,0 +1,15 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+booking-service
+
+# Test and coverage
+*.out
+
+# Env
+.env
+.env.local
+

@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hotel-platform-config
+  namespace: hotel-platform
+data:
+  NODE_ENV: "production"
+  CLIENT_URL: "https://yourhotelapp.vercel.app"
+  REDIS_URL: "redis://redis-service:6379"
+  RABBITMQ_URL: "amqp://hotel_admin:hotel_rabbit_pass@rabbitmq-service:5672"
+  AUTH_SERVICE_URL: "http://auth-service:8001"
+  USER_SERVICE_URL: "http://user-guest-service:8002"
+  HOTEL_SERVICE_URL: "http://hotel-service:8003"
+  ROOM_SERVICE_URL: "http://room-service:8004"
+  BOOKING_SERVICE_URL: "http://booking-service:8005"
+  PAYMENT_SERVICE_URL: "http://payment-service:8006"
+  EMPLOYEE_SERVICE_URL: "http://employee-service:8007"
+  HOUSEKEEPING_SERVICE_URL: "http://housekeeping-service:8008"
+  REVIEW_SERVICE_URL: "http://review-service:8009"
+  NOTIFICATION_SERVICE_URL: "http://notification-service:8010"
+  ANALYTICS_SERVICE_URL: "http://analytics-service:8011"
+  MONGODB_URI: "mongodb://mongo-service:27017/hotel_catalog"
+

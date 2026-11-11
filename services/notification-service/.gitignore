@@ -1,0 +1,7 @@
+*.exe
+*.dll
+*.so
+notification-service
+.env
+.env.local
+

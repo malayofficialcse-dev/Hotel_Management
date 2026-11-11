@@ -1,0 +1,7 @@
+*.exe
+*.dll
+*.so
+analytics-service
+.env
+.env.local
+

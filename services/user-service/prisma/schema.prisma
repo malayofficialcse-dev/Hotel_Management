@@ -1,0 +1,57 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model UserProfile {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  phone     String?
+  avatarUrl String?
+  city      String?
+  country   String?  @default("India")
+  idProof   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  wishlist    WishlistItem[]
+  preferences UserPreference?
+
+  @@map("user_profiles")
+}
+
+model WishlistItem {
+  id        String   @id @default(uuid())
+  userId    String
+  hotelId   String
+  hotelName String
+  hotelCity String
+  image     String
+  price     Float
+  addedAt   DateTime @default(now())
+
+  user      UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, hotelId])
+  @@map("wishlist_items")
+}
+
+model UserPreference {
+  id                 String   @id @default(uuid())
+  userId             String   @unique
+  preferredCity      String?
+  preferredCategory  String?  @default("All")
+  newsletterOptIn    Boolean  @default(true)
+  smsAlerts          Boolean  @default(true)
+  updatedAt          DateTime @updatedAt
+
+  user               UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
+}
+

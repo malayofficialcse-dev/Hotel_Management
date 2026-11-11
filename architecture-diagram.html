@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StayEase Enterprise Architecture Diagram</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: #0b1120;
+      color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 24px;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    h1 {
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      color: #ffffff;
+    }
+    p {
+      color: #94a3b8;
+      font-size: 14px;
+      margin-top: 6px;
+    }
+    .badge-bar {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      margin-top: 14px;
+      flex-wrap: wrap;
+    }
+    .badge {
+      background: #1e293b;
+      border: 1px solid #334155;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .badge.nest { color: #f43f5e; border-color: rgba(244,63,94,0.3); }
+    .badge.go { color: #38bdf8; border-color: rgba(56,189,248,0.3); }
+    .badge.pg { color: #60a5fa; border-color: rgba(96,165,250,0.3); }
+    .badge.mongo { color: #34d399; border-color: rgba(52,211,153,0.3); }
+    .badge.rabbit { color: #fb923c; border-color: rgba(251,146,60,0.3); }
+    .badge.redis { color: #f87171; border-color: rgba(248,113,113,0.3); }
+    .container {
+      width: 100%;
+      max-width: 1600px;
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+      margin-top: 10px;
+    }
+    img, svg {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>StayEase Hotel Platform — Production Architecture</h1>
+    <p>Complete Enterprise Blueprint • Polyglot Microservices • Event-Driven Bus • Multi-Database Architecture</p>
+    <div class="badge-bar">
+      <span class="badge nest">API Gateway (NestJS)</span>
+      <span class="badge go">Booking Engine (Go)</span>
+      <span class="badge pg">PostgreSQL 16 Cluster</span>
+      <span class="badge mongo">MongoDB 7 Replica Set</span>
+      <span class="badge redis">Redis 7 Distributed Lock</span>
+      <span class="badge rabbit">RabbitMQ Event Broker</span>
+      <span class="badge">Kubernetes + Docker</span>
+    </div>
+  </header>
+
+  <div class="container">
+    <object data="architecture-diagram.svg" type="image/svg+xml" style="width: 100%; height: auto;"></object>
+  </div>
+</body>
+</html>
+

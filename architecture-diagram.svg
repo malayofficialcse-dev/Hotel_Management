@@ -1,0 +1,414 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1150" width="100%" height="100%" style="background-color: #0b1120; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <defs>
+    <!-- Gradients -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b1120"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+
+    <linearGradient id="gatewayGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+
+    <linearGradient id="nestCardGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#111827"/>
+    </linearGradient>
+
+    <linearGradient id="goCardGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#082f49"/>
+      <stop offset="100%" stop-color="#0c4a6e"/>
+    </linearGradient>
+
+    <linearGradient id="rabbitGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#431407"/>
+      <stop offset="100%" stop-color="#7c2d12"/>
+    </linearGradient>
+
+    <linearGradient id="pgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e3a8a"/>
+      <stop offset="100%" stop-color="#172554"/>
+    </linearGradient>
+
+    <linearGradient id="mongoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#064e3b"/>
+      <stop offset="100%" stop-color="#022c22"/>
+    </linearGradient>
+
+    <linearGradient id="redisGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7f1d1d"/>
+      <stop offset="100%" stop-color="#450a0a"/>
+    </linearGradient>
+
+    <!-- Drop Shadows -->
+    <filter id="cardShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#000000" flood-opacity="0.4"/>
+    </filter>
+    <filter id="glowNest" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="#e11d48" flood-opacity="0.3"/>
+    </filter>
+    <filter id="glowGo" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="#0ea5e9" flood-opacity="0.3"/>
+    </filter>
+
+    <!-- Markers -->
+    <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 8 5 L 0 9 z" fill="#64748b"/>
+    </marker>
+    <marker id="arrowBlue" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 8 5 L 0 9 z" fill="#38bdf8"/>
+    </marker>
+    <marker id="arrowOrange" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 8 5 L 0 9 z" fill="#fb923c"/>
+    </marker>
+  </defs>
+
+  <!-- Title Header -->
+  <rect x="0" y="0" width="1600" height="1150" fill="url(#bgGrad)"/>
+  <text x="800" y="45" text-anchor="middle" font-size="24" font-weight="800" fill="#f8fafc" letter-spacing="1">STAYEASE ENTERPRISE ARCHITECTURE</text>
+  <text x="800" y="70" text-anchor="middle" font-size="13" font-weight="500" fill="#94a3b8">Polyglot Microservices (NestJS + Go + PostgreSQL + MongoDB + Redis + RabbitMQ + gRPC + Kubernetes)</text>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════ -->
+  <!-- LAYER 1: CLIENT & EDGE LAYER (VERCEL) -->
+  <!-- ══════════════════════════════════════════════════════════════════════════ -->
+  <rect x="40" y="90" width="1520" height="95" rx="8" fill="#1e293b" fill-opacity="0.5" stroke="#334155" stroke-dasharray="4 4"/>
+  <text x="55" y="112" font-size="11" font-weight="700" fill="#94a3b8" letter-spacing="1">CLIENT &amp; EDGE TIER (VERCEL)</text>
+
+  <!-- Client 1: Next.js Web App -->
+  <g transform="translate(420, 115)">
+    <rect width="360" height="56" rx="6" fill="#0f172a" stroke="#475569" filter="url(#cardShadow)"/>
+    <circle cx="28" cy="28" r="14" fill="#000000" stroke="#38bdf8"/>
+    <text x="28" y="33" text-anchor="middle" font-size="11" font-weight="bold" fill="#38bdf8">N</text>
+    <text x="54" y="27" font-size="13" font-weight="700" fill="#f1f5f9">Next.js 15 Web Application</text>
+    <text x="54" y="44" font-size="11" fill="#94a3b8">Guest Booking Flow • 4px Radius • Port :3000</text>
+  </g>
+
+  <!-- Client 2: Pastel Admin Dashboard -->
+  <g transform="translate(820, 115)">
+    <rect width="360" height="56" rx="6" fill="#0f172a" stroke="#475569" filter="url(#cardShadow)"/>
+    <circle cx="28" cy="28" r="14" fill="#6366f1" stroke="#a5b4fc"/>
+    <text x="28" y="33" text-anchor="middle" font-size="11" font-weight="bold" fill="#ffffff">A</text>
+    <text x="54" y="27" font-size="13" font-weight="700" fill="#f1f5f9">Pastel Admin Dashboard</text>
+    <text x="54" y="44" font-size="11" fill="#94a3b8">Occupancy • Front Desk • Housekeeping Logs</text>
+  </g>
+
+  <!-- Connection: Clients to Gateway -->
+  <path d="M 600 171 L 600 215 L 750 215 L 750 230" fill="none" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <path d="M 1000 171 L 1000 215 L 850 215 L 850 230" fill="none" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════ -->
+  <!-- LAYER 2: API GATEWAY (NESTJS :8000) -->
+  <!-- ══════════════════════════════════════════════════════════════════════════ -->
+  <g transform="translate(480, 230)">
+    <rect width="640" height="74" rx="8" fill="url(#gatewayGrad)" stroke="#e11d48" stroke-width="1.5" filter="url(#glowNest)"/>
+    <rect x="12" y="14" width="46" height="46" rx="6" fill="#e11d48" fill-opacity="0.2" stroke="#e11d48"/>
+    <text x="35" y="42" text-anchor="middle" font-size="14" font-weight="bold" fill="#fb7185">GW</text>
+    <text x="70" y="34" font-size="15" font-weight="800" fill="#ffffff">API Gateway (NestJS)</text>
+    <text x="280" y="34" font-size="11" font-weight="600" fill="#fb7185">[PORT :8000]</text>
+    <text x="70" y="52" font-size="11" fill="#cbd5e1">Centralized JWT Check • Rate Limiting • Helmet • Reverse Proxy Routing</text>
+    <rect x="520" y="24" width="95" height="24" rx="4" fill="#047857"/>
+    <text x="567" y="40" text-anchor="middle" font-size="10" font-weight="700" fill="#ffffff">PUBLIC INGRESS</text>
+  </g>
+
+  <!-- Gateway dispatch bus line -->
+  <path d="M 800 304 L 800 340" fill="none" stroke="#e11d48" stroke-width="1.5"/>
+  <path d="M 105 340 L 1495 340" fill="none" stroke="#e11d48" stroke-width="1.5"/>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════ -->
+  <!-- LAYER 3: NESTJS MICROSERVICES (BUSINESS DOMAIN) -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <rect x="40" y="355" width="1520" height="205" rx="8" fill="#1e293b" fill-opacity="0.3" stroke="#334155" stroke-dasharray="4 4"/>
+  <text x="55" y="375" font-size="11" font-weight="700" fill="#e11d48" letter-spacing="1">NESTJS MICROSERVICES (BUSINESS DOMAIN)</text>
+
+  <!-- 1. Auth Service (:8001) -->
+  <g transform="translate(60, 390)">
+    <path d="M 45 -50 L 45 0" fill="none" stroke="#64748b" stroke-width="1.2" marker-end="url(#arrow)"/>
+    <rect width="170" height="150" rx="6" fill="url(#nestCardGrad)" stroke="#e11d48" stroke-width="1.2" filter="url(#cardShadow)"/>
+    <rect x="10" y="10" width="30" height="20" rx="3" fill="#e11d48"/>
+    <text x="25" y="24" text-anchor="middle" font-size="9" font-weight="bold" fill="#ffffff">AUTH</text>
+    <text x="48" y="24" font-size="11" font-weight="700" fill="#ffffff">Auth Service</text>
+    <text x="10" y="48" font-size="10" fill="#cbd5e1">NestJS • Port :8001</text>
+    <text x="10" y="66" font-size="9" fill="#94a3b8">Credentials, JWT Tokens</text>
+    <text x="10" y="80" font-size="9" fill="#94a3b8">Refresh Token Rotation</text>
+    <rect x="10" y="98" width="150" height="20" rx="3" fill="#1e3a8a"/>
+    <text x="85" y="112" text-anchor="middle" font-size="9" font-weight="700" fill="#93c5fd">DB: PostgreSQL (Prisma)</text>
+    <rect x="10" y="122" width="150" height="18" rx="3" fill="#0f172a"/>
+    <text x="85" y="134" text-anchor="middle" font-size="8.5" fill="#f43f5e">Session Cache: Redis</text>
+  </g>
+
+  <!-- 2. Guest / User Service (:8002) -->
+  <g transform="translate(245, 390)">
+    <path d="M 45 -50 L 45 0" fill="none" stroke="#64748b" stroke-width="1.2" marker-end="url(#arrow)"/>
+    <rect width="170" height="150" rx="6" fill="url(#nestCardGrad)" stroke="#38bdf8" stroke-width="1.2" filter="url(#cardShadow)"/>
+    <rect x="10" y="10" width="30" height="20" rx="3" fill="#0284c7"/>
+    <text x="25" y="24" text-anchor="middle" font-size="9" font-weight="bold" fill="#ffffff">USER</text>
+    <text x="48" y="24" font-size="11" font-weight="700" fill="#ffffff">Guest Mgmt</text>
+    <text x="10" y="48" font-size="10" fill="#cbd5e1">NestJS • Port :8002</text>
+    <text x="10" y="66" font-size="9" fill="#94a3b8">Profiles, Wishlists</text>
+    <text x="10" y="80" font-size="9" fill="#94a3b8">Preferences, KYC</text>
+    <rect x="10" y="98" width="150" height="20" rx="3" fill="#1e3a8a"/>
+    <text x="85" y="112" text-anchor="middle" font-size="9" font-weight="700" fill="#93c5fd">DB: PostgreSQL (Prisma)</text>
+    <rect x="10" y="122" width="150" height="18" rx="3" fill="#0f172a"/>
+    <text x="85" y="134" text-anchor="middle" font-size="8.5" fill="#38bdf8">hotel_users_db</text>
+  </g>
+
+  <!-- 3. Hotel Management (:8003) -->
+  <g transform="translate(430, 390)">
+    <path d="M 45 -50 L 45 0" fill="none" stroke="#64748b" stroke-width="1.2" marker-end="url(#arrow)"/>
+    <rect width="170" height="150" rx="6" fill="url(#nestCardGrad)" stroke="#10b981" stroke-width="1.2" filter="url(#cardShadow)"/>
+    <rect x="10" y="10" width="30" height="20" rx="3" fill="#059669"/>
+    <text x="25" y="24" text-anchor="middle" font-size="9" font-weight="bold" fill="#ffffff">HOTEL</text>
+    <text x="48" y="24" font-size="11" font-weight="700" fill="#ffffff">Hotel Catalog</text>
+    <text x="10" y="48" font-size="10" fill="#cbd5e1">NestJS • Port :8003</text>
+    <text x="10" y="66" font-size="9" fill="#94a3b8">Rich Media, Locations</text>
+    <text x="10" y="80" font-size="9" fill="#94a3b8">Figma Stays, Amenities</text>
+    <rect x="10" y="98" width="150" height="20" rx="3" fill="#064e3b"/>
+    <text x="85" y="112" text-anchor="middle" font-size="9" font-weight="700" fill="#6ee7b7">DB: MongoDB (Mongoose)</text>
+    <rect x="10" y="122" width="150" height="18" rx="3" fill="#0f172a"/>
+    <text x="85" y="134" text-anchor="middle" font-size="8.5" fill="#10b981">Cache: Redis (120s TTL)</text>
+  </g>
+
+  <!-- 4. Room Management (:8004) -->
+  <g transform="translate(615, 390)">
+    <path d="M 45 -50 L 45 0" fill="none" stroke="#64748b" stroke-width="1.2" marker-end="url(#arrow)"/>
+    <rect width="170" height="150" rx="6" fill="url(#nestCardGrad)" stroke="#10b981" stroke-width="1.2" filter="url(#cardShadow)"/>
+    <rect x="10" y="10" width="30" height="20" rx="3" fill="#059669"/>
+    <text x="25" y="24" text-anchor="middle" font-size="9" font-weight="bold" fill="#ffffff">ROOM</text>
+    <text x="48" y="24" font-size="11" font-weight="700" fill="#ffffff">Room Inventory</text>
+    <text x="10" y="48" font-size="10" fill="#cbd5e1">NestJS • Port :8004</text>
+    <text x="10" y="66" font-size="9" fill="#94a3b8">Bed Specs, Inventory</text>
+    <text x="10" y="80" font-size="9" fill="#94a3b8">Live Availability Matrix</text>
+    <rect x="10" y="98" width="150" height="20" rx="3" fill="#064e3b"/>
+    <text x="85" y="112" text-anchor="middle" font-size="9" font-weight="700" fill="#6ee7b7">DB: MongoDB (Mongoose)</text>
+    <rect x="10" y="122" width="150" height="18" rx="3" fill="#0f172a"/>
+    <text x="85" y="134" text-anchor="middle" font-size="8.5" fill="#38bdf8">gRPC -> Booking Engine</text>
+  </g>
+
+  <!-- 5. Payment Service (:8006) -->
+  <g transform="translate(800, 390)">
+    <path d="M 45 -50 L 45 0" fill="none" stroke="#64748b" stroke-width="1.2" marker-end="url(#arrow)"/>
+    <rect width="170" height="150" rx="6" fill="url(#nestCardGrad)" stroke="#6366f1" stroke-width="1.2" filter="url(#cardShadow)"/>
+    <rect x="10" y="10" width="30" height="20" rx="3" fill="#4f46e5"/>
+    <text x="25" y="24" text-anchor="middle" font-size="9" font-weight="bold" fill="#ffffff">PAY</text>
+    <text x="48" y="24" font-size="11" font-weight="700" fill="#ffffff">Payment Service</text>
+    <text x="10" y="48" font-size="10" fill="#cbd5e1">NestJS • Port :8006</text>
+    <text x="10" y="66" font-size="9" fill="#94a3b8">Stripe PaymentIntents</text>
+    <text x="10" y="80" font-size="9" fill="#94a3b8">Webhooks, Auto-Refunds</text>
+    <rect x="10" y="98" width="150" height="20" rx="3" fill="#1e3a8a"/>
+    <text x="85" y="112" text-anchor="middle" font-size="9" font-weight="700" fill="#93c5fd">DB: PostgreSQL (Prisma)</text>
+    <rect x="10" y="122" width="150" height="18" rx="3" fill="#0f172a"/>
+    <text x="85" y="134" text-anchor="middle" font-size="8.5" fill="#818cf8">hotel_payments_db</text>
+  </g>
+
+  <!-- 6. Employee & Dept (:8007) -->
+  <g transform="translate(985, 390)">
+    <path d="M 45 -50 L 45 0" fill="none" stroke="#64748b" stroke-width="1.2" marker-end="url(#arrow)"/>
+    <rect width="170" height="150" rx="6" fill="url(#nestCardGrad)" stroke="#a855f7" stroke-width="1.2" filter="url(#cardShadow)"/>
+    <rect x="10" y="10" width="30" height="20" rx="3" fill="#9333ea"/>
+    <text x="25" y="24" text-anchor="middle" font-size="9" font-weight="bold" fill="#ffffff">EMP</text>
+    <text x="48" y="24" font-size="11" font-weight="700" fill="#ffffff">Employee &amp; Dept</text>
+    <text x="10" y="48" font-size="10" fill="#cbd5e1">NestJS • Port :8007</text>
+    <text x="10" y="66" font-size="9" fill="#94a3b8">Staff Directory, Roles</text>
+    <text x="10" y="80" font-size="9" fill="#94a3b8">Shifts &amp; Work Rosters</text>
+    <rect x="10" y="98" width="150" height="20" rx="3" fill="#1e3a8a"/>
+    <text x="85" y="112" text-anchor="middle" font-size="9" font-weight="700" fill="#93c5fd">DB: PostgreSQL (Prisma)</text>
+    <rect x="10" y="122" width="150" height="18" rx="3" fill="#0f172a"/>
+    <text x="85" y="134" text-anchor="middle" font-size="8.5" fill="#c084fc">hotel_operations_db</text>
+  </g>
+
+  <!-- 7. Housekeeping (:8008) -->
+  <g transform="translate(1170, 390)">
+    <path d="M 45 -50 L 45 0" fill="none" stroke="#64748b" stroke-width="1.2" marker-end="url(#arrow)"/>
+    <rect width="170" height="150" rx="6" fill="url(#nestCardGrad)" stroke="#10b981" stroke-width="1.2" filter="url(#cardShadow)"/>
+    <rect x="10" y="10" width="30" height="20" rx="3" fill="#059669"/>
+    <text x="25" y="24" text-anchor="middle" font-size="9" font-weight="bold" fill="#ffffff">HK</text>
+    <text x="48" y="24" font-size="11" font-weight="700" fill="#ffffff">Housekeeping</text>
+    <text x="10" y="48" font-size="10" fill="#cbd5e1">NestJS • Port :8008</text>
+    <text x="10" y="66" font-size="9" fill="#94a3b8">Room Clean Statuses</text>
+    <text x="10" y="80" font-size="9" fill="#94a3b8">Inspection Checklists</text>
+    <rect x="10" y="98" width="150" height="20" rx="3" fill="#064e3b"/>
+    <text x="85" y="112" text-anchor="middle" font-size="9" font-weight="700" fill="#6ee7b7">DB: MongoDB (Mongoose)</text>
+    <rect x="10" y="122" width="150" height="18" rx="3" fill="#0f172a"/>
+    <text x="85" y="134" text-anchor="middle" font-size="8.5" fill="#34d399">hotel_housekeeping</text>
+  </g>
+
+  <!-- 8. Review Service (:8009) -->
+  <g transform="translate(1355, 390)">
+    <path d="M 45 -50 L 45 0" fill="none" stroke="#64748b" stroke-width="1.2" marker-end="url(#arrow)"/>
+    <rect width="170" height="150" rx="6" fill="url(#nestCardGrad)" stroke="#10b981" stroke-width="1.2" filter="url(#cardShadow)"/>
+    <rect x="10" y="10" width="30" height="20" rx="3" fill="#059669"/>
+    <text x="25" y="24" text-anchor="middle" font-size="9" font-weight="bold" fill="#ffffff">REV</text>
+    <text x="48" y="24" font-size="11" font-weight="700" fill="#ffffff">Guest Reviews</text>
+    <text x="10" y="48" font-size="10" fill="#cbd5e1">NestJS • Port :8009</text>
+    <text x="10" y="66" font-size="9" fill="#94a3b8">Criteria Breakdowns</text>
+    <text x="10" y="80" font-size="9" fill="#94a3b8">Verified Stay Badges</text>
+    <rect x="10" y="98" width="150" height="20" rx="3" fill="#064e3b"/>
+    <text x="85" y="112" text-anchor="middle" font-size="9" font-weight="700" fill="#6ee7b7">DB: MongoDB (Mongoose)</text>
+    <rect x="10" y="122" width="150" height="18" rx="3" fill="#0f172a"/>
+    <text x="85" y="134" text-anchor="middle" font-size="8.5" fill="#34d399">hotel_reviews</text>
+  </g>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════ -->
+  <!-- LAYER 4: HIGH-PERFORMANCE GO SERVICES & RABBITMQ -->
+  <!-- ══════════════════════════════════════════════════════════════════════════ -->
+  <rect x="40" y="580" width="1520" height="200" rx="8" fill="#082f49" fill-opacity="0.25" stroke="#0284c7" stroke-dasharray="4 4"/>
+  <text x="55" y="602" font-size="11" font-weight="700" fill="#38bdf8" letter-spacing="1">HIGH-PERFORMANCE GO ENGINE &amp; EVENT BROKER</text>
+
+  <!-- 1. Go Booking Engine (:8005 / gRPC :50051) -->
+  <g transform="translate(60, 615)">
+    <rect width="450" height="145" rx="8" fill="url(#goCardGrad)" stroke="#38bdf8" stroke-width="1.5" filter="url(#glowGo)"/>
+    <rect x="15" y="14" width="46" height="46" rx="6" fill="#0284c7" fill-opacity="0.3" stroke="#38bdf8"/>
+    <text x="38" y="42" text-anchor="middle" font-size="14" font-weight="bold" fill="#38bdf8">GO</text>
+    <text x="75" y="32" font-size="15" font-weight="800" fill="#ffffff">Booking Engine Service (Go)</text>
+    <text x="75" y="50" font-size="11" fill="#bae6fd">HTTP Port :8005 • gRPC Port :50051 (pgx / sqlc)</text>
+    <text x="15" y="76" font-size="10.5" fill="#e0f2fe">• Redis Distributed Lock (SET NX EX) guarantees Zero Double-Booking</text>
+    <text x="15" y="92" font-size="10.5" fill="#e0f2fe">• 10-Minute Cart Hold State Machine (hold:booking:{id} TTL 600s)</text>
+    <rect x="15" y="106" width="200" height="24" rx="4" fill="#1e3a8a"/>
+    <text x="115" y="122" text-anchor="middle" font-size="10" font-weight="700" fill="#bfdbfe">DB: PostgreSQL (hotel_bookings_db)</text>
+    <rect x="225" y="106" width="210" height="24" rx="4" fill="#7f1d1d"/>
+    <text x="330" y="122" text-anchor="middle" font-size="10" font-weight="700" fill="#fca5a5">State/Lock: Redis (Distributed Lock)</text>
+  </g>
+
+  <!-- 2. Message Broker (RabbitMQ :5672) -->
+  <g transform="translate(540, 615)">
+    <rect width="490" height="145" rx="8" fill="url(#rabbitGrad)" stroke="#f97316" stroke-width="1.5" filter="url(#cardShadow)"/>
+    <rect x="15" y="14" width="46" height="46" rx="6" fill="#c2410c" fill-opacity="0.3" stroke="#f97316"/>
+    <text x="38" y="42" text-anchor="middle" font-size="13" font-weight="bold" fill="#fdba74">MQ</text>
+    <text x="75" y="32" font-size="15" font-weight="800" fill="#ffffff">RabbitMQ Message Broker</text>
+    <text x="75" y="50" font-size="11" fill="#ffedd5">AMQP Port :5672 • Management UI Port :15672</text>
+    <text x="15" y="74" font-size="10.5" fill="#fed7aa">Topic: booking.held -> triggers 10m inventory hold</text>
+    <text x="15" y="90" font-size="10.5" fill="#fed7aa">Topic: payment.succeeded -> confirms booking &amp; issues invoice</text>
+    <text x="15" y="106" font-size="10.5" fill="#fed7aa">Topic: room.cleaned -> housekeeping notifies front-desk</text>
+    <rect x="15" y="116" width="460" height="18" rx="3" fill="#431407"/>
+    <text x="245" y="129" text-anchor="middle" font-size="9" font-weight="700" fill="#fed7aa">Event-Driven Asynchronous Backbone</text>
+  </g>
+
+  <!-- 3. Go Notification Service (:8010) -->
+  <g transform="translate(1060, 615)">
+    <rect width="230" height="145" rx="6" fill="url(#goCardGrad)" stroke="#38bdf8" stroke-width="1.2" filter="url(#cardShadow)"/>
+    <rect x="10" y="10" width="30" height="20" rx="3" fill="#0284c7"/>
+    <text x="25" y="24" text-anchor="middle" font-size="9" font-weight="bold" fill="#ffffff">NOTIF</text>
+    <text x="48" y="24" font-size="11" font-weight="700" fill="#ffffff">Notification Svc (Go)</text>
+    <text x="10" y="48" font-size="10" fill="#cbd5e1">HTTP :8010 • gRPC :50052</text>
+    <text x="10" y="66" font-size="9" fill="#94a3b8">RabbitMQ Event Consumer</text>
+    <text x="10" y="80" font-size="9" fill="#94a3b8">SMS, Email, WhatsApp, Push</text>
+    <rect x="10" y="98" width="210" height="20" rx="3" fill="#1e3a8a"/>
+    <text x="115" y="112" text-anchor="middle" font-size="9" font-weight="700" fill="#93c5fd">DB: Postgres / MongoDB</text>
+    <rect x="10" y="122" width="210" height="18" rx="3" fill="#0f172a"/>
+    <text x="115" y="134" text-anchor="middle" font-size="8.5" fill="#38bdf8">Instant Confirmation Passes</text>
+  </g>
+
+  <!-- 4. Go Analytics Service (:8011) -->
+  <g transform="translate(1310, 615)">
+    <rect width="230" height="145" rx="6" fill="url(#goCardGrad)" stroke="#38bdf8" stroke-width="1.2" filter="url(#cardShadow)"/>
+    <rect x="10" y="10" width="30" height="20" rx="3" fill="#0284c7"/>
+    <text x="25" y="24" text-anchor="middle" font-size="9" font-weight="bold" fill="#ffffff">DATA</text>
+    <text x="48" y="24" font-size="11" font-weight="700" fill="#ffffff">Analytics Svc (Go)</text>
+    <text x="10" y="48" font-size="10" fill="#cbd5e1">HTTP Port :8011</text>
+    <text x="10" y="66" font-size="9" fill="#94a3b8">Occupancy, ADR, RevPAR</text>
+    <text x="10" y="80" font-size="9" fill="#94a3b8">Real-time Revenue Telemetry</text>
+    <rect x="10" y="98" width="210" height="20" rx="3" fill="#1e3a8a"/>
+    <text x="115" y="112" text-anchor="middle" font-size="9" font-weight="700" fill="#93c5fd">DB: PostgreSQL / Redis</text>
+    <rect x="10" y="122" width="210" height="18" rx="3" fill="#0f172a"/>
+    <text x="115" y="134" text-anchor="middle" font-size="8.5" fill="#38bdf8">hotel_analytics_db</text>
+  </g>
+
+  <!-- Inter-service connections (RabbitMQ) -->
+  <path d="M 510 680 L 540 680" fill="none" stroke="#fb923c" stroke-width="1.5" marker-end="url(#arrowOrange)"/>
+  <path d="M 1030 680 L 1060 680" fill="none" stroke="#fb923c" stroke-width="1.5" marker-end="url(#arrowOrange)"/>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════ -->
+  <!-- LAYER 5: DISTRIBUTED DATA & STATE PERSISTENCE -->
+  <!-- ══════════════════════════════════════════════════════════════════════════ -->
+  <rect x="40" y="805" width="1520" height="230" rx="8" fill="#0f172a" fill-opacity="0.4" stroke="#334155" stroke-dasharray="4 4"/>
+  <text x="55" y="828" font-size="11" font-weight="700" fill="#94a3b8" letter-spacing="1">DISTRIBUTED DATA &amp; STATE STORAGE TIER</text>
+
+  <!-- Database 1: PostgreSQL 16 Cluster -->
+  <g transform="translate(60, 845)">
+    <rect width="450" height="170" rx="8" fill="url(#pgGrad)" stroke="#3b82f6" stroke-width="1.5" filter="url(#cardShadow)"/>
+    <circle cx="30" cy="30" r="15" fill="#1d4ed8"/>
+    <text x="30" y="35" text-anchor="middle" font-size="12" font-weight="bold" fill="#ffffff">PG</text>
+    <text x="60" y="28" font-size="15" font-weight="800" fill="#ffffff">PostgreSQL 16 Multi-Database Cluster</text>
+    <text x="60" y="44" font-size="11" fill="#93c5fd">ACID Transactions • Row-Level Locks • Port :5432</text>
+    
+    <rect x="20" y="60" width="195" height="26" rx="4" fill="#0f172a" fill-opacity="0.6"/>
+    <text x="30" y="77" font-size="10" fill="#bfdbfe">• hotel_auth_db (Auth Service)</text>
+
+    <rect x="235" y="60" width="195" height="26" rx="4" fill="#0f172a" fill-opacity="0.6"/>
+    <text x="245" y="77" font-size="10" fill="#bfdbfe">• hotel_users_db (Guest Mgmt)</text>
+
+    <rect x="20" y="95" width="195" height="26" rx="4" fill="#0f172a" fill-opacity="0.6"/>
+    <text x="30" y="112" font-size="10" fill="#bfdbfe">• hotel_bookings_db (Booking Go)</text>
+
+    <rect x="235" y="95" width="195" height="26" rx="4" fill="#0f172a" fill-opacity="0.6"/>
+    <text x="245" y="112" font-size="10" fill="#bfdbfe">• hotel_payments_db (Payment)</text>
+
+    <rect x="20" y="130" width="195" height="26" rx="4" fill="#0f172a" fill-opacity="0.6"/>
+    <text x="30" y="147" font-size="10" fill="#bfdbfe">• hotel_operations_db (Employee)</text>
+
+    <rect x="235" y="130" width="195" height="26" rx="4" fill="#0f172a" fill-opacity="0.6"/>
+    <text x="245" y="147" font-size="10" fill="#bfdbfe">• hotel_analytics_db (Analytics)</text>
+  </g>
+
+  <!-- Database 2: MongoDB 7 Replica Set -->
+  <g transform="translate(540, 845)">
+    <rect width="490" height="170" rx="8" fill="url(#mongoGrad)" stroke="#10b981" stroke-width="1.5" filter="url(#cardShadow)"/>
+    <circle cx="30" cy="30" r="15" fill="#047857"/>
+    <text x="30" y="35" text-anchor="middle" font-size="11" font-weight="bold" fill="#ffffff">M</text>
+    <text x="60" y="28" font-size="15" font-weight="800" fill="#ffffff">MongoDB 7 Replica Set (Document Store)</text>
+    <text x="60" y="44" font-size="11" fill="#6ee7b7">Flexible Schemas • Rich JSON Media • Port :27017</text>
+
+    <rect x="20" y="65" width="450" height="28" rx="4" fill="#022c22" fill-opacity="0.8"/>
+    <text x="35" y="83" font-size="11" fill="#a7f3d0">hotel_catalog (Hotel Catalog &amp; Room Specifications)</text>
+
+    <rect x="20" y="100" width="450" height="28" rx="4" fill="#022c22" fill-opacity="0.8"/>
+    <text x="35" y="118" font-size="11" fill="#a7f3d0">hotel_housekeeping (Room Cleaning Statuses &amp; Checklists)</text>
+
+    <rect x="20" y="135" width="450" height="28" rx="4" fill="#022c22" fill-opacity="0.8"/>
+    <text x="35" y="153" font-size="11" fill="#a7f3d0">hotel_reviews (Ratings Breakdown &amp; Verified Guest Feedback)</text>
+  </g>
+
+  <!-- Database 3: Redis 7 In-Memory Cluster -->
+  <g transform="translate(1060, 845)">
+    <rect width="480" height="170" rx="8" fill="url(#redisGrad)" stroke="#ef4444" stroke-width="1.5" filter="url(#cardShadow)"/>
+    <circle cx="30" cy="30" r="15" fill="#b91c1c"/>
+    <text x="30" y="35" text-anchor="middle" font-size="11" font-weight="bold" fill="#ffffff">R</text>
+    <text x="60" y="28" font-size="15" font-weight="800" fill="#ffffff">Redis 7 In-Memory Cluster &amp; Redlock</text>
+    <text x="60" y="44" font-size="11" fill="#fca5a5">Sub-millisecond Latency • Port :6379</text>
+
+    <rect x="20" y="65" width="440" height="28" rx="4" fill="#450a0a" fill-opacity="0.8"/>
+    <text x="35" y="83" font-size="11" fill="#fecaca">Distributed Lock (SET NX EX) -> lock:room:{id}:{dates}</text>
+
+    <rect x="20" y="100" width="440" height="28" rx="4" fill="#450a0a" fill-opacity="0.8"/>
+    <text x="35" y="118" font-size="11" fill="#fecaca">10-Minute Cart Hold (TTL: 600s) -> hold:booking:{id}</text>
+
+    <rect x="20" y="135" width="440" height="28" rx="4" fill="#450a0a" fill-opacity="0.8"/>
+    <text x="35" y="153" font-size="11" fill="#fecaca">Hotel Search Query Cache (TTL: 120s) -> cache:hotels:list</text>
+  </g>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════ -->
+  <!-- INFRASTRUCTURE FOOTER BADGES -->
+  <!-- ══════════════════════════════════════════════════════════════════════════ -->
+  <g transform="translate(60, 1060)">
+    <rect width="270" height="40" rx="6" fill="#1e293b" stroke="#334155"/>
+    <text x="135" y="25" text-anchor="middle" font-size="12" font-weight="bold" fill="#cbd5e1">Containerization: Docker (Alpine OCI)</text>
+  </g>
+  <g transform="translate(360, 1060)">
+    <rect width="320" height="40" rx="6" fill="#1e293b" stroke="#334155"/>
+    <text x="160" y="25" text-anchor="middle" font-size="12" font-weight="bold" fill="#cbd5e1">Orchestration: Kubernetes (HPA / Ingress)</text>
+  </g>
+  <g transform="translate(710, 1060)">
+    <rect width="300" height="40" rx="6" fill="#1e293b" stroke="#334155"/>
+    <text x="150" y="25" text-anchor="middle" font-size="12" font-weight="bold" fill="#cbd5e1">Internal RPC: gRPC (HTTP/2 Proto3)</text>
+  </g>
+  <g transform="translate(1040, 1060)">
+    <rect width="250" height="40" rx="6" fill="#1e293b" stroke="#334155"/>
+    <text x="125" y="25" text-anchor="middle" font-size="12" font-weight="bold" fill="#cbd5e1">Event Bus: RabbitMQ (AMQP)</text>
+  </g>
+  <g transform="translate(1320, 1060)">
+    <rect width="220" height="40" rx="6" fill="#1e293b" stroke="#334155"/>
+    <text x="110" y="25" text-anchor="middle" font-size="12" font-weight="bold" fill="#cbd5e1">CI/CD: GitHub Actions</text>
+  </g>
+</svg>
+
