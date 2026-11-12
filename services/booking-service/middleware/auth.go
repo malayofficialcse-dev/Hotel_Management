@@ -41,17 +41,6 @@ func RequireAuth(authServiceURL string) func(next http.Handler) http.Handler {
 
 			token := strings.TrimPrefix(authHeader, "Bearer ")
 
-			// Fast-path: Check gateway forwarding headers if present
-			if gwUserID := r.Header.Get("x-user-id"); gwUserID != "" {
-				if parsedID, err := uuid.Parse(gwUserID); err == nil {
-					ctx := context.WithValue(r.Context(), UserIDKey, parsedID)
-					ctx = context.WithValue(ctx, UserEmailKey, r.Header.Get("x-user-email"))
-					ctx = context.WithValue(ctx, UserRoleKey, r.Header.Get("x-user-role"))
-					next.ServeHTTP(w, r.WithContext(ctx))
-					return
-				}
-			}
-
 			// Validate with Auth Service
 			req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, authServiceURL+"/internal/auth/validate", strings.NewReader(`{"token":"`+token+`"}`))
 			if err != nil {
@@ -88,6 +77,21 @@ func RequireAuth(authServiceURL string) func(next http.Handler) http.Handler {
 	}
 }
 
+// RequireAdmin validates the token and restricts access to administrator accounts.
+func RequireAdmin(authServiceURL string) func(next http.Handler) http.Handler {
+	requireAuth := RequireAuth(authServiceURL)
+	return func(next http.Handler) http.Handler {
+		return requireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			role, _ := r.Context().Value(UserRoleKey).(string)
+			if role != "ADMIN" {
+				http.Error(w, `{"error":"forbidden","message":"administrator access required"}`, http.StatusForbidden)
+				return
+			}
+			next.ServeHTTP(w, r)
+		}))
+	}
+}
+
 // OptionalAuth attaches user context if token is present and valid, but doesn't block unauthenticated requests.
 func OptionalAuth(authServiceURL string) func(next http.Handler) http.Handler {
 	client := &http.Client{Timeout: 4 * time.Second}
@@ -101,16 +105,6 @@ func OptionalAuth(authServiceURL string) func(next http.Handler) http.Handler {
 			}
 
 			token := strings.TrimPrefix(authHeader, "Bearer ")
-			if gwUserID := r.Header.Get("x-user-id"); gwUserID != "" {
-				if parsedID, err := uuid.Parse(gwUserID); err == nil {
-					ctx := context.WithValue(r.Context(), UserIDKey, parsedID)
-					ctx = context.WithValue(ctx, UserEmailKey, r.Header.Get("x-user-email"))
-					ctx = context.WithValue(ctx, UserRoleKey, r.Header.Get("x-user-role"))
-					next.ServeHTTP(w, r.WithContext(ctx))
-					return
-				}
-			}
-
 			req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, authServiceURL+"/internal/auth/validate", strings.NewReader(`{"token":"`+token+`"}`))
 			if err == nil {
 				req.Header.Set("Content-Type", "application/json")

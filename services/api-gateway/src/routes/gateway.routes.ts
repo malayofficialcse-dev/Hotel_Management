@@ -3,6 +3,7 @@ export const GATEWAY_ROUTES = {
   AUTH: "/api/v1/auth",
   USERS: "/api/v1/users",
   HOTELS: "/api/v1/hotels",
+  OFFERS: "/api/v1/offers",
   ROOMS: "/api/v1/rooms",
   BOOKINGS: "/api/v1/bookings",
   PAYMENTS: "/api/v1/payments",

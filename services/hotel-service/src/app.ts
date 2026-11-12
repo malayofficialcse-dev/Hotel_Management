@@ -2,6 +2,7 @@ import cors from "cors";
 import express from "express";
 import mongoose from "mongoose";
 import { hotelRoutes } from "./routes/hotel.routes.js";
+import { offerRoutes } from "./routes/offer.routes.js";
 
 export function createApp(grpcPort: number) {
   const app = express();
@@ -17,6 +18,7 @@ export function createApp(grpcPort: number) {
     });
   });
   app.use("/api/v1/hotels", hotelRoutes);
+  app.use("/api/v1/offers", offerRoutes);
   app.use("/internal/hotels", hotelRoutes);
   app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     console.error("[Hotel Service] request failed", error);

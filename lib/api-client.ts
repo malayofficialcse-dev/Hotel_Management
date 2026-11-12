@@ -66,6 +66,35 @@ export interface HousekeepingTask {
   priority?: string;
 }
 
+export interface AdminBooking {
+  id: string;
+  booking_code: string;
+  hotel_id: string;
+  hotel_name: string;
+  room_type_id: string;
+  room_type_name: string;
+  check_in_date: string;
+  check_out_date: string;
+  total_price: number;
+  status: string;
+  guest_first_name: string;
+  guest_last_name: string;
+  guest_email: string;
+  created_at: string;
+}
+
+export interface AdminOffer {
+  _id: string;
+  code: string;
+  name: string;
+  description?: string;
+  discountType: "PERCENTAGE" | "FIXED";
+  discountValue: number;
+  startsAt?: string;
+  endsAt?: string;
+  isActive: boolean;
+}
+
 export interface PublicRoom {
   id: string;
   name: string;
@@ -138,6 +167,10 @@ export const api = {
   createHousekeepingTask(data: Record<string, unknown>) { return request<HousekeepingTask>("/housekeeping", { method: "POST", body: JSON.stringify(data) }); },
   updateHousekeepingTask(id: string, data: Record<string, unknown>) { return request<HousekeepingTask>(`/housekeeping/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(data) }); },
   deleteHousekeepingTask(id: string) { return request<void>(`/housekeeping/${encodeURIComponent(id)}`, { method: "DELETE" }); },
+  getAdminReservations() { return request<{ bookings: AdminBooking[]; total: number }>("/bookings/admin"); },
+  getAdminOffers() { return request<AdminOffer[]>("/offers?includeInactive=true"); },
+  createOffer(data: Record<string, unknown>) { return request<AdminOffer>("/offers", { method: "POST", body: JSON.stringify(data) }); },
+  deleteOffer(id: string) { return request<void>(`/offers/${encodeURIComponent(id)}`, { method: "DELETE" }); },
   async getRoomsByHotel(hotelId: string): Promise<PublicRoom[]> {
     const rows = await request<(AdminRoom & { description?: string; amenities?: string[]; roomSize?: string; image?: string })[]>(
       `/rooms/hotel/${encodeURIComponent(hotelId)}`,

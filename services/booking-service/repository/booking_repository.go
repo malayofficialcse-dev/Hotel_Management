@@ -76,6 +76,12 @@ func (r *BookingRepository) GetBookingByCode(ctx context.Context, code string) (
 	return scanBooking(row)
 }
 
+// GetAllBookings returns bookings newest-first for the administrator workspace.
+func (r *BookingRepository) GetAllBookings(ctx context.Context) ([]*models.Booking, error) {
+	const q = `SELECT ` + bookingColumns + ` FROM bookings ORDER BY created_at DESC`
+	return r.queryBookings(ctx, q)
+}
+
 // GetBookingsByUser returns all bookings belonging to a specific user, ordered by creation date.
 func (r *BookingRepository) GetBookingsByUser(ctx context.Context, userID uuid.UUID) ([]*models.Booking, error) {
 	const q = `SELECT ` + bookingColumns + ` FROM bookings WHERE user_id = $1 ORDER BY created_at DESC`
@@ -204,7 +210,7 @@ func (r *BookingRepository) queryBookings(ctx context.Context, q string, args ..
 	}
 	defer rows.Close()
 
-	var bookings []*models.Booking
+	bookings := make([]*models.Booking, 0)
 	for rows.Next() {
 		b := &models.Booking{}
 		if err := rows.Scan(

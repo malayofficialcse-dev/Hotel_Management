@@ -149,6 +149,18 @@ func (c *BookingController) GetBookingByCode(w http.ResponseWriter, r *http.Requ
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "data": booking})
 }
 
+func (c *BookingController) ListAdminBookings(w http.ResponseWriter, r *http.Request) {
+	result, err := c.bookingService.GetAdminBookings(r.Context())
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "message": "Could not load reservations"})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "data": result})
+}
+
 func (c *BookingController) GetBookedRoomCount(w http.ResponseWriter, r *http.Request) {
 	roomTypeID := chi.URLParam(r, "roomTypeId")
 	checkIn := r.URL.Query().Get("checkIn")

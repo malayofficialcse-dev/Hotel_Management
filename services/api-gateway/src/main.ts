@@ -11,6 +11,7 @@ const proxyRoutes = [
   { route: GATEWAY_ROUTES.AUTH, target: env.AUTH_SERVICE_URL },
   { route: GATEWAY_ROUTES.USERS, target: env.USER_SERVICE_URL },
   { route: GATEWAY_ROUTES.HOTELS, target: env.HOTEL_SERVICE_URL },
+  { route: GATEWAY_ROUTES.OFFERS, target: env.HOTEL_SERVICE_URL },
   { route: GATEWAY_ROUTES.ROOMS, target: env.ROOM_SERVICE_URL },
   { route: GATEWAY_ROUTES.BOOKINGS, target: env.BOOKING_SERVICE_URL },
   { route: GATEWAY_ROUTES.PAYMENTS, target: env.PAYMENT_SERVICE_URL },

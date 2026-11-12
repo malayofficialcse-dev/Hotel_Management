@@ -20,11 +20,9 @@ func main() {
 
 	db, err := config.InitDB(cfg.DatabaseURL)
 	if err != nil {
-		log.Printf("⚠️ PostgreSQL warning: %v", err)
+		log.Fatalf("PostgreSQL connection failed: %v", err)
 	}
-	if db != nil {
-		defer db.Close()
-	}
+	defer db.Close()
 
 	rdb, err := config.InitRedis(cfg.RedisURL)
 	if err != nil {

@@ -26,6 +26,7 @@ func SetupRoutes(c *controllers.BookingController, authServiceURL string) *chi.M
 	r.Route("/api/v1/bookings", func(api chi.Router) {
 		// Hold allows guest checkout or logged in user (optional token)
 		api.With(bookingMiddleware.OptionalAuth(authServiceURL)).Post("/hold", c.HoldRoom)
+		api.With(bookingMiddleware.RequireAdmin(authServiceURL)).Get("/admin", c.ListAdminBookings)
 		api.Post("/{id}/confirm", c.ConfirmBooking)
 		api.With(bookingMiddleware.OptionalAuth(authServiceURL)).Post("/{id}/cancel", c.CancelBooking)
 		api.Get("/{id}", c.GetBookingByID)
