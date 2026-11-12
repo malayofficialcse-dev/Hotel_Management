@@ -8,6 +8,7 @@ export type AdminSection =
   | "customers"
   | "departments"
   | "employees"
+  | "housekeeping"
   | "roles"
   | "payments"
   | "offers"
@@ -34,6 +35,7 @@ export const adminNavigation: { id: AdminSection; label: string; group?: string 
   { id: "customers", label: "Customers" },
   { id: "departments", label: "Departments" },
   { id: "employees", label: "Employees" },
+  { id: "housekeeping", label: "Housekeeping" },
   { id: "roles", label: "Roles & Permissions (RBAC)" },
   { id: "payments", label: "Payments" },
   { id: "offers", label: "Offers" },
@@ -52,6 +54,7 @@ export const sectionTitles: Record<AdminSection, { title: string; subtitle: stri
   customers: { title: "Customers", subtitle: "Know the people behind every stay.", action: "Add customer" },
   departments: { title: "Departments", subtitle: "Great stays start with great teams.", action: "Add department" },
   employees: { title: "Employees", subtitle: "Your people, in the right places.", action: "Add employee" },
+  housekeeping: { title: "Housekeeping", subtitle: "Keep every room clean, ready, and accounted for.", action: "Create task" },
   roles: { title: "Roles & permissions", subtitle: "Set clear access for every team member.", action: "Create role" },
   payments: { title: "Payments", subtitle: "Track transactions, payouts, and refunds.", action: "Export payments" },
   offers: { title: "Offers", subtitle: "Thoughtful offers for memorable stays.", action: "Create offer" },
@@ -110,6 +113,7 @@ export const sectionRecords: Partial<Record<AdminSection, AdminRecord[]>> = {
     ["EM-2059", "Neil Fernandes", "Finance · Portfolio", "Active", "Finance manager", "Nov 06, 2026"],
     ["EM-2042", "Aditi Sharma", "Guest services · Lakehouse", "Active", "Guest experience", "Nov 05, 2026"],
   ].map(([id, name, detail, status, value, date]) => ({ id, name, detail, status, value, date })),
+  housekeeping: [],
   roles: [
     ["RL-01", "Administrator", "Full workspace access", "Active", "4 members", "Nov 08, 2026"],
     ["RL-02", "Property manager", "Assigned property access", "Active", "12 members", "Nov 08, 2026"],
@@ -200,6 +204,12 @@ export const statCards: Record<AdminSection, { label: string; value: string; not
     { label: "Active today", value: "118", note: "On shift across 6 stays" },
     { label: "On leave", value: "08", note: "Across 4 departments" },
     { label: "Open positions", value: "06", note: "3 applications received" },
+  ],
+  housekeeping: [
+    { label: "Open tasks", value: "—", note: "Across all properties" },
+    { label: "In progress", value: "—", note: "Currently being serviced" },
+    { label: "Ready for inspection", value: "—", note: "Clean rooms awaiting review" },
+    { label: "Completed today", value: "—", note: "All properties" },
   ],
   roles: [
     { label: "Roles", value: "08", note: "4 system · 4 custom" },

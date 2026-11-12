@@ -1,34 +1,59 @@
-import { Controller, Get, Post, Body, Param, Query } from "@nestjs/common";
+import type { Request, Response } from "express";
 import { HotelService } from "../services/hotel.service.js";
 
-@Controller("api/v1/hotels")
-export class HotelController {
-  constructor(private readonly hotelService: HotelService) {}
+const service = new HotelService();
 
-  @Get("health")
-  healthCheck() {
-    return { status: "UP", service: "hotel-service", engine: "NestJS + MongoDB (Mongoose)", port: 8003 };
-  }
-
-  @Get()
-  async getHotels(
-    @Query("city") city?: string,
-    @Query("category") category?: string,
-    @Query("search") search?: string,
-    @Query("minPrice") minPrice?: number,
-    @Query("maxPrice") maxPrice?: number,
-  ) {
-    return this.hotelService.getHotels({ city, category, search, minPrice, maxPrice });
-  }
-
-  @Get(":slug")
-  async getHotelBySlug(@Param("slug") slug: string) {
-    return this.hotelService.getHotelBySlug(slug);
-  }
-
-  @Post()
-  async createHotel(@Body() body: any) {
-    return this.hotelService.createHotel(body);
-  }
+function optionalNumber(value: unknown, name: string) {
+  if (value === undefined) return undefined;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) throw new Error(`${name} must be a number`);
+  return parsed;
 }
 
+export class HotelController {
+  async list(req: Request, res: Response) {
+    try {
+      const data = await service.list({
+        city: typeof req.query.city === "string" ? req.query.city : undefined,
+        category: typeof req.query.category === "string" ? req.query.category : undefined,
+        search: typeof req.query.search === "string" ? req.query.search : undefined,
+        minPrice: optionalNumber(req.query.minPrice, "minPrice"),
+        maxPrice: optionalNumber(req.query.maxPrice, "maxPrice"),
+        includeInactive: req.query.includeInactive === "true",
+      });
+      return res.json(data);
+    } catch (error) {
+      return res.status(400).json({ message: error instanceof Error ? error.message : "Invalid filters" });
+    }
+  }
+
+  async get(req: Request, res: Response) {
+    const hotel = await service.get(req.params.identifier);
+    if (!hotel) return res.status(404).json({ message: "Hotel not found" });
+    return res.json(hotel);
+  }
+
+  async create(req: Request, res: Response) {
+    try {
+      return res.status(201).json(await service.create(req.body));
+    } catch (error) {
+      return res.status(400).json({ message: error instanceof Error ? error.message : "Invalid hotel" });
+    }
+  }
+
+  async update(req: Request, res: Response) {
+    try {
+      const hotel = await service.update(req.params.identifier, req.body);
+      if (!hotel) return res.status(404).json({ message: "Hotel not found" });
+      return res.json(hotel);
+    } catch (error) {
+      return res.status(400).json({ message: error instanceof Error ? error.message : "Invalid hotel" });
+    }
+  }
+
+  async delete(req: Request, res: Response) {
+    const hotel = await service.delete(req.params.identifier);
+    if (!hotel) return res.status(404).json({ message: "Hotel not found" });
+    return res.status(204).end();
+  }
+}

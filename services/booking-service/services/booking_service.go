@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"math/rand"
 	"net/http"
 	"time"
@@ -28,9 +29,10 @@ var (
 	ErrNotAuthorized   = errors.New("not authorised to perform this action")
 )
 
-// inventoryResponse is the payload returned by the Hotel Service inventory endpoint.
+// inventoryResponse is the payload returned by the Room Service inventory endpoint.
 type inventoryResponse struct {
-	Inventory int `json:"inventory"`
+	Inventory     int     `json:"inventory"`
+	PricePerNight float64 `json:"pricePerNight"`
 }
 
 // BookingService contains all booking domain logic.
@@ -112,7 +114,7 @@ func (s *BookingService) HoldRoom(ctx context.Context, req *models.HoldBookingRe
 	}
 
 	// 2b — inventory from Hotel Service.
-	inventory, err := s.fetchInventory(ctx, req.RoomTypeID)
+	inventory, pricePerNight, err := s.fetchInventory(ctx, req.RoomTypeID)
 	if err != nil {
 		return nil, fmt.Errorf("inventory check: %w", err)
 	}
@@ -126,6 +128,7 @@ func (s *BookingService) HoldRoom(ctx context.Context, req *models.HoldBookingRe
 	// 2d — build & insert booking.
 	now := time.Now().UTC()
 	nights := int(checkOut.Sub(checkIn).Hours() / 24)
+	taxesAndFees := math.Round(pricePerNight*float64(nights)*float64(req.RoomCount)*0.12*100) / 100
 	booking := &models.Booking{
 		ID:                uuid.New(),
 		BookingCode:       generateBookingCode(),
@@ -139,9 +142,9 @@ func (s *BookingService) HoldRoom(ctx context.Context, req *models.HoldBookingRe
 		TotalNights:       nights,
 		GuestsCount:       req.GuestsCount,
 		RoomCount:         req.RoomCount,
-		RoomPricePerNight: req.RoomPricePerNight,
-		TaxesAndFees:      req.TaxesAndFees,
-		TotalPrice:        (req.RoomPricePerNight*float64(nights)*float64(req.RoomCount) + req.TaxesAndFees),
+		RoomPricePerNight: pricePerNight,
+		TaxesAndFees:      taxesAndFees,
+		TotalPrice:        (pricePerNight*float64(nights)*float64(req.RoomCount) + taxesAndFees),
 		Status:            models.StatusPendingPayment,
 		GuestFirstName:    req.GuestFirstName,
 		GuestLastName:     req.GuestLastName,
@@ -348,31 +351,31 @@ func (s *BookingService) GetOverlappingCount(ctx context.Context, roomTypeID, ch
 // helpers
 // --------------------------------------------------------------------------
 
-// fetchInventory calls the Hotel Service to retrieve the total room inventory.
-func (s *BookingService) fetchInventory(ctx context.Context, roomTypeID string) (int, error) {
+// fetchInventory gets room inventory and its authoritative nightly price.
+func (s *BookingService) fetchInventory(ctx context.Context, roomTypeID string) (int, float64, error) {
 	url := fmt.Sprintf("%s/internal/rooms/%s/inventory", s.hotelServiceURL, roomTypeID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return 0, fmt.Errorf("build inventory request: %w", err)
+		return 0, 0, fmt.Errorf("build inventory request: %w", err)
 	}
 
 	client := &http.Client{Timeout: 5 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		return 0, fmt.Errorf("call hotel service: %w", err)
+		return 0, 0, fmt.Errorf("call hotel service: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return 0, fmt.Errorf("hotel service returned %d: %s", resp.StatusCode, body)
+		return 0, 0, fmt.Errorf("hotel service returned %d: %s", resp.StatusCode, body)
 	}
 
 	var inv inventoryResponse
 	if err := json.NewDecoder(resp.Body).Decode(&inv); err != nil {
-		return 0, fmt.Errorf("decode inventory response: %w", err)
+		return 0, 0, fmt.Errorf("decode inventory response: %w", err)
 	}
-	return inv.Inventory, nil
+	return inv.Inventory, inv.PricePerNight, nil
 }
 
 // generateBookingCode returns "SE-" followed by 6 random chars from bookingCodeChars.

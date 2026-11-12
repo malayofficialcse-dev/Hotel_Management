@@ -1,76 +1,92 @@
-import { Injectable, OnModuleInit } from "@nestjs/common";
-import { RoomRepository } from "../repository/room.repository.js";
-import { SEED_ROOMS } from "../utils/seed_rooms.js";
-import { env } from "../config/env.js";
-import axios from "axios";
+import { getBookedRoomCount } from "./booking-client.service.js";
+import { requireHotel } from "./hotel-client.service.js";
+import { RoomRepository } from "../repositories/room.repository.js";
 
-@Injectable()
-export class RoomService implements OnModuleInit {
-  constructor(private readonly repo: RoomRepository) {}
+const repository = new RoomRepository();
+const editableFields = [
+  "hotelId",
+  "name",
+  "description",
+  "price",
+  "capacity",
+  "totalInventory",
+  "amenities",
+  "bedType",
+  "roomSize",
+  "image",
+  "isActive",
+];
 
-  async onModuleInit() {
-    try {
-      const count = await this.repo.count();
-      if (count === 0) {
-        console.log("🌱 [Room Service] Seeding initial room types into MongoDB...");
-        for (const room of SEED_ROOMS) {
-          await this.repo.create(room);
-        }
-        console.log("✅ Seed completed.");
-      }
-    } catch (e: any) {
-      console.warn("⚠️ Room MongoDB seed notice:", e.message);
+export interface Availability {
+  roomTypeId: string;
+  checkIn: string;
+  checkOut: string;
+  totalInventory: number;
+  currentlyBooked: number;
+  availableInventory: number;
+  isAvailable: boolean;
+  pricePerNight: number;
+}
+
+export class RoomService {
+  list(hotelId?: string, includeInactive = false) {
+    return repository.list(hotelId, includeInactive);
+  }
+
+  get(id: string) {
+    return repository.findById(id);
+  }
+
+  async create(body: Record<string, unknown>) {
+    const data = this.pickFields(body);
+    for (const field of ["hotelId", "name", "price", "capacity", "totalInventory"]) {
+      if (data[field] === undefined || data[field] === "") throw new Error(`${field} is required`);
     }
+    await requireHotel(String(data.hotelId));
+    return repository.create(data);
   }
 
-  async getRoomsByHotel(hotelId: string) {
-    try {
-      const rooms = await this.repo.findByHotel(hotelId);
-      if (rooms.length > 0) return rooms;
-    } catch {}
-    return SEED_ROOMS.filter((r) => r.hotelId === hotelId);
+  async update(id: string, body: Record<string, unknown>) {
+    const data = this.pickFields(body);
+    if (Object.keys(data).length === 0) throw new Error("at least one supported field is required");
+    if (typeof data.hotelId === "string") await requireHotel(data.hotelId);
+    return repository.update(id, data);
   }
 
-  async getRoomById(id: string) {
-    try {
-      const room = await this.repo.findById(id);
-      if (room) return room;
-    } catch {}
-    return SEED_ROOMS[0];
+  delete(id: string) {
+    return repository.delete(id);
   }
 
-  async checkAvailability(roomTypeId: string, checkIn: string, checkOut: string, count: number = 1) {
-    const room = await this.getRoomById(roomTypeId);
-    let bookedCount = 0;
+  async availability(id: string, checkIn: string, checkOut: string, count: number): Promise<Availability | null> {
+    if (!Number.isInteger(count) || count < 1) throw new Error("count must be a positive integer");
+    const room = await repository.findById(id);
+    if (!room || !room.isActive) return null;
 
-    try {
-      // Connect to Go Booking Engine
-      const res = await axios.get(
-        `${env.BOOKING_SERVICE_URL}/internal/rooms/${roomTypeId}/booked-count?checkIn=${checkIn}&checkOut=${checkOut}`,
-        { timeout: 3000 }
-      );
-      if (res.data?.success) {
-        bookedCount = res.data.count || 0;
+    let currentlyBooked = 0;
+    if (checkIn || checkOut) {
+      const start = new Date(`${checkIn}T00:00:00.000Z`);
+      const end = new Date(`${checkOut}T00:00:00.000Z`);
+      if (!checkIn || !checkOut || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
+        throw new Error("checkIn and checkOut must be valid dates and checkOut must be after checkIn");
       }
-    } catch {
-      // Fallback
+      currentlyBooked = await getBookedRoomCount(id, checkIn, checkOut);
     }
 
-    const available = Math.max(0, room.totalInventory - bookedCount);
+    const totalInventory = room.totalInventory;
+    const availableInventory = Math.max(0, totalInventory - currentlyBooked);
     return {
-      roomTypeId,
+      roomTypeId: id,
       checkIn,
       checkOut,
-      totalInventory: room.totalInventory,
-      currentlyBooked: bookedCount,
-      availableInventory: available,
-      isAvailable: available >= count,
+      totalInventory,
+      currentlyBooked,
+      availableInventory,
+      isAvailable: availableInventory >= count,
       pricePerNight: room.price,
     };
   }
 
-  async createRoom(data: any) {
-    return this.repo.create(data);
+  private pickFields(body: Record<string, unknown>) {
+    return Object.fromEntries(editableFields.filter((field) => body[field] !== undefined).map((field) => [field, body[field]]));
   }
 }
-

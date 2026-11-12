@@ -1,279 +1,210 @@
-import { hotels as mockHotels, Hotel } from "./data";
+import { hotels as fallbackHotels, Hotel } from "./data";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1").replace(/\/$/, "");
 
 export interface HoldRoomPayload {
-  hotelId: string;
-  roomTypeId: string;
-  userId?: string;
-  checkInDate: string; // YYYY-MM-DD
-  checkOutDate: string; // YYYY-MM-DD
-  guestsCount: number;
-  roomCount: number;
-  guestFirstName: string;
-  guestLastName: string;
-  guestEmail: string;
-  guestPhone: string;
-  specialRequests?: string;
+  hotelId: string; hotelName: string; roomTypeId: string; roomTypeName: string;
+  checkInDate: string; checkOutDate: string; guestsCount: number; roomCount: number;
+  guestFirstName: string; guestLastName: string;
+  guestEmail: string; guestPhone: string; specialRequests?: string;
+}
+export interface HoldRoomResponse { bookingId: string; bookingCode: string; expiresAt: string; holdSeconds: number; totalPrice: number; }
+
+export interface AdminHotel {
+  _id: string;
+  slug: string;
+  name: string;
+  city: string;
+  location: string;
+  mainImage?: string;
+  basePrice: number;
+  rating: number;
+  reviewsCount: number;
+  tag?: string;
+  offer?: string;
+  category: string;
+  amenities?: string[];
+  isActive: boolean;
 }
 
-export interface HoldRoomResponse {
-  bookingId: string;
-  bookingCode: string;
-  expiresAt: string;
-  holdSeconds: number;
-  totalPrice: number;
+export interface AdminRoom {
+  _id: string;
+  hotelId: string;
+  name: string;
+  price: number;
+  capacity: number;
+  totalInventory: number;
+  bedType?: string;
+  isActive: boolean;
+}
+
+export interface AdminDepartment {
+  _id: string;
+  hotelId: string;
+  name: string;
+  description?: string;
+  isActive: boolean;
+}
+
+export interface AdminEmployee {
+  id: string;
+  departmentId: string;
+  name: string;
+  email: string;
+  position: string;
+  isActive: boolean;
+  department?: { id?: string; _id?: string; name: string } | null;
+}
+
+export interface HousekeepingTask {
+  _id: string;
+  hotelId: string;
+  roomNumber: string;
+  status: string;
+  assignedTo?: string;
+  taskType?: string;
+  priority?: string;
+}
+
+export interface PublicRoom {
+  id: string;
+  name: string;
+  beds: string;
+  detail: string;
+  inclusions: string;
+  price: number;
+  image: string;
+  capacity: number;
+  totalInventory: number;
+}
+
+function getToken() { return typeof window === "undefined" ? undefined : window.localStorage.getItem("stayease-token") || undefined; }
+
+function toPublicHotel(hotel: AdminHotel): Hotel {
+  const categories: Hotel["category"][] = [
+    "Boutique hotels",
+    "Beach resorts",
+    "Heritage stays",
+    "City hotels",
+    "Villas & retreats",
+  ];
+  return {
+    id: hotel.slug || hotel._id,
+    name: hotel.name,
+    city: hotel.city,
+    location: hotel.location,
+    image: hotel.mainImage || "",
+    price: hotel.basePrice,
+    rating: String(hotel.rating),
+    reviews: hotel.reviewsCount,
+    tag: hotel.tag || "",
+    features: hotel.amenities || [],
+    offer: hotel.offer || "",
+    category: categories.includes(hotel.category as Hotel["category"])
+      ? (hotel.category as Hotel["category"])
+      : "Boutique hotels",
+  };
+}
+
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const headers = new Headers(init.headers); headers.set("Accept", "application/json");
+  if (init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  const accessToken = getToken(); if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
+  const response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers, cache: "no-store" });
+  const body = (await response.json().catch(() => ({}))) as { data?: T; message?: string } & T;
+  if (!response.ok) throw new Error(body.message || `Request failed (${response.status})`);
+  return (body.data === undefined ? body : body.data) as T;
 }
 
 export const api = {
-  // -------------------------------------------------------------
-  // 1. Authentication Service (NestJS :8001 via Gateway)
-  // -------------------------------------------------------------
-  async register(data: { email: string; password: string; name: string; phone?: string }) {
+  async register(data: { email: string; password: string; name: string; phone?: string }) { const result = await request<{ user: unknown; token: string }>("/auth/register", { method: "POST", body: JSON.stringify(data) }); if (typeof window !== "undefined" && result.token) window.localStorage.setItem("stayease-token", result.token); return result; },
+  async login(data: { email: string; password: string }) { const result = await request<{ user: unknown; token: string }>("/auth/login", { method: "POST", body: JSON.stringify(data) }); if (typeof window !== "undefined" && result.token) window.localStorage.setItem("stayease-token", result.token); return result; },
+  logout() { if (typeof window !== "undefined") window.localStorage.removeItem("stayease-token"); },
+  async getHotels(filters?: { city?: string; category?: string; search?: string; minPrice?: number; maxPrice?: number }): Promise<Hotel[]> { try { const params = new URLSearchParams(); Object.entries(filters || {}).forEach(([key, value]) => { if (value && value !== "All" && value !== "All Stays") params.set(key, String(value)); }); const rows = await request<AdminHotel[]>(`/hotels?${params}`); return rows.map(toPublicHotel); } catch { return fallbackHotels; } },
+  async getHotel(identifier: string): Promise<Hotel | undefined> { try { return toPublicHotel(await request<AdminHotel>(`/hotels/${encodeURIComponent(identifier)}`)); } catch { return fallbackHotels.find((hotel) => hotel.id === identifier); } },
+  getAdminHotels() { return request<AdminHotel[]>("/hotels?includeInactive=true"); },
+  createHotel(data: Record<string, unknown>) { return request<AdminHotel>("/hotels", { method: "POST", body: JSON.stringify(data) }); },
+  deleteHotel(id: string) { return request<void>(`/hotels/${encodeURIComponent(id)}`, { method: "DELETE" }); },
+  getAdminRooms() { return request<AdminRoom[]>("/rooms?includeInactive=true"); },
+  createRoom(data: Record<string, unknown>) { return request<AdminRoom>("/rooms", { method: "POST", body: JSON.stringify(data) }); },
+  deleteRoom(id: string) { return request<void>(`/rooms/${encodeURIComponent(id)}`, { method: "DELETE" }); },
+  getAdminDepartments() { return request<AdminDepartment[]>("/departments"); },
+  createDepartment(data: Record<string, unknown>) { return request<AdminDepartment>("/departments", { method: "POST", body: JSON.stringify(data) }); },
+  deleteDepartment(id: string) { return request<void>(`/departments/${encodeURIComponent(id)}`, { method: "DELETE" }); },
+  getAdminEmployees() { return request<AdminEmployee[]>("/employees"); },
+  createEmployee(data: Record<string, unknown>) { return request<AdminEmployee>("/employees", { method: "POST", body: JSON.stringify(data) }); },
+  deleteEmployee(id: string) { return request<void>(`/employees/${encodeURIComponent(id)}`, { method: "DELETE" }); },
+  getAdminHousekeepingTasks() { return request<HousekeepingTask[]>("/housekeeping"); },
+  createHousekeepingTask(data: Record<string, unknown>) { return request<HousekeepingTask>("/housekeeping", { method: "POST", body: JSON.stringify(data) }); },
+  updateHousekeepingTask(id: string, data: Record<string, unknown>) { return request<HousekeepingTask>(`/housekeeping/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(data) }); },
+  deleteHousekeepingTask(id: string) { return request<void>(`/housekeeping/${encodeURIComponent(id)}`, { method: "DELETE" }); },
+  async getRoomsByHotel(hotelId: string): Promise<PublicRoom[]> {
+    const rows = await request<(AdminRoom & { description?: string; amenities?: string[]; roomSize?: string; image?: string })[]>(
+      `/rooms/hotel/${encodeURIComponent(hotelId)}`,
+    );
+    return rows.map((room) => ({
+      id: room._id,
+      name: room.name,
+      beds: `${room.bedType || "Room"} · ${room.capacity} guests${room.roomSize ? ` · ${room.roomSize}` : ""}`,
+      detail: room.description || "",
+      inclusions: room.amenities?.join(" · ") || "",
+      price: room.price,
+      image: room.image || "",
+      capacity: room.capacity,
+      totalInventory: room.totalInventory,
+    }));
+  },
+  checkRoomAvailability(roomId: string, checkIn: string, checkOut: string, count = 1) { const params = new URLSearchParams({ checkIn, checkOut, count: String(count) }); return request<{ isAvailable: boolean; availableInventory: number }>(`/rooms/${encodeURIComponent(roomId)}/availability?${params}`); },
+  async holdRoom(payload: HoldRoomPayload) {
     try {
-      const res = await fetch(`${API_BASE_URL}/auth/register`, {
+      const result = await request<{
+        booking: { id: string; booking_code: string; expires_at: string; total_price: number };
+        expires_in_seconds: number;
+      }>("/bookings/hold", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          hotel_id: payload.hotelId,
+          hotel_name: payload.hotelName,
+          room_type_id: payload.roomTypeId,
+          room_type_name: payload.roomTypeName,
+          check_in_date: payload.checkInDate,
+          check_out_date: payload.checkOutDate,
+          guests_count: payload.guestsCount,
+          room_count: payload.roomCount,
+          guest_first_name: payload.guestFirstName,
+          guest_last_name: payload.guestLastName,
+          guest_email: payload.guestEmail,
+          guest_phone: payload.guestPhone,
+          special_requests: payload.specialRequests,
+        }),
       });
-      return await res.json();
-    } catch {
-      return { success: true, user: { email: data.email, name: data.name, role: "CUSTOMER" }, token: "sim-token" };
-    }
-  },
-
-  async login(data: { email: string; password: string }) {
-    try {
-      const res = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      return await res.json();
-    } catch {
-      return { success: true, user: { email: data.email, name: "Guest User", role: "CUSTOMER" }, token: "sim-token" };
-    }
-  },
-
-  // -------------------------------------------------------------
-  // 2. Hotel Catalog Service (NestJS + MongoDB :8003 via Gateway)
-  // -------------------------------------------------------------
-  async getHotels(filters?: { city?: string; category?: string; search?: string }): Promise<Hotel[]> {
-    try {
-      const params = new URLSearchParams();
-      if (filters?.city && filters.city !== "All") params.append("city", filters.city);
-      if (filters?.category && filters.category !== "All Stays") params.append("category", filters.category);
-      if (filters?.search) params.append("search", filters.search);
-
-      const res = await fetch(`${API_BASE_URL}/hotels?${params.toString()}`, { cache: "no-store" });
-      if (!res.ok) throw new Error("Failed to fetch hotels from API Gateway");
-      const json = await res.json();
-      return json.data || mockHotels;
-    } catch {
-      let results = [...mockHotels];
-      if (filters?.category && filters.category !== "All Stays") {
-        results = results.filter((h) => h.category === filters.category);
-      }
-      if (filters?.city && filters.city !== "All") {
-        results = results.filter((h) => h.city.toLowerCase() === filters.city?.toLowerCase());
-      }
-      return results;
-    }
-  },
-
-  async getHotel(identifier: string): Promise<Hotel | undefined> {
-    try {
-      const res = await fetch(`${API_BASE_URL}/hotels/${identifier}`, { cache: "no-store" });
-      if (!res.ok) throw new Error("Hotel not found");
-      const json = await res.json();
-      return json.data;
-    } catch {
-      return mockHotels.find((h) => h.id === identifier);
-    }
-  },
-
-  // -------------------------------------------------------------
-  // 3. Room Management Service (NestJS + MongoDB :8004 via Gateway)
-  // -------------------------------------------------------------
-  async getRoomsByHotel(hotelId: string): Promise<any[]> {
-    try {
-      const res = await fetch(`${API_BASE_URL}/rooms/hotel/${hotelId}`);
-      if (!res.ok) throw new Error("Failed to load rooms");
-      const json = await res.json();
-      return json;
-    } catch {
-      return [];
-    }
-  },
-
-  async checkRoomAvailability(roomId: string, checkIn: string, checkOut: string, count: number = 1) {
-    try {
-      const res = await fetch(`${API_BASE_URL}/rooms/${roomId}/availability?checkIn=${checkIn}&checkOut=${checkOut}&count=${count}`);
-      return await res.json();
-    } catch {
-      return { isAvailable: true, availableInventory: 4 };
-    }
-  },
-
-  // -------------------------------------------------------------
-  // 4. Booking Engine Service (Go + Redis Concurrency :8005 via Gateway)
-  // -------------------------------------------------------------
-  async holdRoom(payload: HoldRoomPayload): Promise<{ success: boolean; data?: HoldRoomResponse; message?: string }> {
-    try {
-      const res = await fetch(`${API_BASE_URL}/bookings/hold`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (!res.ok) return { success: false, message: data.message || "Failed to hold room" };
-      return { success: true, data: data.data };
-    } catch {
-      const bookingCode = "SE-" + Math.random().toString(36).substring(2, 8).toUpperCase();
-      const expiresAt = new Date(Date.now() + 600 * 1000).toISOString();
       return {
-        success: true,
+        success: true as const,
         data: {
-          bookingId: "sim-" + Date.now(),
-          bookingCode,
-          expiresAt,
-          holdSeconds: 600,
-          totalPrice: 8960,
+          bookingId: result.booking.id,
+          bookingCode: result.booking.booking_code,
+          expiresAt: result.booking.expires_at,
+          holdSeconds: result.expires_in_seconds,
+          totalPrice: result.booking.total_price,
         },
       };
+    } catch (error) {
+      return { success: false as const, message: error instanceof Error ? error.message : "Booking request failed" };
     }
   },
-
-  async confirmBooking(bookingId: string): Promise<boolean> {
-    try {
-      const res = await fetch(`${API_BASE_URL}/bookings/${bookingId}/confirm`, { method: "POST" });
-      return res.ok;
-    } catch {
-      return true;
-    }
-  },
-
-  async getBookingByCode(code: string): Promise<any> {
-    try {
-      const res = await fetch(`${API_BASE_URL}/bookings/code/${code}`);
-      if (!res.ok) throw new Error("Booking not found");
-      const json = await res.json();
-      return json.data;
-    } catch {
-      return null;
-    }
-  },
-
-  // -------------------------------------------------------------
-  // 5. Payment Service (NestJS + PostgreSQL :8006 via Gateway)
-  // -------------------------------------------------------------
-  async createPaymentIntent(bookingId: string, bookingCode: string, amount: number) {
-    try {
-      const res = await fetch(`${API_BASE_URL}/payments/intent`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookingId, bookingCode, amount }),
-      });
-      return await res.json();
-    } catch {
-      return { success: true, clientSecret: `pi_mock_${Date.now()}` };
-    }
-  },
-
-  async confirmPaymentIntent(paymentId: string) {
-    try {
-      const res = await fetch(`${API_BASE_URL}/payments/confirm`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paymentId }),
-      });
-      return await res.json();
-    } catch {
-      return { success: true, message: "Payment confirmed" };
-    }
-  },
-
-  // -------------------------------------------------------------
-  // 6. User / Guest Service (NestJS + PostgreSQL :8002 via Gateway)
-  // -------------------------------------------------------------
-  async getUserProfile(userId: string = "default-guest") {
-    try {
-      const res = await fetch(`${API_BASE_URL}/users/me`, {
-        headers: { "x-user-id": userId },
-      });
-      return await res.json();
-    } catch {
-      return { id: userId, name: "Guest User", email: "guest@stayease.internal" };
-    }
-  },
-
-  async getWishlist(userId: string = "default-guest") {
-    try {
-      const res = await fetch(`${API_BASE_URL}/users/me/wishlist`, {
-        headers: { "x-user-id": userId },
-      });
-      return await res.json();
-    } catch {
-      return [];
-    }
-  },
-
-  // -------------------------------------------------------------
-  // 7. Housekeeping Service (NestJS + MongoDB :8008 via Gateway)
-  // -------------------------------------------------------------
-  async getHousekeepingTasks(hotelId: string = "palm-house") {
-    try {
-      const res = await fetch(`${API_BASE_URL}/housekeeping/hotel/${hotelId}`);
-      return await res.json();
-    } catch {
-      return [];
-    }
-  },
-
-  // -------------------------------------------------------------
-  // 8. Guest Reviews Service (NestJS + MongoDB :8009 via Gateway)
-  // -------------------------------------------------------------
-  async getHotelReviews(hotelId: string): Promise<any[]> {
-    try {
-      const res = await fetch(`${API_BASE_URL}/reviews/hotel/${hotelId}`);
-      if (!res.ok) throw new Error("Failed to load reviews");
-      const json = await res.json();
-      return json;
-    } catch {
-      return [];
-    }
-  },
-
-  // -------------------------------------------------------------
-  // 9. Employee & Operations Service (NestJS + PostgreSQL :8007 via Gateway)
-  // -------------------------------------------------------------
-  async getEmployees(departmentId?: string) {
-    try {
-      const url = departmentId
-        ? `${API_BASE_URL}/employees?departmentId=${departmentId}`
-        : `${API_BASE_URL}/employees`;
-      const res = await fetch(url);
-      return await res.json();
-    } catch {
-      return [];
-    }
-  },
-
-  // -------------------------------------------------------------
-  // 10. Analytics Service (Go :8011 via Gateway)
-  // -------------------------------------------------------------
-  async getAnalyticsOverview() {
-    try {
-      const res = await fetch(`${API_BASE_URL}/analytics/overview`);
-      const json = await res.json();
-      return json.data;
-    } catch {
-      return {
-        totalBookings: 1428,
-        totalRevenue: 9854200.0,
-        activeGuests: 312,
-        occupancyRate: 84.6,
-      };
-    }
-  },
+  confirmBooking(bookingId: string) { return request<{ success: boolean }>(`/bookings/${bookingId}/confirm`, { method: "POST" }).then(() => true).catch(() => false); },
+  getBookingByCode(code: string) { return request<any>(`/bookings/code/${encodeURIComponent(code)}`); },
+  createPaymentIntent(bookingId: string, bookingCode: string, amount: number) { return request<any>("/payments/intent", { method: "POST", body: JSON.stringify({ bookingId, bookingCode, amount }) }); },
+  confirmPaymentIntent(paymentId: string) { return request<any>("/payments/confirm", { method: "POST", body: JSON.stringify({ paymentId }) }); },
+  getUserProfile(userId = "default-guest") { return request<any>("/users/me", { headers: { "x-user-id": userId } }); },
+  updateUserProfile(data: Record<string, unknown>, userId = "default-guest") { return request<any>("/users/me", { method: "PATCH", headers: { "x-user-id": userId }, body: JSON.stringify(data) }); },
+  getWishlist(userId = "default-guest") { return request<any[]>("/users/me/wishlist", { headers: { "x-user-id": userId } }); },
+  addWishlist(hotelId: string, userId = "default-guest") { return request<any>("/users/me/wishlist", { method: "POST", headers: { "x-user-id": userId }, body: JSON.stringify({ hotelId }) }); },
+  removeWishlist(hotelId: string, userId = "default-guest") { return request<any>(`/users/me/wishlist/${encodeURIComponent(hotelId)}`, { method: "DELETE", headers: { "x-user-id": userId } }); },
+  getHousekeepingTasks(hotelId: string) { return request<any[]>(`/housekeeping/hotel/${hotelId}`); },
+  getHotelReviews(hotelId: string) { return request<any[]>(`/reviews/hotel/${hotelId}`); },
+  createReview(data: Record<string, unknown>) { return request<any>("/reviews", { method: "POST", body: JSON.stringify(data) }); },
+  getEmployees(departmentId?: string) { return request<any[]>(`/employees${departmentId ? `?departmentId=${encodeURIComponent(departmentId)}` : ""}`); },
+  getDepartments() { return request<any[]>("/departments"); },
+  getAnalyticsOverview() { return request<any>("/analytics/overview"); },
 };

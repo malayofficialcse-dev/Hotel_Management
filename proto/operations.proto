@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package stayease.internal;
+
+service HotelCatalog { rpc GetHotel (HotelRequest) returns (HotelReply); }
+service RoomInventory { rpc CheckAvailability (AvailabilityRequest) returns (AvailabilityReply); }
+service Housekeeping { rpc GetTasks (HotelRequest) returns (TaskListReply); }
+service EmployeeDirectory {
+  rpc ListEmployees (DepartmentRequest) returns (EmployeeListReply);
+  rpc GetEmployee (EmployeeRequest) returns (EmployeeListReply);
+}
+service DepartmentDirectory {
+  rpc ListDepartments (HotelRequest) returns (DepartmentListReply);
+  rpc GetDepartment (DepartmentRequest) returns (DepartmentListReply);
+}
+
+message HotelRequest { string hotel_id = 1; }
+message DepartmentRequest { string department_id = 1; }
+message EmployeeRequest { string employee_id = 1; }
+message AvailabilityRequest { string room_type_id = 1; string check_in = 2; string check_out = 3; int32 count = 4; }
+message HotelReply { string json = 1; }
+message AvailabilityReply { bool is_available = 1; int32 available_inventory = 2; string json = 3; }
+message TaskListReply { string json = 1; }
+message EmployeeListReply { string json = 1; }
+message DepartmentListReply { string json = 1; }

@@ -1,4 +1,6 @@
-import Link from "next/link";
+"use client";
+
+import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { BookingStepper } from "@/components/booking-stepper";
 import { BookingSummary } from "@/components/booking-summary";
@@ -19,6 +21,8 @@ END:VEVENT
 END:VCALENDAR`;
 
 export default function BookingConfirmationPage() {
+  const [bookingCode, setBookingCode] = useState("SE-261218-0482");
+  useEffect(() => { const code = new URLSearchParams(window.location.search).get("code"); if (code) setBookingCode(code); }, []);
   return (
     <>
       <SiteHeader />
@@ -28,7 +32,7 @@ export default function BookingConfirmationPage() {
           <span className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-white"><FigmaIcon name="check" className="h-5 w-5" /></span>
           <h1 className="mt-4 text-[24px] font-semibold tracking-[-0.5px]">You’re going to Goa, Aarav!</h1>
           <p className="mt-2 text-xs text-muted">Your stay is confirmed. Let the countdown to slow mornings begin.</p>
-          <span className="mt-3 inline-block rounded-[4px] bg-white px-3 py-1 text-[9px] font-semibold">CONFIRMED · BOOKING ID SE-261218-0482</span>
+          <span className="mt-3 inline-block rounded-[4px] bg-white px-3 py-1 text-[9px] font-semibold">CONFIRMED · BOOKING ID {bookingCode}</span>
         </section>
         <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
           <div className="space-y-4">
@@ -47,7 +51,7 @@ export default function BookingConfirmationPage() {
                   <a href="#location" className="mt-2 inline-block text-[10px] font-medium text-forest">Get directions ↗</a>
                 </div>
                 <div className="hidden items-center justify-center sm:flex">
-                  <QRCodeSVG value="https://stayease.example/booking/SE-261218-0482" size={88} level="M" />
+                  <QRCodeSVG value={`${typeof window !== "undefined" ? window.location.origin : ""}/booking/confirmation?code=${bookingCode}`} size={88} level="M" />
                 </div>
               </div>
               <div className="mt-4 grid grid-cols-2 gap-3 border-t border-line pt-4 text-[10px]">
@@ -61,7 +65,7 @@ export default function BookingConfirmationPage() {
                   <p className="mt-1 text-muted">Breakfast included · Free Wi-Fi</p>
                   <p className="mt-2 text-muted">Show this QR at the front desk for a smooth check-in.</p>
                 </div>
-                <div className="sm:hidden"><QRCodeSVG value="https://stayease.example/booking/SE-261218-0482" size={72} /></div>
+                <div className="sm:hidden"><QRCodeSVG value={`${typeof window !== "undefined" ? window.location.origin : ""}/booking/confirmation?code=${bookingCode}`} size={72} /></div>
               </div>
             </Surface>
             <Surface className="bg-sky p-5">

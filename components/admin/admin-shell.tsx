@@ -1,9 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { api, type AdminDepartment, type AdminEmployee, type AdminHotel, type AdminRoom, type HousekeepingTask } from "@/lib/api-client";
 import { adminNavigation, type AdminSection } from "./admin-data";
+
+type SearchItem = { label: string; detail: string; href: string };
 
 const icons: Record<AdminSection, string> = {
   dashboard: "▦",
@@ -13,6 +17,7 @@ const icons: Record<AdminSection, string> = {
   customers: "♙",
   departments: "♧",
   employees: "♙",
+  housekeeping: "♧",
   roles: "⛨",
   payments: "▱",
   offers: "◇",
@@ -25,7 +30,111 @@ const icons: Record<AdminSection, string> = {
 
 export function AdminShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const current = pathname.split("/")[2] || "dashboard";
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchItems, setSearchItems] = useState<SearchItem[]>([]);
+  const [searchErrors, setSearchErrors] = useState<string[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [hasLoadedSearch, setHasLoadedSearch] = useState(false);
+  const searchInput = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    function handleShortcut(event: KeyboardEvent) {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setSearchOpen(true);
+      }
+      if (event.key === "Escape") setSearchOpen(false);
+    }
+    document.addEventListener("keydown", handleShortcut);
+    return () => document.removeEventListener("keydown", handleShortcut);
+  }, []);
+
+  useEffect(() => {
+    if (!searchOpen) return;
+    searchInput.current?.focus();
+    if (hasLoadedSearch) return;
+
+    let active = true;
+    setSearchLoading(true);
+    Promise.allSettled([
+      api.getAdminHotels(),
+      api.getAdminRooms(),
+      api.getAdminDepartments(),
+      api.getAdminEmployees(),
+      api.getAdminHousekeepingTasks(),
+    ]).then(([hotels, rooms, departments, employees, tasks]) => {
+      if (!active) return;
+      const items: SearchItem[] = [];
+      const errors: string[] = [];
+      if (hotels.status === "fulfilled") {
+        items.push(...hotels.value.map((hotel: AdminHotel) => ({
+          label: hotel.name,
+          detail: `${hotel.city} · Hotel`,
+          href: `/admin/hotels/${encodeURIComponent(hotel.slug || hotel._id)}`,
+        })));
+      } else errors.push("Hotels");
+      if (rooms.status === "fulfilled") {
+        items.push(...rooms.value.map((room: AdminRoom) => ({
+          label: room.name,
+          detail: `${room.hotelId} · Room`,
+          href: "/admin/rooms",
+        })));
+      } else errors.push("Rooms");
+      if (departments.status === "fulfilled") {
+        items.push(...departments.value.map((department: AdminDepartment) => ({
+          label: department.name,
+          detail: `${department.hotelId} · Department`,
+          href: "/admin/departments",
+        })));
+      } else errors.push("Departments");
+      if (employees.status === "fulfilled") {
+        items.push(...employees.value.map((employee: AdminEmployee) => ({
+          label: employee.name,
+          detail: `${employee.email} · Employee`,
+          href: `/admin/employees/${encodeURIComponent(employee.id)}`,
+        })));
+      } else errors.push("Employees");
+      if (tasks.status === "fulfilled") {
+        items.push(...tasks.value.map((task: HousekeepingTask) => ({
+          label: `Room ${task.roomNumber}`,
+          detail: `${task.hotelId} · Housekeeping`,
+          href: "/admin/housekeeping",
+        })));
+      } else errors.push("Housekeeping");
+
+      setSearchItems(items);
+      setSearchErrors(errors);
+      setHasLoadedSearch(true);
+    }).catch((error: unknown) => {
+      if (active) {
+        console.error("[Admin workspace] search failed", error);
+        setSearchErrors(["workspace records"]);
+      }
+    }).finally(() => {
+      if (active) setSearchLoading(false);
+    });
+    return () => { active = false; };
+  }, [searchOpen, hasLoadedSearch]);
+
+  const matchingSections = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return adminNavigation.filter((item) => !query || item.label.toLowerCase().includes(query));
+  }, [searchQuery]);
+  const matchingRecords = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return searchItems
+      .filter((item) => !query || `${item.label} ${item.detail}`.toLowerCase().includes(query))
+      .slice(0, 8);
+  }, [searchItems, searchQuery]);
+
+  function navigateFromSearch(href: string) {
+    setSearchOpen(false);
+    setSearchQuery("");
+    router.push(href);
+  }
 
   return (
     <div className="admin-root">
@@ -37,7 +146,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
         <div className="admin-side-caption">PORTFOLIO WORKSPACE</div>
         <div className="admin-property-picker">
           <span className="admin-property-avatar">A</span>
-          <span><strong>All 6 properties</strong><small>Portfolio workspace</small></span>
+          <span><strong>All properties</strong><small>Portfolio workspace</small></span>
           <span className="admin-picker-arrow">⌄</span>
         </div>
         <nav className="admin-nav" aria-label="Admin navigation">
@@ -51,34 +160,83 @@ export function AdminShell({ children }: { children: ReactNode }) {
               >
                 <span className="admin-nav-icon" aria-hidden="true">{icons[item.id]}</span>
                 <span>{item.label}</span>
-                {item.id === "notifications" && <span className="admin-nav-count">2</span>}
               </Link>
             </div>
           ))}
         </nav>
         <div className="admin-sidebar-bottom">
-          <div className="admin-sidebar-note"><span className="admin-online-dot" /> All systems operational</div>
+          <div className="admin-sidebar-note">Portfolio operations</div>
           <Link href="/" className="admin-customer-link">← View customer website</Link>
           <div className="admin-user">
-            <span className="admin-user-avatar">AM</span>
-            <span><strong>Aarav Mehta</strong><small>Workspace administrator</small></span>
+            <span className="admin-user-avatar">A</span>
+            <span><strong>Workspace admin</strong><small>Administrator</small></span>
             <span className="admin-picker-arrow">···</span>
           </div>
         </div>
       </aside>
       <div className="admin-main">
         <header className="admin-topbar">
-          <div className="admin-breadcrumb"><span>Workspace</span><span className="admin-crumb-sep">/</span><strong>All 6 properties</strong></div>
+          <div className="admin-breadcrumb"><span>Workspace</span><span className="admin-crumb-sep">/</span><strong>Portfolio</strong></div>
           <div className="admin-top-actions">
-            <button type="button" className="admin-search-global" aria-label="Search workspace">⌕ <span>Search anything...</span><kbd>⌘ K</kbd></button>
+            <button type="button" className="admin-search-global" aria-label="Search workspace" onClick={() => setSearchOpen(true)}>⌕ <span>Search anything...</span><kbd>⌘ K</kbd></button>
             <button type="button" className="admin-icon-button" aria-label="Help">?</button>
-            <button type="button" className="admin-icon-button admin-bell" aria-label="Notifications">♧<i /></button>
-            <span className="admin-top-avatar">AM</span>
+            <button type="button" className="admin-icon-button admin-bell" aria-label="Open notifications" onClick={() => router.push("/admin/notifications")}>♧</button>
+            <span className="admin-top-avatar">A</span>
           </div>
         </header>
         <main className="admin-content">{children}</main>
         <footer className="admin-footer"><span>StayEase Admin · All times in property local time</span><span>Privacy&nbsp;&nbsp; · &nbsp;&nbsp;Help centre</span></footer>
       </div>
+      {searchOpen && (
+        <div className="admin-command-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setSearchOpen(false); }}>
+          <section className="admin-command-dialog" role="dialog" aria-modal="true" aria-label="Search workspace">
+            <div className="admin-command-input">⌕
+              <input
+                ref={searchInput}
+                aria-label="Search workspace"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Search pages, hotels, rooms, and teams"
+              />
+              <button type="button" onClick={() => setSearchOpen(false)} aria-label="Close search">Esc</button>
+            </div>
+            {searchLoading && <p className="admin-command-message">Loading workspace records…</p>}
+            {searchErrors.length > 0 && (
+              <p className="admin-command-error" role="status">
+                Some services could not be searched: {searchErrors.join(", ")}.
+                <button type="button" onClick={() => { setHasLoadedSearch(false); setSearchErrors([]); setSearchItems([]); }}>Retry</button>
+              </p>
+            )}
+            {!searchLoading && (
+              <div className="admin-command-results">
+                {matchingSections.length > 0 && (
+                  <div>
+                    <p className="admin-command-heading">Pages</p>
+                    {matchingSections.slice(0, 5).map((item) => (
+                      <button key={item.id} type="button" onClick={() => navigateFromSearch(item.id === "dashboard" ? "/admin" : `/admin/${item.id}`)}>
+                        <span>{icons[item.id]}</span><strong>{item.label}</strong><small>Workspace page</small>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {matchingRecords.length > 0 && (
+                  <div>
+                    <p className="admin-command-heading">Records</p>
+                    {matchingRecords.map((item, index) => (
+                      <button key={`${item.href}-${item.label}-${index}`} type="button" onClick={() => navigateFromSearch(item.href)}>
+                        <span>⌕</span><strong>{item.label}</strong><small>{item.detail}</small>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {matchingSections.length === 0 && matchingRecords.length === 0 && (
+                  <p className="admin-command-message">{searchQuery ? "No matching pages or records." : "Type to search workspace pages and records."}</p>
+                )}
+              </div>
+            )}
+          </section>
+        </div>
+      )}
     </div>
   );
 }

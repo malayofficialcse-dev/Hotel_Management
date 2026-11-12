@@ -10,65 +10,50 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Department {
-  id          String     @id @default(uuid())
-  name        String     // "Front Desk" | "Housekeeping" | "Kitchen" | "Maintenance" | "Security" | "F&B" | "Concierge"
-  hotelId     String
-  description String?
-  headId      String?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  employees   Employee[]
-  tasks       Task[]
-
-  @@map("departments")
-}
-
 model Employee {
-  id           String     @id @default(uuid())
-  userId       String     @unique  // references Auth Service user id
-  departmentId String
-  name         String
-  email        String
-  phone        String?
-  position     String
-  joiningDate  DateTime
+  id           String     @id @default(uuid()) @db.Uuid
+  userId       String     @unique @db.Uuid @map("user_id")
+  departmentId String     @map("department_id")
+  name         String     @db.VarChar(128)
+  email        String     @db.VarChar(255)
+  phone        String?    @db.VarChar(32)
+  position     String     @db.VarChar(64)
+  joiningDate  DateTime   @db.Date @map("joining_date")
   salary       Float?
-  isActive     Boolean    @default(true)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-  department   Department @relation(fields: [departmentId], references: [id])
+  isActive     Boolean    @default(true) @map("is_active")
+  createdAt    DateTime   @default(now()) @db.Timestamptz(6) @map("created_at")
+  updatedAt    DateTime   @updatedAt @db.Timestamptz(6) @map("updated_at")
   tasks        Task[]
   schedules    Schedule[]
 
+  @@index([departmentId])
   @@map("employees")
 }
 
 model Task {
-  id           String     @id @default(uuid())
-  title        String
+  id           String     @id @default(uuid()) @db.Uuid
+  title        String     @db.VarChar(255)
   description  String?
-  departmentId String
-  assigneeId   String?
-  priority     String     @default("MEDIUM") // LOW | MEDIUM | HIGH | URGENT
-  status       String     @default("PENDING") // PENDING | IN_PROGRESS | COMPLETED | CANCELLED
-  dueDate      DateTime?
-  completedAt  DateTime?
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-  department   Department @relation(fields: [departmentId], references: [id])
+  departmentId String     @map("department_id")
+  assigneeId   String?    @db.Uuid @map("assignee_id")
+  priority     String     @default("MEDIUM") @db.VarChar(16) // LOW | MEDIUM | HIGH | URGENT
+  status       String     @default("PENDING") @db.VarChar(32) // PENDING | IN_PROGRESS | COMPLETED | CANCELLED
+  dueDate      DateTime?  @db.Timestamptz(6) @map("due_date")
+  completedAt  DateTime?  @db.Timestamptz(6) @map("completed_at")
+  createdAt    DateTime   @default(now()) @db.Timestamptz(6) @map("created_at")
+  updatedAt    DateTime   @updatedAt @db.Timestamptz(6) @map("updated_at")
   assignee     Employee?  @relation(fields: [assigneeId], references: [id])
 
   @@map("tasks")
 }
 
 model Schedule {
-  id         String   @id @default(uuid())
-  employeeId String
+  id         String   @id @default(uuid()) @db.Uuid
+  employeeId String   @db.Uuid @map("employee_id")
   date       DateTime @db.Date
-  shiftStart String   // "08:00"
-  shiftEnd   String   // "16:00"
-  shiftType  String   // "MORNING" | "AFTERNOON" | "NIGHT"
+  shiftStart String   @map("shift_start") // "08:00"
+  shiftEnd   String   @map("shift_end") // "16:00"
+  shiftType  String   @map("shift_type") // "MORNING" | "AFTERNOON" | "NIGHT"
   notes      String?
   employee   Employee @relation(fields: [employeeId], references: [id])
 

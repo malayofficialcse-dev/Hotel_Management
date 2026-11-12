@@ -7,6 +7,7 @@ export const GATEWAY_ROUTES = {
   BOOKINGS: "/api/v1/bookings",
   PAYMENTS: "/api/v1/payments",
   EMPLOYEES: "/api/v1/employees",
+  DEPARTMENTS: "/api/v1/departments",
   HOUSEKEEPING: "/api/v1/housekeeping",
   REVIEWS: "/api/v1/reviews",
   NOTIFICATIONS: "/api/v1/notifications",

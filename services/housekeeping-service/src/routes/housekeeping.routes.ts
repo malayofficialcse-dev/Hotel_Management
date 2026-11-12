@@ -1,11 +1,15 @@
-export const HOUSEKEEPING_ROUTES = {
-  BASE: "/api/v1/housekeeping",
-  HEALTH: "/api/v1/housekeeping/health",
-  BY_HOTEL: "/api/v1/housekeeping/hotel/:hotelId",
-  UPDATE_STATUS: "/api/v1/housekeeping/:id/status",
-  CREATE: "/api/v1/housekeeping",
-  INSPECT: "/api/v1/housekeeping/:id/inspect",
-} as const;
+import { Router } from "express";
+import { HousekeepingController } from "../controllers/housekeeping.controller.js";
 
-export type HousekeepingRoutes = typeof HOUSEKEEPING_ROUTES;
+const controller = new HousekeepingController();
+export const housekeepingRoutes = Router();
 
+housekeepingRoutes.get("/", (req, res, next) => void controller.list(req, res).catch(next));
+housekeepingRoutes.get("/hotel/:hotelId", (req, res, next) => {
+  req.query.hotelId = req.params.hotelId;
+  void controller.list(req, res).catch(next);
+});
+housekeepingRoutes.post("/", (req, res, next) => void controller.create(req, res).catch(next));
+housekeepingRoutes.patch("/:id", (req, res, next) => void controller.update(req, res).catch(next));
+housekeepingRoutes.put("/:id", (req, res, next) => void controller.update(req, res).catch(next));
+housekeepingRoutes.delete("/:id", (req, res, next) => void controller.delete(req, res).catch(next));

@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BookingStepper } from "@/components/booking-stepper";
 import { BookingSummary } from "@/components/booking-summary";
@@ -8,12 +8,79 @@ import { FigmaIcon } from "@/components/figma-icon";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { Button, PageHeading, Surface, TextField } from "@/components/ui";
+import { api } from "@/lib/api-client";
+import { useBooking } from "@/components/booking-provider";
 
 export default function GuestDetailsPage() {
   const router = useRouter();
-  function continueToReview(event: FormEvent<HTMLFormElement>) {
+  const {
+    hotelId, roomId, checkInDate, checkOutDate, guestsCount, roomCount,
+    selectedRoom, setSelectedRoom, setBooking,
+  } = useBooking();
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!roomId || selectedRoom?.id === roomId) return;
+    let active = true;
+    api.getRoomsByHotel(hotelId)
+      .then((rooms) => {
+        const room = rooms.find((item) => item.id === roomId);
+        if (active && room) setSelectedRoom(room);
+        else if (active) setError("Your selected room is no longer available. Please choose another room.");
+      })
+      .catch((cause: unknown) => {
+        if (active) setError(cause instanceof Error ? cause.message : "Could not load your selected room.");
+      });
+    return () => { active = false; };
+  }, [hotelId, roomId, selectedRoom, setSelectedRoom]);
+
+  async function continueToReview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    router.push("/booking/review");
+    setError("");
+    if (!roomId || selectedRoom?.id !== roomId) {
+      setError("Please select a room before continuing.");
+      return;
+    }
+    const nights = (Date.parse(`${checkOutDate}T00:00:00Z`) - Date.parse(`${checkInDate}T00:00:00Z`)) / 86_400_000;
+    if (!Number.isInteger(nights) || nights < 1) {
+      setError("Choose a valid check-in and check-out date before continuing.");
+      return;
+    }
+    if (guestsCount > selectedRoom.capacity * roomCount) {
+      setError(`This room can accommodate up to ${selectedRoom.capacity * roomCount} guests.`);
+      return;
+    }
+    setSubmitting(true);
+    const data = new FormData(event.currentTarget);
+    try {
+      const hotel = await api.getHotel(hotelId);
+      const result = await api.holdRoom({
+        hotelId,
+        hotelName: hotel?.name || hotelId,
+        roomTypeId: roomId,
+        roomTypeName: selectedRoom.name,
+        checkInDate,
+        checkOutDate,
+        guestsCount,
+        roomCount,
+        guestFirstName: String(data.get("firstName")),
+        guestLastName: String(data.get("lastName")),
+        guestEmail: String(data.get("email")),
+        guestPhone: String(data.get("phone")),
+        specialRequests: String(data.get("specialRequests") || ""),
+      });
+      if (!result.success) {
+        setError(result.message || "We couldn't reserve that room. Please try again.");
+        return;
+      }
+      setBooking({ bookingId: result.data.bookingId, bookingCode: result.data.bookingCode, totalPrice: result.data.totalPrice });
+      router.push("/booking/review");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "We couldn't reserve that room. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -30,10 +97,10 @@ export default function GuestDetailsPage() {
           <Surface className="mt-4 p-5">
             <h2 className="text-sm font-semibold">Lead guest details</h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <TextField label="First name *" defaultValue="Aarav" required />
-              <TextField label="Last name *" defaultValue="Mehta" required />
-              <TextField label="Email address *" type="email" defaultValue="aarav.mehta@gmail.com" required />
-              <TextField label="Mobile number *" type="tel" defaultValue="+91 98765 43210" required />
+              <TextField name="firstName" label="First name *" defaultValue="Aarav" required />
+              <TextField name="lastName" label="Last name *" defaultValue="Mehta" required />
+              <TextField name="email" label="Email address *" type="email" defaultValue="aarav.mehta@gmail.com" required />
+              <TextField name="phone" label="Mobile number *" type="tel" defaultValue="+91 98765 43210" required />
             </div>
             <p className="mt-3 text-[10px] text-muted">Your confirmation and stay updates will be sent here.</p>
             <div className="mt-4 flex flex-wrap gap-5 text-[11px]">
@@ -55,7 +122,7 @@ export default function GuestDetailsPage() {
             <h2 className="text-sm font-semibold">Make yourself at home</h2>
             <label className="mt-4 block text-[11px] font-medium">
               Special requests (optional)
-              <textarea defaultValue="A quiet room on a higher floor would be lovely, please." rows={3} className="mt-2 w-full resize-y rounded-[4px] border border-line p-3 text-xs font-normal" />
+              <textarea name="specialRequests" defaultValue="A quiet room on a higher floor would be lovely, please." rows={3} className="mt-2 w-full resize-y rounded-[4px] border border-line p-3 text-xs font-normal" />
             </label>
             <p className="mt-2 text-[10px] text-muted">We’ll share your requests with the hotel. They’re subject to availability.</p>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -66,8 +133,9 @@ export default function GuestDetailsPage() {
           <label className="mt-4 flex items-center gap-2 text-[10px]"><input type="checkbox" defaultChecked className="accent-[#486958]" /> Save these details for my next getaway</label>
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
             <Button href="/booking/room" variant="outline">Back to rooms</Button>
-            <Button type="submit">Review my booking <FigmaIcon name="arrow-right" className="h-4 w-4" /></Button>
+            <Button type="submit" disabled={submitting || !selectedRoom || selectedRoom.id !== roomId}>{submitting ? "Reserving…" : "Review my booking"} <FigmaIcon name="arrow-right" className="h-4 w-4" /></Button>
           </div>
+          {error && <p role="alert" className="mt-3 rounded-[4px] bg-blush p-3 text-[10px] text-red-800">{error}</p>}
         </form>
         <div className="lg:sticky lg:top-24 lg:h-fit"><BookingSummary /></div>
       </main>

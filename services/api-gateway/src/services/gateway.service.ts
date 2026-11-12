@@ -16,6 +16,7 @@ export class GatewayService {
       { name: "booking-service", url: env.BOOKING_SERVICE_URL },
       { name: "payment-service", url: env.PAYMENT_SERVICE_URL },
       { name: "employee-service", url: env.EMPLOYEE_SERVICE_URL },
+      { name: "department-service", url: env.DEPARTMENT_SERVICE_URL },
       { name: "housekeeping-service", url: env.HOUSEKEEPING_SERVICE_URL },
       { name: "review-service", url: env.REVIEW_SERVICE_URL },
       { name: "notification-service", url: env.NOTIFICATION_SERVICE_URL },

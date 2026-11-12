@@ -12,15 +12,16 @@
 | Layer / Service | Technology | Database / State Store | ORM / Driver | Protocols / Ports |
 | :--- | :--- | :--- | :--- | :--- |
 | **API Gateway** | **NestJS** | — | — | HTTP REST (`:8000`), Rate Limiting, Reverse Proxy |
-| **Authentication** | **NestJS** | **PostgreSQL** (`hotel_auth_db`) | **Prisma** | HTTP (`:8001`), gRPC (`:50050`), Redis Session Cache |
+| **Authentication** | **NestJS** | **PostgreSQL** (`hotel_auth_db`) | **Prisma** | HTTP (`:8001`), Redis |
 | **Guest / User Management** | **NestJS** | **PostgreSQL** (`hotel_users_db`) | **Prisma** | HTTP (`:8002`), Profiles, KYC, Preferences |
-| **Hotel Management** | **NestJS** | **MongoDB** (`hotel_catalog`) | **Mongoose** | HTTP (`:8003`), Rich Media, Facilities, Geolocation |
-| **Room Management** | **NestJS** | **MongoDB** (`hotel_catalog`) | **Mongoose** | HTTP (`:8004`), Room Layouts, Dynamic Specs |
+| **Hotel Management** | **Node.js + Express** | **MongoDB** (`hotel_catalog`) | **Mongoose** | REST (`:8003`), gRPC (`:50053`) |
+| **Room Management** | **Node.js + Express** | **MongoDB** (`hotel_catalog`) | **Mongoose** | REST (`:8004`), gRPC (`:50054`), booking-backed inventory |
 | **Booking Engine** | **Go (Golang)** | **PostgreSQL** (`hotel_bookings_db`) | **pgx / sqlc** | HTTP (`:8005`), gRPC (`:50051`), Redis Distributed Lock |
 | **Payment & Invoicing** | **NestJS** | **PostgreSQL** (`hotel_payments_db`) | **Prisma** | HTTP (`:8006`), Stripe Webhooks, Ledgers |
-| **Employee & Department** | **NestJS** | **PostgreSQL** (`hotel_operations_db`) | **Prisma** | HTTP (`:8007`), Staff, Shifts, Permissions |
-| **Housekeeping & Maintenance** | **NestJS** | **MongoDB** (`hotel_housekeeping`) | **Mongoose** | HTTP (`:8008`), Cleaning Logs, Checklists |
-| **Guest Reviews & Ratings** | **NestJS** | **MongoDB** (`hotel_reviews`) | **Mongoose** | HTTP (`:8009`), Multi-criteria Ratings, Photos |
+| **Employee** | **Node.js + Express** | **PostgreSQL** (`hotel_operations_db`) | **Prisma** | REST (`:8007`), gRPC (`:50057`), department lookup |
+| **Department** | **Node.js + Express** | **MongoDB** (`hotel_departments`) | **Mongoose** | REST (`:8012`), gRPC (`:50059`), hotel validation |
+| **Housekeeping & Maintenance** | **Node.js + Express** | **MongoDB** (`hotel_housekeeping`) | **Mongoose** | REST (`:8008`), gRPC (`:50058`), employee validation |
+| **Guest Reviews & Ratings** | **NestJS** | **MongoDB** (`hotel_reviews`) | **Mongoose** | REST (`:8009`), Multi-criteria Ratings, Photos |
 | **Notifications** | **Go (Golang)** | **MongoDB / PostgreSQL** | **pgx / Mongoose** | HTTP (`:8010`), gRPC (`:50052`), RabbitMQ Consumer |
 | **Analytics & Reporting** | **Go (Golang)** | **PostgreSQL / ClickHouse** | **pgx / sqlc** | HTTP (`:8011`), Occupancy, ADR, RevPAR metrics |
 | **Distributed Cache & Locks**| **Redis 7** | In-Memory Cluster | `ioredis` / `go-redis` | Port `:6379`, 10-Min Hold TTL, `SET NX EX` locks |
@@ -45,14 +46,15 @@ flowchart TD
         GW["API Gateway\n- Central JWT Verification\n- Rate Limiting & Helmet\n- Reverse Proxy Routing"]
     end
 
-    subgraph NestServices["NestJS Microservices (Business Domain)"]
+    subgraph TypeScriptServices["TypeScript Services (NestJS + Express)"]
         AuthSvc["Auth Service\n(NestJS + Prisma) :8001"]
         UserSvc["Guest Management\n(NestJS + Prisma) :8002"]
-        HotelSvc["Hotel Catalog\n(NestJS + Mongo) :8003"]
-        RoomSvc["Room Inventory\n(NestJS + Mongo) :8004"]
+        HotelSvc["Hotel Catalog\n(Express + Mongo) :8003 / gRPC :50053"]
+        RoomSvc["Room Inventory\n(Express + Mongo) :8004 / gRPC :50054"]
         PaySvc["Payment Service\n(NestJS + Prisma) :8006"]
-        EmpSvc["Employee & Dept\n(NestJS + Prisma) :8007"]
-        HouseSvc["Housekeeping\n(NestJS + Mongo) :8008"]
+        EmpSvc["Employee Directory\n(Express + PostgreSQL) :8007 / gRPC :50057"]
+        DeptSvc["Department Directory\n(Express + Mongo) :8012 / gRPC :50059"]
+        HouseSvc["Housekeeping\n(Express + Mongo) :8008 / gRPC :50058"]
         ReviewSvc["Review Service\n(NestJS + Mongo) :8009"]
     end
 
@@ -63,12 +65,12 @@ flowchart TD
     end
 
     subgraph EventBroker["Async Message Broker (RabbitMQ)"]
-        RabbitMQ{{"RabbitMQ Event Bus (:5672)\nTopics: booking.created, payment.succeeded,\nroom.cleaned, notification.dispatch"}}
+        RabbitMQ{{"RabbitMQ Event Bus (:5672)\nTopics include booking.held and payment.succeeded"}}
     end
 
     subgraph StorageLayer["Data & Persistence Layer"]
         PG[("PostgreSQL 16 Cluster\n- hotel_auth_db\n- hotel_users_db\n- hotel_bookings_db\n- hotel_payments_db\n- hotel_operations_db")]
-        Mongo[("MongoDB 7 Replica Set\n- hotel_catalog\n- hotel_housekeeping\n- hotel_reviews")]
+        Mongo[("MongoDB 7\n- hotel_catalog\n- hotel_departments\n- hotel_housekeeping\n- hotel_reviews")]
         RedisMaster[("Redis 7 In-Memory Cluster\n- Room Distributed Locks\n- 10-Minute Cart Holds (TTL: 600s)\n- Catalog Cache")]
     end
 
@@ -84,14 +86,19 @@ flowchart TD
     GW -->|/api/v1/bookings| BookingSvc
     GW -->|/api/v1/payments| PaySvc
     GW -->|/api/v1/employees| EmpSvc
+    GW -->|/api/v1/departments| DeptSvc
     GW -->|/api/v1/housekeeping| HouseSvc
     GW -->|/api/v1/reviews| ReviewSvc
     GW -->|/api/v1/analytics| AnalyticsSvc
 
-    %% gRPC Inter-service
-    BookingSvc -.->|gRPC Token Check| AuthSvc
-    PaySvc -.->|gRPC Confirm Booking| BookingSvc
-    RoomSvc -.->|gRPC Availability Query| BookingSvc
+    %% Internal service communication
+    BookingSvc -.->|REST room inventory| RoomSvc
+    RoomSvc -.->|REST booked-room count| BookingSvc
+    RoomSvc -.->|gRPC hotel validation| HotelSvc
+    DeptSvc -.->|gRPC hotel validation| HotelSvc
+    EmpSvc -.->|gRPC department lookup| DeptSvc
+    HouseSvc -.->|gRPC employee validation| EmpSvc
+    PaySvc -.->|Booking confirmation| BookingSvc
 
     %% Data Connections
     AuthSvc --> PG
@@ -102,16 +109,15 @@ flowchart TD
 
     HotelSvc --> Mongo
     RoomSvc --> Mongo
+    DeptSvc --> Mongo
     HouseSvc --> Mongo
     ReviewSvc --> Mongo
 
-    HotelSvc --> RedisMaster
     BookingSvc --> RedisMaster
 
     %% Event Bus Connections
-    BookingSvc -->|Publish booking.hold| RabbitMQ
+    BookingSvc -->|Publish booking.held| RabbitMQ
     PaySvc -->|Publish payment.succeeded| RabbitMQ
-    HouseSvc -->|Publish room.cleaned| RabbitMQ
     RabbitMQ -->|Consume events| NotifSvc
     RabbitMQ -->|Consume metrics| AnalyticsSvc
 ```
@@ -126,6 +132,7 @@ sequenceDiagram
     actor Guest as Guest (Next.js App)
     participant GW as API Gateway (NestJS)
     participant Booking as Booking Engine (Go)
+    participant Room as Room Service (Express + MongoDB)
     participant Redis as Redis (Distributed Lock)
     participant PG as PostgreSQL (hotel_bookings_db)
     participant Pay as Payment Service (NestJS)
@@ -139,7 +146,10 @@ sequenceDiagram
     alt Lock Failed
         Booking-->>Guest: 409 Conflict ("Room in reservation checkout by another guest")
     else Lock Acquired
-        Booking->>PG: Check availability & count active overlapping stays
+        Booking->>PG: Count overlapping active stays
+        Booking->>Room: GET /internal/rooms/{roomTypeId}/inventory
+        Room-->>Booking: Inventory and authoritative room price
+        Booking->>Booking: Reject if requested inventory is unavailable
         Booking->>PG: INSERT booking (status: 'PENDING_PAYMENT', expires_at: NOW() + 10m)
         Booking->>Redis: Set 10-Minute Cart Hold (TTL: 600s)
         Booking->>Redis: Release Distributed Lock
@@ -147,11 +157,13 @@ sequenceDiagram
         Booking-->>Guest: 201 Created (bookingCode, countdown: 600s, totalPrice)
     end
 
-    Guest->>Pay: POST /api/v1/payments/intent (bookingId, amount)
+    Guest->>GW: POST /api/v1/payments/intent (bookingId, amount)
+    GW->>Pay: Forward payment intent request
     Pay-->>Guest: Return Stripe clientSecret
-    Guest->>Pay: Submit Payment
+    Guest->>GW: Submit payment confirmation
+    GW->>Pay: Forward payment confirmation
     Pay->>PG: Record Payment (status: 'SUCCESS')
-    Pay->>Booking: gRPC ConfirmBooking(bookingId, paymentId)
+    Pay->>Booking: POST /api/v1/bookings/{id}/confirm
     Booking->>PG: UPDATE booking SET status = 'CONFIRMED'
     Booking->>Redis: Invalidate hold key
     Booking->>Rabbit: Publish event: "booking.confirmed"
@@ -163,20 +175,23 @@ sequenceDiagram
 
 ## 4. Local Orchestration (Docker Compose)
 
-The environment starts all data stores, message broker, and microservices in isolated containers with a single command:
+Start the containerized data stores and services with Docker Compose:
 
-```bash
-# 1. Start databases, RabbitMQ, Redis, and all microservices
+```powershell
+docker compose -f services\docker-compose.yml up --build
+
+# Check running services
+docker compose -f services\docker-compose.yml ps
+
+# Stop containers without removing persisted database volumes
+docker compose -f services\docker-compose.yml down
+```
+
+For local development without containers, `npm run services:up` and
+`npm run services:down` run the repository's Windows service scripts:
+
+```powershell
 npm run services:up
-
-# 2. Check running services
-docker compose -f services/docker-compose.yml ps
-
-# 3. Access RabbitMQ Management Dashboard
-# URL: http://localhost:15672
-# User: hotel_admin | Password: hotel_rabbit_pass
-
-# 4. Stop all services
 npm run services:down
 ```
 
@@ -184,27 +199,23 @@ npm run services:down
 
 ## 5. Kubernetes Production Deployment (`k8s/`)
 
-Deploying to production on AWS EKS, Google GKE, or self-hosted Kubernetes:
+The checked-in Kubernetes files are legacy scaffolding, not a production-ready
+deployment for the current service map. They do not yet define the complete
+service set, secrets, database resources, or validated service configuration.
+Reconcile and test those manifests in a non-production cluster before deploying.
 
 ```bash
-# 1. Create Namespace & ConfigMaps
 kubectl apply -f k8s/namespace.yaml
 kubectl apply -f k8s/configmap.yaml
-
-# 2. Deploy Services, StatefulSets, and Ingress
 kubectl apply -f k8s/services-deployments.yaml
-
-# 3. Verify Rollout Status
-kubectl rollout status deployment/api-gateway -n hotel-platform
-kubectl rollout status deployment/booking-service -n hotel-platform
 ```
 
 ---
 
 ## 6. Continuous Integration & Deployment (GitHub Actions)
 
-The `.github/workflows/ci-cd.yml` workflow automatically runs on every push:
-1. **Frontend Verification**: TypeScript type-checking (`npm run typecheck`) and production build (`npm run build`).
-2. **Go Services Validation**: Go static analysis and testing across `booking-service`, `auth-service`, and `user-service`.
-3. **Container Build & Registry Publishing**: Multi-stage OCI Docker images pushed to GitHub Container Registry (`ghcr.io`).
-4. **Kubernetes Rolling Update**: Automated zero-downtime cluster rollout via `kubectl apply`.
+The `.github/workflows/ci-cd.yml` file is a deployment scaffold that needs
+alignment with the current service languages, image build contexts, and
+Kubernetes manifests before it can be used as a release pipeline. Run the
+frontend build, service builds/tests, and Compose validation locally until that
+workflow is corrected and verified.

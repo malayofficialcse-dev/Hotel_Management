@@ -1,13 +1,13 @@
-export const EMPLOYEE_ROUTES = {
-  BASE: "/api/v1/employees",
-  HEALTH: "/api/v1/employees/health",
-  LIST: "/api/v1/employees",
-  CREATE: "/api/v1/employees",
-  DEPARTMENTS: "/api/v1/employees/departments",
-  BY_ID: "/api/v1/employees/:id",
-  TASKS: "/api/v1/employees/tasks",
-  SCHEDULES: "/api/v1/employees/schedules",
-} as const;
+import { Router } from "express";
+import { EmployeeController } from "../controllers/employee.controller.js";
 
-export type EmployeeRoutes = typeof EMPLOYEE_ROUTES;
+const controller = new EmployeeController();
+export const employeeRoutes = Router();
 
+employeeRoutes.get("/departments", (req, res, next) => void controller.departments(req, res).catch(next));
+employeeRoutes.get("/", (req, res, next) => void controller.list(req, res).catch(next));
+employeeRoutes.post("/", (req, res, next) => void controller.create(req, res).catch(next));
+employeeRoutes.get("/:id", (req, res, next) => void controller.get(req, res).catch(next));
+employeeRoutes.patch("/:id", (req, res, next) => void controller.update(req, res).catch(next));
+employeeRoutes.put("/:id", (req, res, next) => void controller.update(req, res).catch(next));
+employeeRoutes.delete("/:id", (req, res, next) => void controller.deactivate(req, res).catch(next));

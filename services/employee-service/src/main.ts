@@ -1,15 +1,32 @@
-import { NestFactory } from "@nestjs/core";
-import { AppModule } from "./app.module.js";
-import { ValidationPipe } from "@nestjs/common";
-import { env } from "./config/env.js";
+import "dotenv/config";
+import { createApp } from "./app.js";
+import { prisma } from "./config/database.js";
+import { startGrpcServer } from "./grpc/server.js";
 
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  app.enableCors();
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+const port = Number(process.env.PORT || 8007);
+const grpcPort = Number(process.env.GRPC_PORT || 50057);
 
-  await app.listen(env.PORT);
-  console.log(`🚀 [NestJS Employee & Operations Service] listening on port ${env.PORT} (PostgreSQL hotel_operations_db)`);
+async function start() {
+  await prisma.$connect();
+
+  const app = createApp(grpcPort);
+  const httpServer = app.listen(port, () => {
+    console.log(`[Employee Service] HTTP listening on ${port}`);
+  });
+  const grpcServer = await startGrpcServer(grpcPort);
+
+  const shutdown = async () => {
+    grpcServer.tryShutdown(() => undefined);
+    httpServer.close(() => undefined);
+    await prisma.$disconnect();
+    process.exit(0);
+  };
+  process.once("SIGINT", shutdown);
+  process.once("SIGTERM", shutdown);
 }
-bootstrap();
 
+start().catch(async (error) => {
+  console.error("[Employee Service] startup failed", error);
+  await prisma.$disconnect();
+  process.exitCode = 1;
+});

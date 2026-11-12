@@ -1,12 +1,13 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { FigmaIcon } from "@/components/figma-icon";
 import { HotelCard } from "@/components/hotel-card";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { Button, PageHeading } from "@/components/ui";
 import { hotels } from "@/lib/data";
+import { api } from "@/lib/api-client";
 
 const benefits = [
   { icon: "shield" as const, title: "Handpicked, not endless", subtitle: "Stays worth travelling for", color: "bg-mint" },
@@ -20,9 +21,15 @@ export default function HomePage() {
   const [sort, setSort] = useState("Recommended");
   const [onlyPool, setOnlyPool] = useState(false);
   const [rating, setRating] = useState("4.5 & above");
+  const [catalog, setCatalog] = useState(hotels);
+  const [catalogError, setCatalogError] = useState("");
+
+  useEffect(() => {
+    api.getHotels().then(setCatalog).catch(() => setCatalogError("Showing our saved catalogue while the live catalogue reconnects."));
+  }, []);
 
   const visibleHotels = useMemo(() => {
-    let result = hotels.filter((hotel) => {
+    let result = catalog.filter((hotel) => {
       const matchesQuery =
         !searched ||
         `${hotel.name} ${hotel.location} ${hotel.city}`.toLowerCase().includes(searched.toLowerCase());
@@ -32,7 +39,7 @@ export default function HomePage() {
     if (sort === "Price: low to high") result = [...result].sort((a, b) => a.price - b.price);
     if (sort === "Top rated") result = [...result].sort((a, b) => Number(b.rating) - Number(a.rating));
     return result;
-  }, [searched, sort, onlyPool, rating]);
+  }, [catalog, searched, sort, onlyPool, rating]);
 
   function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -116,6 +123,7 @@ export default function HomePage() {
               title="Good places. Great possibilities."
               description="Handpicked stays in Goa and a few places you might fall for."
             />
+            {catalogError && <p className="text-[10px] text-muted">{catalogError}</p>}
             <label className="flex items-center gap-2 text-[11px] text-muted">
               Sort by:
               <select value={sort} onChange={(event) => setSort(event.target.value)} className="rounded-[4px] border border-line bg-white px-2 py-2 text-[11px] text-ink">

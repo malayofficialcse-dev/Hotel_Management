@@ -8,13 +8,18 @@
 | # | Service | Tech | Port | Database | Responsibility |
 |---|---------|------|------|----------|----------------|
 | 0 | **API Gateway** | NestJS | 8000 | — | Single public entry point, rate limiting, reverse proxy |
-| 1 | **Auth Service** | **Go + Chi** | 8001 | PostgreSQL + Redis | Registration, login, JWT access/refresh tokens |
-| 2 | **User Service** | **Go + Chi** | 8002 | PostgreSQL | User profiles, wishlist, preferences |
-| 3 | **Hotel & Room Service** | **Go + Chi** | 8003 | PostgreSQL + Redis | Hotel catalog, search, room types, availability |
-| 4 | **Booking Service** | **Go + Chi** | 8004 | PostgreSQL + Redis | Reservations, 10-min hold, double-booking prevention |
-| 5 | **Payment Service** | NestJS + Prisma | 8005 | PostgreSQL | Stripe integration, webhooks, refunds |
-| 6 | **Review Service** | NestJS + Mongoose | 8006 | MongoDB | Guest reviews, ratings, moderation |
-| 7 | **Department Service** | NestJS + Prisma | 8007 | PostgreSQL | Staff, departments, tasks, schedules |
+| 1 | **Auth Service** | **NestJS + Prisma** | 8001 | PostgreSQL + Redis | Registration, login, JWT access/refresh tokens |
+| 2 | **User Service** | **NestJS + Prisma** | 8002 | PostgreSQL | User profiles, wishlist, preferences |
+| 3 | **Hotel Service** | Node.js + Express + Mongoose | 8003 / 50053 gRPC | MongoDB | Hotel catalog, search, and property management |
+| 4 | **Room Service** | Node.js + Express + Mongoose | 8004 / 50054 gRPC | MongoDB | Room types, inventory, and booking-backed availability |
+| 5 | **Booking Service** | Go + Chi | 8005 / 50051 gRPC | PostgreSQL + Redis | Reservations, 10-min hold, double-booking prevention |
+| 6 | **Payment Service** | NestJS + Prisma | 8006 | PostgreSQL | Stripe integration, webhooks, refunds |
+| 7 | **Employee Service** | Node.js + Express + Prisma | 8007 / 50057 gRPC | PostgreSQL | Employee records and department-aware staff directory |
+| 8 | **Housekeeping Service** | Node.js + Express + Mongoose | 8008 / 50058 gRPC | MongoDB | Room cleaning tasks, assignment, inspection, and status |
+| 9 | **Review Service** | NestJS + Mongoose | 8009 | MongoDB | Guest reviews, ratings, moderation |
+| 10 | **Notification Service** | Go | 8010 | PostgreSQL / MongoDB | Event notifications |
+| 11 | **Analytics Service** | Go | 8011 | PostgreSQL | Portfolio reporting |
+| 12 | **Department Service** | Node.js + Express + Mongoose | 8012 / 50059 gRPC | MongoDB | Property departments and the gRPC directory |
 
 ---
 
@@ -26,11 +31,12 @@ API Gateway (8000)
 ├── POST /api/v1/auth/**        → Auth Service (8001)
 ├── GET/PATCH /api/v1/users/**  → User Service (8002) [validates via Auth: 8001]
 ├── GET /api/v1/hotels/**       → Hotel & Room Service (8003)
-├── GET /api/v1/rooms/**        → Hotel & Room Service (8003) [availability via Booking: 8004]
-├── POST /api/v1/bookings/**    → Booking Service (8004) [inventory via Hotel: 8003]
-├── POST /api/v1/payments/**    → Payment Service (8005) [confirms booking via: 8004]
-├── GET/POST /api/v1/reviews/** → Review Service (8006) [verifies booking via: 8004]
-└── /api/v1/departments/**      → Department Service (8007) [validates via Auth: 8001]
+├── GET /api/v1/rooms/**        → Room Service (8004) [availability via Booking: 8005]
+├── POST /api/v1/bookings/**    → Booking Service (8005) [inventory via Room: 8004]
+├── POST /api/v1/payments/**    → Payment Service (8006) [confirms booking via: 8005]
+├── /api/v1/employees/**        → Employee Service (8007) [department lookup via gRPC]
+├── /api/v1/housekeeping/**     → Housekeeping Service (8008) [employee validation via gRPC]
+└── /api/v1/departments/**      → Department Service (8012) [hotel lookup via gRPC]
 ```
 
 ---
@@ -107,7 +113,9 @@ npm run dev        # http://localhost:3000
 npm run build
 ```
 
-The Next.js app uses `lib/api-client.ts` for all backend calls via the API Gateway, with graceful fallback to local mock data if services are offline.
+The Next.js app uses `lib/api-client.ts` for backend calls via the API Gateway.
+Public hotel browsing has fallback catalog data; operational admin screens show
+service errors instead of presenting failed requests as live data.
 
 ---
 
@@ -125,28 +133,26 @@ services/
 │   │   └── main.ts
 │   └── Dockerfile
 │
-├── auth-service/          # Go + Chi — Port 8001
+├── auth-service/          # NestJS + Prisma — Port 8001
 │   ├── config/
-│   ├── models/
-│   ├── repository/
-│   ├── services/
-│   ├── controllers/
-│   ├── middleware/
-│   ├── routes/
-│   ├── main.go
-│   ├── go.mod
+│   ├── prisma/
+│   ├── src/
 │   └── Dockerfile
 │
-├── user-service/          # Go + Chi — Port 8002
-│   └── [same structure as auth-service]
+├── user-service/          # NestJS + Prisma — Port 8002
+│   ├── prisma/
+│   ├── src/
+│   └── Dockerfile
 │
-├── hotel-room-service/    # Go + Chi — Port 8003
+├── hotel-service/         # Express + Mongoose — REST 8003, gRPC 50053
+│   └── src/{config,models,repositories,services,controllers,routes,grpc}
+├── room-service/          # Express + Mongoose — REST 8004, gRPC 50054
+│   └── src/{config,models,repositories,services,controllers,routes,grpc}
+│
+├── booking-service/       # Go + Chi — HTTP 8005, gRPC 50051
 │   └── [same structure]
 │
-├── booking-service/       # Go + Chi — Port 8004
-│   └── [same structure]
-│
-├── payment-service/       # NestJS + Prisma — Port 8005
+├── payment-service/       # NestJS + Prisma — Port 8006
 │   ├── prisma/
 │   ├── src/
 │   │   ├── config/
@@ -158,14 +164,19 @@ services/
 │   │   └── modules/
 │   └── Dockerfile
 │
-├── review-service/        # NestJS + Mongoose — Port 8006
+├── review-service/        # NestJS + Mongoose — Port 8009
 │   └── [NestJS structure]
 │
-├── department-service/    # NestJS + Prisma — Port 8007
-│   └── [NestJS structure]
+├── employee-service/      # Express + Prisma/PostgreSQL — REST 8007, gRPC 50057
+│   └── src/{config,models,repositories,services,controllers,routes,grpc}
+├── housekeeping-service/  # Express + Mongoose — REST 8008, gRPC 50058
+│   └── src/{config,models,repositories,services,controllers,routes,grpc}
+├── department-service/    # Express + Mongoose — REST 8012, gRPC 50059
+│   └── src/{config,models,repositories,services,controllers,routes,grpc}
 │
 ├── infra/
 │   └── init-databases.sql # Creates all 6 PostgreSQL databases
+├── ../proto/              # Shared gRPC contracts
 ├── docker-compose.yml
 └── render.yaml
 ```

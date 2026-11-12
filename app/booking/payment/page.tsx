@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent } from "react";
+import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BookingStepper } from "@/components/booking-stepper";
 import { BookingSummary } from "@/components/booking-summary";
@@ -9,6 +9,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { Button, PageHeading, Surface, TextField } from "@/components/ui";
 import { useBooking } from "@/components/booking-provider";
+import { api } from "@/lib/api-client";
 
 const methods = [
   { title: "Credit / Debit card", icon: "credit-card" as const },
@@ -18,11 +19,24 @@ const methods = [
 ];
 
 export default function PaymentPage() {
-  const { paymentMethod, setPaymentMethod } = useBooking();
+  const { paymentMethod, setPaymentMethod, booking, setBooking } = useBooking();
   const router = useRouter();
-  function submitPayment(event: FormEvent<HTMLFormElement>) {
+  const [error, setError] = useState("");
+  const [processing, setProcessing] = useState(false);
+  async function submitPayment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    router.push("/booking/confirmation");
+    if (!booking) { setError("Your room hold has expired. Please return to guest details and try again."); return; }
+    setProcessing(true); setError("");
+    try {
+      const intent = await api.createPaymentIntent(booking.bookingId, booking.bookingCode, booking.totalPrice);
+      const paymentId = intent.paymentId || intent.id || intent.clientSecret;
+      await api.confirmPaymentIntent(paymentId);
+      const confirmed = await api.confirmBooking(booking.bookingId);
+      if (!confirmed) throw new Error("The booking could not be confirmed.");
+      setBooking({ ...booking, totalPrice: booking.totalPrice });
+      router.push(`/booking/confirmation?code=${encodeURIComponent(booking.bookingCode)}`);
+    } catch (paymentError) { setError(paymentError instanceof Error ? paymentError.message : "Payment failed. Please try again."); }
+    finally { setProcessing(false); }
   }
 
   return (
@@ -89,10 +103,11 @@ export default function PaymentPage() {
                 <span className="text-[11px] text-muted">Amount payable</span>
                 <strong className="text-lg">₹24,480</strong>
               </div>
-              <Button type="submit" className="mt-4 w-full">Pay ₹24,480 &amp; confirm booking <FigmaIcon name="lock" className="h-4 w-4" /></Button>
+              <Button type="submit" disabled={processing} className="mt-4 w-full">{processing ? "Processing…" : "Pay ₹24,480 & confirm booking"} <FigmaIcon name="lock" className="h-4 w-4" /></Button>
               <p className="mt-3 text-[9px] text-muted">You may be redirected to your bank to complete verification. Please don’t close this page during payment.</p>
             </Surface>
           </form>
+          {error && <p role="alert" className="mt-3 rounded-[4px] bg-blush p-3 text-[10px] text-red-800">{error}</p>}
           <div className="mt-4 rounded-[4px] bg-sky p-4 text-[10px] text-muted">
             <FigmaIcon name="info" className="mr-2 h-3.5 w-3.5" /> Prefer another way? Pay with any UPI app, major Indian bank, or supported wallet using the options above.
           </div>

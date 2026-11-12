@@ -9,6 +9,7 @@ const sections: AdminSection[] = [
   "customers",
   "departments",
   "employees",
+  "housekeeping",
   "roles",
   "payments",
   "offers",

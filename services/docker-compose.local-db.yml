@@ -28,7 +28,9 @@ services:
 
   # ── API Gateway (NestJS :8000) ───────────────────────────────
   api-gateway:
-    build: ./api-gateway
+    build:
+      context: ..
+      dockerfile: services/api-gateway/Dockerfile
     container_name: stayease-api-gateway
     restart: always
     ports: ["8000:8000"]
@@ -45,6 +47,7 @@ services:
       BOOKING_SERVICE_URL: http://booking-service:8005
       PAYMENT_SERVICE_URL: http://payment-service:8006
       EMPLOYEE_SERVICE_URL: http://employee-service:8007
+      DEPARTMENT_SERVICE_URL: http://department-service:8012
       HOUSEKEEPING_SERVICE_URL: http://housekeeping-service:8008
       REVIEW_SERVICE_URL: http://review-service:8009
       NOTIFICATION_SERVICE_URL: http://notification-service:8010
@@ -82,32 +85,41 @@ services:
       DATABASE_URL: postgresql://postgres:Malay%4021@host.docker.internal:5432/hotel_users_db?schema=public
       AUTH_SERVICE_URL: http://auth-service:8001
 
-  # ── 3. Hotel Catalog Service (NestJS + Local MongoDB :8003) ──
+  # ── 3. Hotel Catalog Service (Express + Local MongoDB :8003) ──
   hotel-service:
-    build: ./hotel-service
+    build:
+      context: ..
+      dockerfile: services/hotel-service/Dockerfile
     container_name: stayease-hotel-service
     restart: always
-    ports: ["8003:8003"]
+    ports: ["8003:8003", "50053:50053"]
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
       PORT: 8003
+      GRPC_PORT: 50053
       MONGODB_URI: mongodb://host.docker.internal:27017/hotel_catalog
       REDIS_URL: redis://redis:6379
       AUTH_SERVICE_URL: http://auth-service:8001
 
-  # ── 4. Room Service (NestJS + Local MongoDB :8004) ────────────
+  # ── 4. Room Service (Express + Local MongoDB :8004) ──────────
   room-service:
-    build: ./room-service
+    build:
+      context: ..
+      dockerfile: services/room-service/Dockerfile
     container_name: stayease-room-service
     restart: always
-    ports: ["8004:8004"]
+    ports: ["8004:8004", "50054:50054"]
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
       PORT: 8004
+      GRPC_PORT: 50054
       MONGODB_URI: mongodb://host.docker.internal:27017/hotel_catalog
       BOOKING_SERVICE_URL: http://booking-service:8005
+      HOTEL_GRPC_URL: hotel-service:50053
+    depends_on:
+      - hotel-service
 
   # ── 5. Booking Service (Go + Local PostgreSQL + Redis :8005) ─
   booking-service:
@@ -150,34 +162,61 @@ services:
     depends_on:
       - rabbitmq
 
-  # ── 7. Employee Service (NestJS + Local PostgreSQL :8007) ────
+  # ── 7. Employee Service (Express + Local PostgreSQL :8007) ───
   employee-service:
-    build: ./employee-service
+    build:
+      context: ..
+      dockerfile: services/employee-service/Dockerfile
     container_name: stayease-employee-service
     restart: always
-    ports: ["8007:8007"]
+    ports: ["8007:8007", "50057:50057"]
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
       PORT: 8007
+      GRPC_PORT: 50057
       DATABASE_URL: postgresql://postgres:Malay%4021@host.docker.internal:5432/hotel_operations_db?schema=public
       AUTH_SERVICE_URL: http://auth-service:8001
+      DEPARTMENT_GRPC_URL: department-service:50059
+    depends_on:
+      - department-service
 
-  # ── 8. Housekeeping Service (NestJS + Local MongoDB :8008) ───
+  department-service:
+    build:
+      context: ..
+      dockerfile: services/department-service/Dockerfile
+    container_name: stayease-department-service
+    restart: always
+    ports: ["8012:8012", "50059:50059"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      PORT: 8012
+      GRPC_PORT: 50059
+      MONGODB_URI: mongodb://host.docker.internal:27017/hotel_departments
+      HOTEL_GRPC_URL: hotel-service:50053
+    depends_on:
+      - hotel-service
+
+  # ── 8. Housekeeping Service (Express + Local MongoDB :8008) ───
   housekeeping-service:
-    build: ./housekeeping-service
+    build:
+      context: ..
+      dockerfile: services/housekeeping-service/Dockerfile
     container_name: stayease-housekeeping-service
     restart: always
-    ports: ["8008:8008"]
+    ports: ["8008:8008", "50058:50058"]
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
       PORT: 8008
+      GRPC_PORT: 50058
       MONGODB_URI: mongodb://host.docker.internal:27017/hotel_housekeeping
       RABBITMQ_URL: amqp://hotel_admin:hotel_rabbit_pass@rabbitmq:5672
       AUTH_SERVICE_URL: http://auth-service:8001
+      EMPLOYEE_GRPC_URL: employee-service:50057
     depends_on:
-      - rabbitmq
+      - employee-service
 
   # ── 9. Review Service (NestJS + Local MongoDB :8009) ─────────
   review-service:

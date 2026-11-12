@@ -75,7 +75,9 @@ services:
 
   # API Gateway [NestJS]
   api-gateway:
-    build: ./api-gateway
+    build:
+      context: ..
+      dockerfile: services/api-gateway/Dockerfile
     container_name: hotel-api-gateway
     restart: always
     ports: ["8000:8000"]
@@ -90,6 +92,7 @@ services:
       BOOKING_SERVICE_URL: http://booking-service:8005
       PAYMENT_SERVICE_URL: http://payment-service:8006
       EMPLOYEE_SERVICE_URL: http://employee-service:8007
+      DEPARTMENT_SERVICE_URL: http://department-service:8012
       HOUSEKEEPING_SERVICE_URL: http://housekeeping-service:8008
       REVIEW_SERVICE_URL: http://review-service:8009
       NOTIFICATION_SERVICE_URL: http://notification-service:8010
@@ -129,33 +132,42 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
 
-  # Hotel Management Service [NestJS + MongoDB (Mongoose)]
+  # Hotel Management Service [Express + MongoDB (Mongoose)]
   hotel-service:
-    build: ./hotel-service
+    build:
+      context: ..
+      dockerfile: services/hotel-service/Dockerfile
     container_name: hotel-management-service
     restart: always
-    ports: ["8003:8003"]
+    ports: ["8003:8003", "50053:50053"]
     environment:
       PORT: 8003
       MONGODB_URI: mongodb://mongo:27017/hotel_catalog
+      GRPC_PORT: 50053
       REDIS_URL: redis://redis:6379
       AUTH_SERVICE_URL: http://auth-service:8001
     depends_on:
       mongo: { condition: service_healthy }
       redis: { condition: service_healthy }
 
-  # Room Management Service [NestJS + MongoDB (Mongoose)]
+  # Room Management Service [Express + MongoDB (Mongoose)]
   room-service:
-    build: ./room-service
+    build:
+      context: ..
+      dockerfile: services/room-service/Dockerfile
     container_name: hotel-room-service
     restart: always
-    ports: ["8004:8004"]
+    ports: ["8004:8004", "50054:50054"]
     environment:
       PORT: 8004
       MONGODB_URI: mongodb://mongo:27017/hotel_catalog
+      GRPC_PORT: 50054
       BOOKING_SERVICE_URL: http://booking-service:8005
+      HOTEL_GRPC_URL: hotel-service:50053
     depends_on:
       mongo: { condition: service_healthy }
+      hotel-service:
+        condition: service_started
 
   # Payment Service [NestJS + PostgreSQL (Prisma)]
   payment-service:
@@ -173,32 +185,59 @@ services:
       postgres: { condition: service_healthy }
       rabbitmq: { condition: service_healthy }
 
-  # Employee & Department Service [NestJS + PostgreSQL]
+  # Employee Service [Express + PostgreSQL (Prisma)]
   employee-service:
-    build: ./employee-service
+    build:
+      context: ..
+      dockerfile: services/employee-service/Dockerfile
     container_name: hotel-employee-service
     restart: always
-    ports: ["8007:8007"]
+    ports: ["8007:8007", "50057:50057"]
     environment:
       PORT: 8007
       DATABASE_URL: postgresql://postgres:postgrespassword@postgres:5432/hotel_operations_db?schema=public
       AUTH_SERVICE_URL: http://auth-service:8001
+      DEPARTMENT_GRPC_URL: department-service:50059
     depends_on:
       postgres: { condition: service_healthy }
+      department-service:
+        condition: service_started
 
-  # Housekeeping Service [NestJS + MongoDB]
-  housekeeping-service:
-    build: ./housekeeping-service
-    container_name: hotel-housekeeping-service
+  department-service:
+    build:
+      context: ..
+      dockerfile: services/department-service/Dockerfile
+    container_name: hotel-department-service
     restart: always
-    ports: ["8008:8008"]
+    ports: ["8012:8012", "50059:50059"]
     environment:
-      PORT: 8008
-      MONGODB_URI: mongodb://mongo:27017/hotel_housekeeping
-      RABBITMQ_URL: amqp://hotel_admin:hotel_rabbit_pass@rabbitmq:5672
+      PORT: 8012
+      GRPC_PORT: 50059
+      MONGODB_URI: mongodb://mongo:27017/hotel_departments
+      HOTEL_GRPC_URL: hotel-service:50053
     depends_on:
       mongo: { condition: service_healthy }
-      rabbitmq: { condition: service_healthy }
+      hotel-service:
+        condition: service_started
+
+  # Housekeeping Service [Express + MongoDB]
+  housekeeping-service:
+    build:
+      context: ..
+      dockerfile: services/housekeeping-service/Dockerfile
+    container_name: hotel-housekeeping-service
+    restart: always
+    ports: ["8008:8008", "50058:50058"]
+    environment:
+      PORT: 8008
+      GRPC_PORT: 50058
+      MONGODB_URI: mongodb://mongo:27017/hotel_housekeeping
+      RABBITMQ_URL: amqp://hotel_admin:hotel_rabbit_pass@rabbitmq:5672
+      EMPLOYEE_GRPC_URL: employee-service:50057
+    depends_on:
+      mongo: { condition: service_healthy }
+      employee-service:
+        condition: service_started
 
   # Review Service [NestJS + MongoDB]
   review-service:
@@ -231,7 +270,7 @@ services:
       DATABASE_URL: postgres://postgres:postgrespassword@postgres:5432/hotel_bookings_db?sslmode=disable
       REDIS_URL: redis://redis:6379
       RABBITMQ_URL: amqp://hotel_admin:hotel_rabbit_pass@rabbitmq:5672
-      HOTEL_SERVICE_URL: http://hotel-service:8003
+      HOTEL_SERVICE_URL: http://room-service:8004
       AUTH_SERVICE_URL: http://auth-service:8001
       PAYMENT_SERVICE_URL: http://payment-service:8006
     depends_on:

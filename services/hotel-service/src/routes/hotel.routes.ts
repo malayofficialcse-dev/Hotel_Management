@@ -1,12 +1,12 @@
-export const HOTEL_ROUTES = {
-  BASE: "/api/v1/hotels",
-  HEALTH: "/api/v1/hotels/health",
-  GET_ALL: "/api/v1/hotels",
-  GET_BY_SLUG: "/api/v1/hotels/:slug",
-  CREATE: "/api/v1/hotels",
-  UPDATE: "/api/v1/hotels/:id",
-  DELETE: "/api/v1/hotels/:id",
-} as const;
+import { Router } from "express";
+import { HotelController } from "../controllers/hotel.controller.js";
 
-export type HotelRoutes = typeof HOTEL_ROUTES;
+const controller = new HotelController();
+export const hotelRoutes = Router();
 
+hotelRoutes.get("/", (req, res, next) => void controller.list(req, res).catch(next));
+hotelRoutes.post("/", (req, res, next) => void controller.create(req, res).catch(next));
+hotelRoutes.get("/:identifier", (req, res, next) => void controller.get(req, res).catch(next));
+hotelRoutes.patch("/:identifier", (req, res, next) => void controller.update(req, res).catch(next));
+hotelRoutes.put("/:identifier", (req, res, next) => void controller.update(req, res).catch(next));
+hotelRoutes.delete("/:identifier", (req, res, next) => void controller.delete(req, res).catch(next));

@@ -3,26 +3,16 @@
 -- Database: PostgreSQL 16
 -- ============================================================
 
-CREATE TABLE IF NOT EXISTS departments (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(64) NOT NULL,
-    hotel_id VARCHAR(64) NOT NULL,
-    description TEXT,
-    head_id UUID,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
 CREATE TABLE IF NOT EXISTS employees (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL UNIQUE,
-    department_id UUID NOT NULL REFERENCES departments(id),
+    department_id VARCHAR(64) NOT NULL,
     name VARCHAR(128) NOT NULL,
     email VARCHAR(255) NOT NULL,
     phone VARCHAR(32),
     position VARCHAR(64) NOT NULL,
     joining_date DATE NOT NULL,
-    salary NUMERIC(10, 2),
+    salary DOUBLE PRECISION,
     is_active BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -32,7 +22,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     title VARCHAR(255) NOT NULL,
     description TEXT,
-    department_id UUID NOT NULL REFERENCES departments(id),
+    department_id VARCHAR(64) NOT NULL,
     assignee_id UUID REFERENCES employees(id),
     priority VARCHAR(16) NOT NULL DEFAULT 'MEDIUM', -- LOW | MEDIUM | HIGH | URGENT
     status VARCHAR(32) NOT NULL DEFAULT 'PENDING',  -- PENDING | IN_PROGRESS | COMPLETED | CANCELLED

@@ -1,74 +1,58 @@
-import { Injectable, OnModuleInit } from "@nestjs/common";
-import { HotelRepository } from "../repository/hotel.repository.js";
-import { RedisService } from "../config/redis.service.js";
-import { SEED_HOTELS } from "../utils/seed_data.js";
+import { HotelRepository, type HotelFilters } from "../repositories/hotel.repository.js";
 
-@Injectable()
-export class HotelService implements OnModuleInit {
-  constructor(
-    private readonly repo: HotelRepository,
-    private readonly redis: RedisService,
-  ) {}
+const repository = new HotelRepository();
+const editableFields = [
+  "slug",
+  "name",
+  "city",
+  "location",
+  "mainImage",
+  "galleryImages",
+  "basePrice",
+  "rating",
+  "reviewsCount",
+  "tag",
+  "offer",
+  "category",
+  "description",
+  "amenities",
+  "isActive",
+];
 
-  async onModuleInit() {
-    try {
-      const count = await this.repo.count();
-      if (count === 0) {
-        console.log("🌱 [Hotel Service] Seeding initial hotels into MongoDB...");
-        for (const hotel of SEED_HOTELS) {
-          await this.repo.create(hotel);
-        }
-        console.log("✅ Seed completed.");
-      }
-    } catch (e: any) {
-      console.warn("⚠️ Hotel MongoDB seed notice:", e.message);
-    }
+export class HotelService {
+  list(filters: HotelFilters) {
+    return repository.list(filters);
   }
 
-  async getHotels(query: { city?: string; category?: string; search?: string; minPrice?: number; maxPrice?: number }) {
-    const cacheKey = `cache:hotels:list:${JSON.stringify(query)}`;
-    const cached = await this.redis.get(cacheKey);
-    if (cached) return { source: "cache", data: JSON.parse(cached) };
-
-    const filter: any = { isActive: true };
-    if (query.city && query.city !== "All") filter.city = new RegExp(query.city, "i");
-    if (query.category && query.category !== "All Stays" && query.category !== "All") {
-      filter.category = query.category;
-    }
-    if (query.search) {
-      filter.$or = [
-        { name: new RegExp(query.search, "i") },
-        { location: new RegExp(query.search, "i") },
-        { city: new RegExp(query.search, "i") },
-      ];
-    }
-    if (query.minPrice || query.maxPrice) {
-      filter.basePrice = {};
-      if (query.minPrice) filter.basePrice.$gte = Number(query.minPrice);
-      if (query.maxPrice) filter.basePrice.$lte = Number(query.maxPrice);
-    }
-
-    try {
-      const hotels = await this.repo.findAll(filter);
-      if (hotels.length > 0) {
-        await this.redis.set(cacheKey, JSON.stringify(hotels), 120);
-        return { source: "db", data: hotels };
-      }
-    } catch {}
-
-    return { source: "fallback", data: SEED_HOTELS };
+  get(identifier: string) {
+    return repository.findByIdentifier(identifier);
   }
 
-  async getHotelBySlug(slug: string) {
-    try {
-      const hotel = await this.repo.findBySlugOrId(slug);
-      if (hotel) return hotel;
-    } catch {}
-    return SEED_HOTELS.find((h) => h.slug === slug) || null;
+  async create(body: Record<string, unknown>) {
+    const data = this.pickFields(body);
+    for (const field of ["name", "city", "location", "basePrice", "category"]) {
+      if (data[field] === undefined || data[field] === "") throw new Error(`${field} is required`);
+    }
+    if (typeof data.name !== "string") throw new Error("name must be a string");
+    data.slug =
+      typeof data.slug === "string" && data.slug.trim()
+        ? data.slug.trim().toLowerCase()
+        : data.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    return repository.create(data);
   }
 
-  async createHotel(data: any) {
-    return this.repo.create(data);
+  update(identifier: string, body: Record<string, unknown>) {
+    const data = this.pickFields(body);
+    if (Object.keys(data).length === 0) throw new Error("at least one supported field is required");
+    if (typeof data.slug === "string") data.slug = data.slug.trim().toLowerCase();
+    return repository.update(identifier, data);
+  }
+
+  delete(identifier: string) {
+    return repository.delete(identifier);
+  }
+
+  private pickFields(body: Record<string, unknown>) {
+    return Object.fromEntries(editableFields.filter((field) => body[field] !== undefined).map((field) => [field, body[field]]));
   }
 }
-

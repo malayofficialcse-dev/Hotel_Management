@@ -1,0 +1,12 @@
+import { Router } from "express";
+import { DepartmentController } from "../controllers/department.controller.js";
+
+const controller = new DepartmentController();
+export const departmentRoutes = Router();
+
+departmentRoutes.get("/", (req, res, next) => void controller.list(req, res).catch(next));
+departmentRoutes.post("/", (req, res, next) => void controller.create(req, res).catch(next));
+departmentRoutes.get("/:id", (req, res, next) => void controller.get(req, res).catch(next));
+departmentRoutes.patch("/:id", (req, res, next) => void controller.update(req, res).catch(next));
+departmentRoutes.put("/:id", (req, res, next) => void controller.update(req, res).catch(next));
+departmentRoutes.delete("/:id", (req, res, next) => void controller.delete(req, res).catch(next));

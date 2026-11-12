@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { hotels } from "@/lib/data";
+import { api, type AdminDepartment, type AdminEmployee, type AdminHotel, type AdminRoom, type HousekeepingTask } from "@/lib/api-client";
 import {
   sectionRecords,
   sectionTabs,
@@ -15,20 +16,154 @@ import {
 const chartValues = [31, 47, 42, 59, 52, 70, 61, 82, 72, 90, 77, 100];
 const formatNumber = (value: number) => value.toLocaleString("en-IN");
 
+async function loadLiveRecords(section: AdminSection): Promise<AdminRecord[] | null> {
+  const date = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  if (section === "hotels") {
+    const rows = await api.getAdminHotels();
+    return rows.map((hotel: AdminHotel) => ({
+      id: hotel.slug || hotel._id,
+      name: hotel.name,
+      detail: `${hotel.location} · ${hotel.city}`,
+      status: hotel.isActive ? "Active" : "Inactive",
+      value: `${hotel.rating} / 5`,
+      date,
+    }));
+  }
+  if (section === "rooms") {
+    const rows = await api.getAdminRooms();
+    return rows.map((room: AdminRoom) => ({
+      id: room._id,
+      name: room.name,
+      detail: `${room.hotelId} · ${room.bedType || `${room.capacity} guests`}`,
+      status: room.isActive ? "Available" : "Inactive",
+      value: `${room.totalInventory} rooms · ₹${room.price.toLocaleString("en-IN")} / night`,
+      date,
+    }));
+  }
+  if (section === "departments") {
+    const rows = await api.getAdminDepartments();
+    return rows.map((department: AdminDepartment) => ({
+      id: department._id,
+      name: department.name,
+      detail: department.description || `Hotel ${department.hotelId}`,
+      status: department.isActive ? "Active" : "Inactive",
+      value: "Department",
+      date,
+    }));
+  }
+  if (section === "employees") {
+    const rows = await api.getAdminEmployees();
+    return rows.map((employee: AdminEmployee) => ({
+      id: employee.id,
+      name: employee.name,
+      detail: `${employee.department?.name || employee.departmentId} · ${employee.email}`,
+      status: employee.isActive ? "Active" : "Inactive",
+      value: employee.position,
+      date,
+    }));
+  }
+  if (section === "housekeeping") {
+    const rows = await api.getAdminHousekeepingTasks();
+    return rows.map((task: HousekeepingTask) => ({
+      id: task._id,
+      name: `Room ${task.roomNumber}`,
+      detail: `${task.hotelId} · ${task.taskType || "STANDARD"}`,
+      status: task.status.replaceAll("_", " "),
+      value: task.assignedTo || "Unassigned",
+      date,
+    }));
+  }
+  return null;
+}
+
+const createFields: Partial<Record<AdminSection, CreateField[]>> = {
+  hotels: [
+    { name: "name", label: "Hotel name", required: true },
+    { name: "city", label: "City", required: true },
+    { name: "location", label: "Location", required: true },
+    { name: "category", label: "Category", required: true },
+    { name: "basePrice", label: "Base price per night", type: "number", required: true },
+  ],
+  rooms: [
+    { name: "hotelId", label: "Hotel slug / ID", required: true },
+    { name: "name", label: "Room name", required: true },
+    { name: "price", label: "Price per night", type: "number", required: true },
+    { name: "capacity", label: "Guest capacity", type: "number", required: true },
+    { name: "totalInventory", label: "Room inventory", type: "number", required: true },
+  ],
+  departments: [
+    { name: "hotelId", label: "Hotel slug / ID", required: true },
+    { name: "name", label: "Department name", required: true },
+    { name: "description", label: "Description" },
+  ],
+  employees: [
+    {
+      name: "userId",
+      label: "Auth user ID (UUID)",
+      required: true,
+      placeholder: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      pattern: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+      title: "Enter the UUID of an existing auth user.",
+    },
+    { name: "departmentId", label: "Department ID", required: true },
+    { name: "name", label: "Full name", required: true },
+    { name: "email", label: "Email", type: "email", required: true },
+    { name: "position", label: "Position", required: true },
+    { name: "joiningDate", label: "Joining date", type: "date", required: true },
+  ],
+  housekeeping: [
+    { name: "hotelId", label: "Hotel slug / ID", required: true },
+    { name: "roomNumber", label: "Room number", required: true },
+    { name: "taskType", label: "Task type" },
+    { name: "assignedTo", label: "Assigned employee ID" },
+  ],
+};
+
 export function AdminWorkspace({ section }: { section: AdminSection }) {
   const [records, setRecords] = useState<AdminRecord[]>(sectionRecords[section] ?? []);
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState(sectionTabs[section]?.[0] ?? "Overview");
   const [notice, setNotice] = useState("");
   const [period, setPeriod] = useState("Last 30 days");
+  const [loading, setLoading] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const content = sectionTitles[section];
+  const live = ["hotels", "rooms", "departments", "employees", "housekeeping"].includes(section);
+
+  useEffect(() => {
+    let active = true;
+    setRecords(live ? [] : sectionRecords[section] ?? []);
+    if (!live) return () => { active = false; };
+    setLoadFailed(false);
+    setLoading(true);
+    loadLiveRecords(section)
+      .then((rows) => {
+        if (active && rows) {
+          setRecords(rows);
+          setLoadFailed(false);
+        }
+      })
+      .catch((error: unknown) => {
+        if (active) {
+          setLoadFailed(true);
+          setNotice(error instanceof Error ? `Could not load ${content.title.toLowerCase()}: ${error.message}` : "Could not load records.");
+        }
+      })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [section, live, content.title]);
+
   const filtered = useMemo(
     () => records.filter((row) => `${row.id} ${row.name} ${row.detail} ${row.status}`.toLowerCase().includes(query.toLowerCase())),
     [records, query],
   );
 
   function onAction() {
-    if (section === "settings") {
+    if (live) {
+      setCreateOpen(true);
+      setNotice("");
+    } else if (section === "settings") {
       setNotice("Workspace settings saved.");
     } else if (section === "notifications") {
       setRecords((rows) => rows.map((row) => ({ ...row, status: "Read" })));
@@ -51,6 +186,80 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
     }
   }
 
+  async function submitCreate(data: Record<string, unknown>) {
+    try {
+      if (section === "hotels") await api.createHotel(data);
+      else if (section === "rooms") await api.createRoom(data);
+      else if (section === "departments") await api.createDepartment(data);
+      else if (section === "employees") await api.createEmployee(data);
+      else if (section === "housekeeping") await api.createHousekeepingTask(data);
+    } catch (error) {
+      setNotice(error instanceof Error ? `Could not create record: ${error.message}` : "Could not create record.");
+      return;
+    }
+
+    setCreateOpen(false);
+    setNotice("Record created successfully.");
+    setLoading(true);
+    try {
+      const rows = await loadLiveRecords(section);
+      if (rows) setRecords(rows);
+    } catch (error) {
+      setNotice(error instanceof Error ? `Record created, but the list could not be refreshed: ${error.message}` : "Record created, but the list could not be refreshed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onRecordAction(row: AdminRecord) {
+    if (!live) {
+      setNotice(`Selected ${row.name}.`);
+      return;
+    }
+
+    if (section !== "housekeeping") {
+      if (!window.confirm(`Remove ${row.name} from this workspace?`)) return;
+      try {
+        if (section === "hotels") await api.deleteHotel(row.id);
+        else if (section === "rooms") await api.deleteRoom(row.id);
+        else if (section === "departments") await api.deleteDepartment(row.id);
+        else if (section === "employees") await api.deleteEmployee(row.id);
+        setNotice(`${row.name} removed.`);
+      } catch (error) {
+        setNotice(error instanceof Error ? `Could not remove record: ${error.message}` : "Could not remove record.");
+        return;
+      }
+      try {
+        setRecords((await loadLiveRecords(section)) || []);
+      } catch (error) {
+        setNotice(error instanceof Error ? `Record removed, but the list could not be refreshed: ${error.message}` : "Record removed, but the list could not be refreshed.");
+      }
+      return;
+    }
+
+    const transitions: Record<string, string> = {
+      DIRTY: "IN_PROGRESS",
+      "IN PROGRESS": "CLEAN",
+      CLEAN: "INSPECTED",
+      INSPECTED: "DIRTY",
+      MAINTENANCE: "DIRTY",
+    };
+    const nextStatus = transitions[row.status.toUpperCase()];
+    if (!nextStatus) return;
+    try {
+      await api.updateHousekeepingTask(row.id, { status: nextStatus });
+      setNotice(`${row.name} marked ${nextStatus.toLowerCase().replaceAll("_", " ")}.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? `Could not update task: ${error.message}` : "Could not update task.");
+      return;
+    }
+    try {
+      setRecords((await loadLiveRecords(section)) || []);
+    } catch (error) {
+      setNotice(error instanceof Error ? `Task updated, but the list could not be refreshed: ${error.message}` : "Task updated, but the list could not be refreshed.");
+    }
+  }
+
   if (section === "dashboard") {
     return <Dashboard onPeriodChange={setPeriod} period={period} />;
   }
@@ -59,7 +268,7 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
     return (
       <>
         <PageHeader section={section} notice={notice} onAction={onAction} />
-        <Stats section={section} />
+        <Stats section={section} records={records} unavailable={loadFailed} />
         <div className="admin-settings-grid">
           <section className="admin-panel admin-settings-panel">
             <h2>Workspace details</h2><p className="admin-panel-subtitle">Manage the details used across your portfolio.</p>
@@ -89,8 +298,7 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
   return (
     <>
       <PageHeader section={section} notice={notice} onAction={onAction} />
-      <Stats section={section} />
-      {section === "hotels" && <PropertyStrip />}
+      <Stats section={section} records={records} />
       {section === "reports" && <ReportsChart period={period} onPeriodChange={setPeriod} />}
       {section === "roles" && <RoleNotice />}
       <section className="admin-panel admin-table-panel">
@@ -112,7 +320,7 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
         <div className="admin-table-scroll">
           <table className="admin-table">
             <thead><tr><th><input type="checkbox" aria-label="Select all rows" /></th><th>{section === "reservations" ? "BOOKING ID" : "ID"}</th><th>{section === "customers" || section === "employees" ? "GUEST / TEAM MEMBER" : "NAME"}</th><th>DETAILS</th><th>STATUS</th><th>{section === "hotels" ? "RATING" : "VALUE"}</th><th>UPDATED</th><th><span className="sr-only">Actions</span></th></tr></thead>
-            <tbody>{filtered.map((row) => (
+            <tbody>{loading ? <tr><td colSpan={8}>Loading records…</td></tr> : filtered.map((row) => (
               <tr key={row.id}>
                 <td><input type="checkbox" aria-label={`Select ${row.name}`} /></td>
                 <td className="admin-id">{row.id}</td>
@@ -125,7 +333,7 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
                 <td><StatusBadge status={row.status} /></td>
                 <td className="admin-value-cell">{row.value}</td>
                 <td className="admin-date-cell">{row.date}</td>
-                <td><button className="admin-row-menu" type="button" aria-label={`Actions for ${row.name}`} onClick={() => setNotice(`Selected ${row.name}.`)}>···</button></td>
+                <td><button className="admin-row-menu" type="button" aria-label={`Actions for ${row.name}`} onClick={() => void onRecordAction(row)}>{section === "housekeeping" ? "Update" : live ? "Remove" : "···"}</button></td>
               </tr>
             ))}</tbody>
           </table>
@@ -134,6 +342,14 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
         <div className="admin-table-foot"><span>Showing {filtered.length ? 1 : 0}–{filtered.length} of {formatNumber(filtered.length)} properties · Portfolio totals in INR</span><div><span>Page 1 of 1</span><button type="button" aria-label="Previous page" disabled>‹</button><button type="button" aria-label="Next page" disabled>›</button></div></div>
       </section>
       {section === "hotels" && <div className="admin-footnote">StayEase Admin · All times in property local time</div>}
+      {createOpen && (
+        <CreateRecordDialog
+          section={section}
+          fields={createFields[section] || []}
+          onClose={() => setCreateOpen(false)}
+          onSubmit={(data) => void submitCreate(data)}
+        />
+      )}
     </>
   );
 }
@@ -152,12 +368,219 @@ function PageHeader({ section, notice, onAction }: { section: AdminSection; noti
   );
 }
 
-function Stats({ section }: { section: AdminSection }) {
-  return <div className="admin-stats-grid">{statCards[section].map((stat, index) => <div key={stat.label} className="admin-stat-card"><div className="admin-stat-top"><span>{stat.label}</span><span className={`admin-stat-icon tone-${index % 4}`}>{["↗", "⌂", "▤", "◷"][index % 4]}</span></div><strong>{stat.value}</strong><small>{stat.note}</small></div>)}</div>;
+function Stats({
+  section,
+  records,
+  cards: suppliedCards,
+  unavailable = false,
+}: {
+  section: AdminSection;
+  records?: AdminRecord[];
+  cards?: { label: string; value: string; note: string }[];
+  unavailable?: boolean;
+}) {
+  let cards = suppliedCards || statCards[section];
+  if (records && ["hotels", "rooms", "departments", "employees", "housekeeping"].includes(section)) {
+    const active = records.filter((row) => row.status.toLowerCase() !== "inactive").length;
+    if (section === "housekeeping") {
+      cards = [
+        { label: "Open tasks", value: String(records.filter((row) => row.status !== "INSPECTED").length), note: "Across all properties" },
+        { label: "In progress", value: String(records.filter((row) => row.status === "IN PROGRESS").length), note: "Currently being serviced" },
+        { label: "Ready for inspection", value: String(records.filter((row) => row.status === "CLEAN").length), note: "Clean rooms awaiting review" },
+        { label: "Completed today", value: String(records.filter((row) => row.status === "INSPECTED").length), note: "All properties" },
+      ];
+    } else {
+      cards = [
+        { label: `Total ${section}`, value: formatNumber(records.length), note: "Loaded from service" },
+        { label: "Active", value: formatNumber(active), note: "Currently enabled" },
+        { label: section === "rooms" ? "Room types" : "Records shown", value: formatNumber(records.length), note: "Across your portfolio" },
+        { label: "Last synced", value: "Live", note: "Connected to service" },
+      ];
+    }
+    if (unavailable) {
+      cards = cards.map((card) => ({ ...card, value: "Unavailable", note: "Service connection failed" }));
+    }
+  }
+  return <div className="admin-stats-grid">{cards.map((stat, index) => <div key={stat.label} className="admin-stat-card"><div className="admin-stat-top"><span>{stat.label}</span><span className={`admin-stat-icon tone-${index % 4}`}>{["↗", "⌂", "▤", "◷"][index % 4]}</span></div><strong>{stat.value}</strong><small>{stat.note}</small></div>)}</div>;
+}
+
+type CreateField = {
+  name: string;
+  label: string;
+  type?: string;
+  required?: boolean;
+  placeholder?: string;
+  pattern?: string;
+  title?: string;
+};
+
+function CreateRecordDialog({
+  section,
+  fields,
+  onClose,
+  onSubmit,
+}: {
+  section: AdminSection;
+  fields: CreateField[];
+  onClose: () => void;
+  onSubmit: (data: Record<string, unknown>) => void;
+}) {
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [lookupOptions, setLookupOptions] = useState<Record<string, { value: string; label: string }[]>>({});
+  const [lookupErrors, setLookupErrors] = useState<string[]>([]);
+  const [loadingLookups, setLoadingLookups] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    const lookups: [string, string, Promise<{ value: string; label: string }[]>][] = [];
+    if (["rooms", "departments", "housekeeping"].includes(section)) {
+      lookups.push(["hotelId", "hotels", api.getAdminHotels().then((rows) =>
+        rows.map((hotel) => ({ value: hotel.slug || hotel._id, label: `${hotel.name} · ${hotel.city}` })),
+      )]);
+    }
+    if (section === "employees") {
+      lookups.push(["departmentId", "departments", api.getAdminDepartments().then((rows) =>
+        rows.map((department) => ({ value: department._id, label: `${department.name} · ${department.hotelId}` })),
+      )]);
+    }
+    if (section === "housekeeping") {
+      lookups.push(["assignedTo", "employees", api.getAdminEmployees().then((rows) =>
+        rows.map((employee) => ({ value: employee.id, label: `${employee.name} · ${employee.position}` })),
+      )]);
+    }
+    if (lookups.length === 0) return () => { active = false; };
+
+    setLoadingLookups(true);
+    Promise.all(lookups.map(async ([field, label, request]): Promise<
+      | { field: string; label: string; options: { value: string; label: string }[] }
+      | { field: string; label: string; error: string }
+    > => {
+      try {
+        return { field, label, options: await request };
+      } catch (error) {
+        return { field, label, error: error instanceof Error ? error.message : "Request failed" };
+      }
+    })).then((results) => {
+      if (!active) return;
+      const options: Record<string, { value: string; label: string }[]> = {};
+      const errors: string[] = [];
+      for (const result of results) {
+        if ("options" in result) options[result.field] = result.options;
+        else errors.push(`${result.label}: ${result.error}`);
+      }
+      setLookupOptions(options);
+      setLookupErrors(errors);
+    }).finally(() => {
+      if (active) setLoadingLookups(false);
+    });
+    return () => { active = false; };
+  }, [section]);
+
+  const requiredLookupsReady = fields
+    .filter((field) => field.required && ["hotelId", "departmentId"].includes(field.name))
+    .every((field) => Boolean(lookupOptions[field.name]?.length));
+  const hasRequiredLookups = fields.some((field) => field.required && ["hotelId", "departmentId"].includes(field.name));
+  const missingRequiredOptions = fields.some(
+    (field) => field.required && ["hotelId", "departmentId"].includes(field.name) && !lookupOptions[field.name]?.length,
+  );
+
+  return (
+    <div className="admin-dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+      <form className="admin-dialog" onSubmit={(event) => {
+        event.preventDefault();
+        const data: Record<string, unknown> = Object.fromEntries(Object.entries(values).filter(([, value]) => value !== ""));
+        for (const field of ["basePrice", "price", "capacity", "totalInventory", "salary"]) {
+          if (data[field] !== undefined) data[field] = Number(data[field]);
+        }
+        onSubmit(data);
+      }}>
+        <div className="admin-dialog-heading"><div><span className="admin-eyebrow">NEW RECORD</span><h2>{sectionTitles[section].action}</h2></div><button type="button" className="admin-row-menu" aria-label="Close dialog" onClick={onClose}>×</button></div>
+        <div className="admin-dialog-fields">
+          {fields.map((field) => (
+            <label key={field.name}>{field.label}
+              {lookupOptions[field.name] ? (
+                <select
+                  required={field.required}
+                  value={values[field.name] || ""}
+                  onChange={(event) => setValues((current) => ({ ...current, [field.name]: event.target.value }))}
+                >
+                  <option value="">{loadingLookups ? "Loading choices…" : "Select an option"}</option>
+                  {lookupOptions[field.name].map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+              ) : (
+                <input
+                  autoComplete="off"
+                  required={field.required}
+                  type={field.type || "text"}
+                  placeholder={field.placeholder}
+                  pattern={field.pattern}
+                  title={field.title}
+                  value={values[field.name] || (field.name === "category" ? "Beach resorts" : "")}
+                  onChange={(event) => setValues((current) => ({ ...current, [field.name]: event.target.value }))}
+                />
+              )}
+            </label>
+          ))}
+        </div>
+        {lookupErrors.length > 0 && <p className="admin-dialog-error" role="alert">Could not load record choices: {lookupErrors.join("; ")}. Start the related services and retry.</p>}
+        {!loadingLookups && lookupErrors.length === 0 && hasRequiredLookups && missingRequiredOptions &&
+          <p className="admin-dialog-error" role="alert">No matching records exist yet. Create the required hotel or department first.</p>}
+        {section === "housekeeping" && (
+          <label className="admin-dialog-select">Priority
+            <select value={values.priority || "NORMAL"} onChange={(event) => setValues((current) => ({ ...current, priority: event.target.value }))}>
+              <option value="LOW">Low</option><option value="NORMAL">Normal</option><option value="HIGH">High</option><option value="URGENT">Urgent</option>
+            </select>
+          </label>
+        )}
+        {section === "employees" && (
+          <label className="admin-dialog-select">Salary
+            <input type="number" min="0" value={values.salary || ""} onChange={(event) => setValues((current) => ({ ...current, salary: event.target.value }))} />
+          </label>
+        )}
+        <div className="admin-dialog-actions"><button type="button" className="admin-secondary-button" onClick={onClose}>Cancel</button><button type="submit" className="admin-primary-button" disabled={loadingLookups || !requiredLookupsReady}>Save record</button></div>
+      </form>
+    </div>
+  );
 }
 
 function Dashboard({ period, onPeriodChange }: { period: string; onPeriodChange: (value: string) => void }) {
   const [notice, setNotice] = useState("");
+  const [overview, setOverview] = useState<{
+    hotels: AdminHotel[] | null;
+    rooms: AdminRoom[] | null;
+    employees: AdminEmployee[] | null;
+    tasks: HousekeepingTask[] | null;
+  } | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    Promise.allSettled([
+      api.getAdminHotels(),
+      api.getAdminRooms(),
+      api.getAdminEmployees(),
+      api.getAdminHousekeepingTasks(),
+    ]).then(([hotelResult, roomResult, employeeResult, taskResult]) => {
+      if (!active) return;
+      const failures = [hotelResult, roomResult, employeeResult, taskResult].filter((result) => result.status === "rejected");
+      setOverview({
+        hotels: hotelResult.status === "fulfilled" ? hotelResult.value : null,
+        rooms: roomResult.status === "fulfilled" ? roomResult.value : null,
+        employees: employeeResult.status === "fulfilled" ? employeeResult.value : null,
+        tasks: taskResult.status === "fulfilled" ? taskResult.value : null,
+      });
+      if (failures.length) setNotice(`${failures.length} dashboard service${failures.length === 1 ? "" : "s"} could not be reached.`);
+    });
+    return () => { active = false; };
+  }, []);
+
+  const dashboardCards = [
+    { label: "Properties", value: overview ? (overview.hotels ? formatNumber(overview.hotels.length) : "Unavailable") : "Loading…", note: overview?.hotels ? `${new Set(overview.hotels.map((hotel) => hotel.city)).size} destinations` : "Hotel service" },
+    { label: "Room inventory", value: overview?.rooms ? formatNumber(overview.rooms.reduce((sum, room) => sum + room.totalInventory, 0)) : overview ? "Unavailable" : "Loading…", note: overview?.rooms ? `${overview.rooms.length} room types` : "Room service" },
+    { label: "Team members", value: overview?.employees ? formatNumber(overview.employees.length) : overview ? "Unavailable" : "Loading…", note: "Employee service" },
+    { label: "Open housekeeping", value: overview?.tasks ? formatNumber(overview.tasks.filter((task) => task.status !== "INSPECTED").length) : overview ? "Unavailable" : "Loading…", note: "Housekeeping service" },
+    { label: "Guest rating", value: overview?.hotels?.length ? `${(overview.hotels.reduce((sum, hotel) => sum + hotel.rating, 0) / overview.hotels.length).toFixed(1)} / 5` : overview ? "Unavailable" : "Loading…", note: "Average across active properties" },
+    { label: "Active properties", value: overview?.hotels ? formatNumber(overview.hotels.filter((hotel) => hotel.isActive).length) : overview ? "Unavailable" : "Loading…", note: "Hotel catalog" },
+  ];
   const upcoming = sectionRecords.reservations?.slice(0, 4) ?? [];
   return (
     <>
@@ -166,7 +589,7 @@ function Dashboard({ period, onPeriodChange }: { period: string; onPeriodChange:
         <div className="admin-heading-actions"><select aria-label="Dashboard date range" value={period} onChange={(event) => onPeriodChange(event.target.value)} className="admin-period-select"><option>Last 30 days</option><option>This month</option><option>This year</option></select><button type="button" className="admin-primary-button" onClick={() => setNotice("Your dashboard report is ready to export.")}>↓ &nbsp;Export report</button></div>
       </div>
       {notice && <div className="admin-inline-notice" role="status">{notice}</div>}
-      <Stats section="dashboard" />
+      <Stats section="dashboard" cards={dashboardCards} />
       <div className="admin-dashboard-grid">
         <section className="admin-panel admin-chart-panel">
           <div className="admin-panel-heading"><div><h2>Revenue overview</h2><p>Portfolio performance · {period.toLowerCase()}</p></div><button type="button" className="admin-filter-button" onClick={() => setNotice("Revenue chart is showing portfolio totals.")}>Monthly⌄</button></div>
@@ -203,7 +626,7 @@ function Activity({ title, detail, time, tone }: { title: string; detail: string
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const tone = /active|confirmed|paid|available|published|completed|checked in/i.test(status) ? "green" : /pending|scheduled|reply|occupied|unread/i.test(status) ? "amber" : /cancel|refund|maintenance|flagged|leave|expired/i.test(status) ? "rose" : "gray";
+  const tone = /active|confirmed|paid|available|published|completed|checked in|clean|inspected/i.test(status) ? "green" : /pending|scheduled|reply|occupied|unread|in progress/i.test(status) ? "amber" : /cancel|refund|maintenance|flagged|leave|expired|dirty/i.test(status) ? "rose" : "gray";
   return <span className={`admin-status status-${tone}`}><i />{status}</span>;
 }
 

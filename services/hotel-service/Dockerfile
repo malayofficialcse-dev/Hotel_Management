@@ -1,15 +1,16 @@
 FROM node:20-alpine AS builder
-WORKDIR /app
-COPY package*.json ./
-RUN npm install
-COPY . .
+WORKDIR /app/services/hotel-service
+COPY services/hotel-service/package*.json ./
+RUN npm ci
+COPY services/hotel-service ./
+COPY proto/operations.proto /app/proto/operations.proto
 RUN npm run build
 
 FROM node:20-alpine AS runner
-WORKDIR /app
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/dist ./dist
-EXPOSE 8003
+WORKDIR /app/services/hotel-service
+COPY --from=builder /app/services/hotel-service/package*.json ./
+COPY --from=builder /app/services/hotel-service/node_modules ./node_modules
+COPY --from=builder /app/services/hotel-service/dist ./dist
+COPY --from=builder /app/proto/operations.proto /app/proto/operations.proto
+EXPOSE 8003 50053
 CMD ["node", "dist/main.js"]
-
