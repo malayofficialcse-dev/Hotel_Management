@@ -114,7 +114,7 @@ npm run build
 ```
 
 The Next.js app uses `lib/api-client.ts` for backend calls via the API Gateway.
-Public hotel browsing has fallback catalog data; operational admin screens show
+Public hotel browsing requires the hotel catalog API; operational admin screens show
 service errors instead of presenting failed requests as live data.
 
 ---

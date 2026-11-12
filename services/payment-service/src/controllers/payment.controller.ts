@@ -1,4 +1,5 @@
-import { Controller, Post, Body, Get, Param } from "@nestjs/common";
+import { Controller, Post, Body, Get, Param, Req, ForbiddenException } from "@nestjs/common";
+import type { Request } from "express";
 import { PaymentService } from "../services/payment.service.js";
 import { CreatePaymentIntentDto, ConfirmPaymentDto, RefundDto } from "../models/payment.dto.js";
 
@@ -29,6 +30,12 @@ export class PaymentController {
   @Get("booking/:bookingId")
   getByBooking(@Param("bookingId") bookingId: string) {
     return this.paymentService.getByBookingId(bookingId);
+  }
+
+  @Get("admin")
+  getAdminPayments(@Req() request: Request & { user?: { role?: string } }) {
+    if (request.user?.role !== "ADMIN") throw new ForbiddenException("Administrator access required");
+    return this.paymentService.getAdminPayments();
   }
 }
 

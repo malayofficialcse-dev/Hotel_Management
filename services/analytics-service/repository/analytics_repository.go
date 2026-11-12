@@ -15,26 +15,8 @@ type AnalyticsRepository struct {
 func NewAnalyticsRepository() *AnalyticsRepository {
 	return &AnalyticsRepository{
 		metrics: &models.DashboardMetrics{
-			TotalBookings:    1428,
-			TotalRevenue:     9854200.0,
-			ActiveGuests:     312,
-			OccupancyRate:    84.6,
-			AverageDailyRate: 8500.0,
-			RevenuePerRoom:   7191.0,
-			MonthlyRevenue: []models.MonthlyRevenue{
-				{Month: "Jun", Revenue: 1250000},
-				{Month: "Jul", Revenue: 1420000},
-				{Month: "Aug", Revenue: 1380000},
-				{Month: "Sep", Revenue: 1690000},
-				{Month: "Oct", Revenue: 1980000},
-				{Month: "Nov", Revenue: 2134200},
-			},
-			OccupancyByHotel: []models.HotelOccupancy{
-				{HotelName: "The Palm House (Goa)", Rate: 92.4},
-				{HotelName: "Haveli & Co. (Jaipur)", Rate: 88.1},
-				{HotelName: "Lakehouse Retreat (Udaipur)", Rate: 86.5},
-				{HotelName: "Green Canopy (Munnar)", Rate: 74.0},
-			},
+			MonthlyRevenue:    []models.MonthlyRevenue{},
+			OccupancyByHotel:  []models.HotelOccupancy{},
 			UpdatedAt: time.Now(),
 		},
 	}

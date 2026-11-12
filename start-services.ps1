@@ -81,11 +81,15 @@ $NodeAvailable = [bool](Get-Command node.exe -ErrorAction SilentlyContinue) -and
 $GoAvailable = $false
 if ($GoCommand) {
     $PreviousErrorActionPreference = $ErrorActionPreference
-    $ErrorActionPreference = "Continue"
-    & $GoCommand.Source tool compile -V 2>&1 | Out-Null
-    $GoCompilerExitCode = $LASTEXITCODE
-    $ErrorActionPreference = $PreviousErrorActionPreference
-    $GoAvailable = $GoCompilerExitCode -eq 0
+    try {
+        $ErrorActionPreference = "Stop"
+        & $GoCommand.Source tool compile -V 2>&1 | Out-Null
+        $GoAvailable = $LASTEXITCODE -eq 0
+    } catch {
+        $GoAvailable = $false
+    } finally {
+        $ErrorActionPreference = $PreviousErrorActionPreference
+    }
 }
 if (-not (Test-Path -LiteralPath $RunnerPath -PathType Leaf)) {
     $MissingRequirements += "Service terminal runner was not found: $RunnerPath"
@@ -100,10 +104,6 @@ foreach ($Service in $Services) {
     } elseif ($Service.Runtime -eq "Go" -and
         -not (Test-Path -LiteralPath (Join-Path $ServicePath "go.mod") -PathType Leaf)) {
         $MissingRequirements += "Go module file was not found for '$($Service.Name)'."
-    }
-    if ((Test-Path -LiteralPath $ServicePath -PathType Container) -and
-        -not (Test-Path -LiteralPath (Join-Path $ServicePath ".env") -PathType Leaf)) {
-        $MissingRequirements += "Local .env configuration was not found for '$($Service.Name)'."
     }
 }
 
@@ -194,18 +194,36 @@ foreach ($Service in $ServicesToStart | Where-Object { $_.Runtime -eq "Node" }) 
     $ServicePath = Join-Path $ServicesDir $Service.Name
     $RequiredExecutable = if ($Service.Script -eq "start:dev") { "nest.cmd" } else { "tsx.cmd" }
     $ExecutablePath = Join-Path $ServicePath "node_modules\.bin\$RequiredExecutable"
+    $DependenciesReady = Test-Path -LiteralPath $ExecutablePath -PathType Leaf
 
-    if (-not (Test-Path -LiteralPath $ExecutablePath -PathType Leaf)) {
-        Write-Host "Installing local npm dependencies for $($Service.Name)..." -ForegroundColor Cyan
+    if ($DependenciesReady) {
         Push-Location -LiteralPath $ServicePath
         try {
             $PreviousErrorActionPreference = $ErrorActionPreference
             $ErrorActionPreference = "Continue"
-            & $NpmCommand install --no-package-lock --no-audit --no-fund
+            & $NpmCommand ls --depth=0 2>&1 | Out-Null
+            $DependenciesReady = $LASTEXITCODE -eq 0
+        } finally {
+            $ErrorActionPreference = $PreviousErrorActionPreference
+            Pop-Location
+        }
+    }
+
+    if (-not $DependenciesReady) {
+        Write-Host "Repairing npm dependencies for $($Service.Name)..." -ForegroundColor Cyan
+        Push-Location -LiteralPath $ServicePath
+        try {
+            $PreviousErrorActionPreference = $ErrorActionPreference
+            $ErrorActionPreference = "Continue"
+            if (Test-Path -LiteralPath (Join-Path $ServicePath "package-lock.json") -PathType Leaf) {
+                & $NpmCommand ci --no-audit --no-fund
+            } else {
+                & $NpmCommand install --no-audit --no-fund
+            }
             $NpmExitCode = $LASTEXITCODE
             $ErrorActionPreference = $PreviousErrorActionPreference
             if ($NpmExitCode -ne 0) {
-                Write-Host "Skipping $($Service.Name): npm install failed with exit code $NpmExitCode." -ForegroundColor Red
+                Write-Host "Skipping $($Service.Name): npm dependency installation failed with exit code $NpmExitCode." -ForegroundColor Red
                 $ServicesToSkip += $Service
                 $ServicesToStart = @($ServicesToStart | Where-Object { $_.Name -ne $Service.Name })
             }

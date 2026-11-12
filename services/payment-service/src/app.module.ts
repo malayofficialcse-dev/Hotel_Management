@@ -19,7 +19,8 @@ export class AppModule implements NestModule {
         { path: "api/v1/payments/webhook", method: RequestMethod.POST }
       )
       .forRoutes(
-        { path: "api/v1/payments/refund", method: RequestMethod.POST }
+        { path: "api/v1/payments/refund", method: RequestMethod.POST },
+        { path: "api/v1/payments/admin", method: RequestMethod.GET }
       );
   }
 }

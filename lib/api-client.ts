@@ -1,4 +1,4 @@
-import { hotels as fallbackHotels, Hotel } from "./data";
+import { Hotel } from "./data";
 
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1").replace(/\/$/, "");
 
@@ -24,6 +24,7 @@ export interface AdminHotel {
   offer?: string;
   category: string;
   amenities?: string[];
+  description?: string;
   isActive: boolean;
 }
 
@@ -149,10 +150,11 @@ export const api = {
   async register(data: { email: string; password: string; name: string; phone?: string }) { const result = await request<{ user: unknown; token: string }>("/auth/register", { method: "POST", body: JSON.stringify(data) }); if (typeof window !== "undefined" && result.token) window.localStorage.setItem("stayease-token", result.token); return result; },
   async login(data: { email: string; password: string }) { const result = await request<{ user: unknown; token: string }>("/auth/login", { method: "POST", body: JSON.stringify(data) }); if (typeof window !== "undefined" && result.token) window.localStorage.setItem("stayease-token", result.token); return result; },
   logout() { if (typeof window !== "undefined") window.localStorage.removeItem("stayease-token"); },
-  async getHotels(filters?: { city?: string; category?: string; search?: string; minPrice?: number; maxPrice?: number }): Promise<Hotel[]> { try { const params = new URLSearchParams(); Object.entries(filters || {}).forEach(([key, value]) => { if (value && value !== "All" && value !== "All Stays") params.set(key, String(value)); }); const rows = await request<AdminHotel[]>(`/hotels?${params}`); return rows.map(toPublicHotel); } catch { return fallbackHotels; } },
-  async getHotel(identifier: string): Promise<Hotel | undefined> { try { return toPublicHotel(await request<AdminHotel>(`/hotels/${encodeURIComponent(identifier)}`)); } catch { return fallbackHotels.find((hotel) => hotel.id === identifier); } },
+  async getHotels(filters?: { city?: string; category?: string; search?: string; minPrice?: number; maxPrice?: number }): Promise<Hotel[]> { const params = new URLSearchParams(); Object.entries(filters || {}).forEach(([key, value]) => { if (value && value !== "All" && value !== "All Stays") params.set(key, String(value)); }); return (await request<AdminHotel[]>(`/hotels?${params}`)).map(toPublicHotel); },
+  async getHotel(identifier: string): Promise<Hotel> { return toPublicHotel(await request<AdminHotel>(`/hotels/${encodeURIComponent(identifier)}`)); },
   getAdminHotels() { return request<AdminHotel[]>("/hotels?includeInactive=true"); },
   createHotel(data: Record<string, unknown>) { return request<AdminHotel>("/hotels", { method: "POST", body: JSON.stringify(data) }); },
+  updateHotel(id: string, data: Record<string, unknown>) { return request<AdminHotel>(`/hotels/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(data) }); },
   deleteHotel(id: string) { return request<void>(`/hotels/${encodeURIComponent(id)}`, { method: "DELETE" }); },
   getAdminRooms() { return request<AdminRoom[]>("/rooms?includeInactive=true"); },
   createRoom(data: Record<string, unknown>) { return request<AdminRoom>("/rooms", { method: "POST", body: JSON.stringify(data) }); },
@@ -169,6 +171,8 @@ export const api = {
   deleteHousekeepingTask(id: string) { return request<void>(`/housekeeping/${encodeURIComponent(id)}`, { method: "DELETE" }); },
   getAdminReservations() { return request<{ bookings: AdminBooking[]; total: number }>("/bookings/admin"); },
   getAdminOffers() { return request<AdminOffer[]>("/offers?includeInactive=true"); },
+  getAdminPayments() { return request<AdminPayment[]>("/payments/admin"); },
+  getAdminReviews() { return request<AdminReview[]>("/reviews/admin"); },
   createOffer(data: Record<string, unknown>) { return request<AdminOffer>("/offers", { method: "POST", body: JSON.stringify(data) }); },
   deleteOffer(id: string) { return request<void>(`/offers/${encodeURIComponent(id)}`, { method: "DELETE" }); },
   async getRoomsByHotel(hotelId: string): Promise<PublicRoom[]> {
@@ -241,3 +245,6 @@ export const api = {
   getDepartments() { return request<any[]>("/departments"); },
   getAnalyticsOverview() { return request<any>("/analytics/overview"); },
 };
+
+export interface AdminPayment { id: string; bookingCode: string; amount: number; currency: string; status: string; provider: string; paymentMethod?: string | null; createdAt: string; refunds?: { amount: number; status: string }[]; }
+export interface AdminReview { _id: string; hotelId: string; userName: string; rating: number; title?: string; comment: string; isApproved: boolean; isHidden: boolean; createdAt: string; }

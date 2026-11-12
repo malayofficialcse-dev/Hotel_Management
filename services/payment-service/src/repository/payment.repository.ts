@@ -52,6 +52,13 @@ export class PaymentRepository extends PrismaClient implements OnModuleInit, OnM
     }) as Promise<PaymentEntity[]>;
   }
 
+  async findAll(): Promise<PaymentEntity[]> {
+    return this.payment.findMany({
+      include: { refunds: true },
+      orderBy: { createdAt: 'desc' },
+    }) as Promise<PaymentEntity[]>;
+  }
+
   async createPayment(data: CreatePaymentData): Promise<PaymentEntity> {
     return this.payment.create({
       data: {

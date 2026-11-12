@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Body, Param } from "@nestjs/common";
+import { Controller, Get, Post, Body, Param, Req, ForbiddenException } from "@nestjs/common";
+import type { Request } from "express";
 import { ReviewService } from "../services/review.service.js";
 import { CreateReviewDto } from "../models/review.dto.js";
 
@@ -14,6 +15,12 @@ export class ReviewController {
   @Get("hotel/:hotelId")
   getByHotel(@Param("hotelId") hotelId: string) {
     return this.reviewService.getHotelReviews(hotelId);
+  }
+
+  @Get("admin")
+  getAdminReviews(@Req() request: Request & { user?: { role?: string } }) {
+    if (request.user?.role !== "ADMIN") throw new ForbiddenException("Administrator access required");
+    return this.reviewService.getAdminReviews();
   }
 
   @Get("hotel/:hotelId/stats")

@@ -5,8 +5,13 @@ import { RoomService } from "../services/room.service.js";
 const service = new RoomService();
 
 function dependencyStatus(error: unknown) {
+  if (error instanceof Error && error.message === "Hotel not found") return 404;
   if (typeof error !== "object" || error === null || !("code" in error)) return 400;
-  return error.code === grpcStatus.UNAVAILABLE || error.code === grpcStatus.DEADLINE_EXCEEDED ? 503 : 400;
+  const code = error.code;
+  if (code === 11000) return 409;
+  if (code === grpcStatus.UNAVAILABLE || code === grpcStatus.DEADLINE_EXCEEDED) return 503;
+  if (code === grpcStatus.NOT_FOUND) return 404;
+  return 400;
 }
 
 export class RoomController {

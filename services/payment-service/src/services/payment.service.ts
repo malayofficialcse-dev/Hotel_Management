@@ -67,5 +67,9 @@ export class PaymentService {
   async getByBookingId(bookingId: string) {
     return this.repo.findByBookingId(bookingId);
   }
+
+  async getAdminPayments() {
+    return this.repo.findAll();
+  }
 }
 
