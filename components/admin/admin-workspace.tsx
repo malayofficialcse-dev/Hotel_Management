@@ -162,10 +162,10 @@ const createFields: Partial<Record<AdminSection, CreateField[]>> = {
     { name: "salary", label: "Salary", type: "number", placeholder: "e.g. 35000" },
   ],
   housekeeping: [
-    { name: "hotelId", label: "Hotel slug / ID", required: true },
-    { name: "roomNumber", label: "Room number", required: true },
-    { name: "taskType", label: "Task type" },
-    { name: "assignedTo", label: "Assigned employee ID" },
+    { name: "hotelId", label: "Hotel", required: true },
+    { name: "roomNumber", label: "Room", required: true },
+    { name: "taskType", label: "Task type", placeholder: "e.g. CLEAN, REPAIR, INSPECTION" },
+    { name: "assignedTo", label: "Assigned employee" },
   ],
   offers: [
     { name: "code", label: "Offer code", required: true },
@@ -545,11 +545,13 @@ function CreateRecordDialog({
   const [reservationRooms, setReservationRooms] = useState<AdminRoom[]>([]);
   const [employeeHotels, setEmployeeHotels] = useState<AdminHotel[]>([]);
   const [employeeDepartments, setEmployeeDepartments] = useState<AdminDepartment[]>([]);
+  const [housekeepingHotels, setHousekeepingHotels] = useState<AdminHotel[]>([]);
+  const [housekeepingRooms, setHousekeepingRooms] = useState<AdminRoom[]>([]);
 
   useEffect(() => {
     let active = true;
     const lookups: [string, string, Promise<{ value: string; label: string }[]>][] = [];
-    if (["rooms", "departments", "housekeeping"].includes(section)) {
+    if (["rooms", "departments"].includes(section)) {
       lookups.push(["hotelId", "hotels", api.getAdminHotels().then((rows) =>
         rows.filter((hotel) => section !== "rooms" || hotel.isActive).map((hotel) => ({ value: hotel.slug || hotel._id, label: `${hotel.name} · ${hotel.city}` })),
       )]);
@@ -575,8 +577,16 @@ function CreateRecordDialog({
       })]);
     }
     if (section === "housekeeping") {
+      lookups.push(["hotelId", "hotels", api.getAdminHotels().then((rows) => {
+        if (active) setHousekeepingHotels(rows);
+        return rows.map((hotel) => ({ value: hotel.slug || hotel._id, label: `${hotel.name} · ${hotel.city || hotel.slug}` }));
+      })]);
+      lookups.push(["roomNumber", "rooms", api.getAdminRooms().then((rows) => {
+        if (active) setHousekeepingRooms(rows);
+        return rows.map((room) => ({ value: room.name, label: `${room.name} · ${room.hotelId}` }));
+      })]);
       lookups.push(["assignedTo", "employees", api.getAdminEmployees().then((rows) =>
-        rows.map((employee) => ({ value: employee.id, label: `${employee.name} · ${employee.position}` })),
+        rows.map((employee) => ({ value: employee.employeeCode || employee.id, label: `${employee.name} · ${employee.position}` })),
       )]);
     }
     if (lookups.length === 0) return () => { active = false; };
@@ -647,8 +657,28 @@ function CreateRecordDialog({
       }));
   }, [section, values.hotelId, employeeHotels, employeeDepartments]);
 
+  const housekeepingRoomOptions = useMemo(() => {
+    if (section !== "housekeeping") return [];
+    const selectedHotelId = values.hotelId;
+    if (!selectedHotelId) return [];
+    const selectedHotel = housekeepingHotels.find(
+      (h) => (h.slug || h._id) === selectedHotelId || h._id === selectedHotelId || h.slug === selectedHotelId,
+    );
+    return housekeepingRooms
+      .filter((room) => {
+        if (selectedHotel) {
+          return room.hotelId === selectedHotel.slug || room.hotelId === selectedHotel._id || room.hotelId === selectedHotelId;
+        }
+        return room.hotelId === selectedHotelId;
+      })
+      .map((room) => ({
+        value: room.name,
+        label: `${room.name} (${room.capacity} guests)`,
+      }));
+  }, [section, values.hotelId, housekeepingHotels, housekeepingRooms]);
+
   const requiredLookupsReady = fields
-    .filter((field) => field.required && ["hotelId", "departmentId", "roomTypeId"].includes(field.name))
+    .filter((field) => field.required && ["hotelId", "departmentId", "roomTypeId", "roomNumber"].includes(field.name))
     .every((field) => {
       if (field.name === "roomTypeId" && section === "reservations") {
         return Boolean(values.hotelId && reservationRoomOptions.length > 0);
@@ -656,9 +686,12 @@ function CreateRecordDialog({
       if (field.name === "departmentId" && section === "employees") {
         return Boolean(values.hotelId && employeeDepartmentOptions.length > 0);
       }
+      if (field.name === "roomNumber" && section === "housekeeping") {
+        return Boolean(values.hotelId && housekeepingRoomOptions.length > 0);
+      }
       return Boolean(lookupOptions[field.name]?.length);
     });
-  const hasRequiredLookups = fields.some((field) => field.required && ["hotelId", "departmentId", "roomTypeId"].includes(field.name));
+  const hasRequiredLookups = fields.some((field) => field.required && ["hotelId", "departmentId", "roomTypeId", "roomNumber"].includes(field.name));
   const missingRequiredOptions = fields.some((field) => {
     if (field.name === "roomTypeId" && section === "reservations") {
       return Boolean(values.hotelId && reservationRoomOptions.length === 0);
@@ -666,7 +699,10 @@ function CreateRecordDialog({
     if (field.name === "departmentId" && section === "employees") {
       return Boolean(values.hotelId && employeeDepartmentOptions.length === 0);
     }
-    return field.required && ["hotelId", "departmentId"].includes(field.name) && !lookupOptions[field.name]?.length;
+    if (field.name === "roomNumber" && section === "housekeeping") {
+      return Boolean(values.hotelId && housekeepingRoomOptions.length === 0);
+    }
+    return field.required && ["hotelId", "departmentId", "roomNumber"].includes(field.name) && !lookupOptions[field.name]?.length;
   });
 
   return (
@@ -684,10 +720,13 @@ function CreateRecordDialog({
           {fields.map((field) => {
             const isReservationRoom = field.name === "roomTypeId" && section === "reservations";
             const isEmployeeDept = field.name === "departmentId" && section === "employees";
+            const isHousekeepingRoom = field.name === "roomNumber" && section === "housekeeping";
             const options = isReservationRoom
               ? reservationRoomOptions
               : isEmployeeDept
               ? employeeDepartmentOptions
+              : isHousekeepingRoom
+              ? housekeepingRoomOptions
               : lookupOptions[field.name];
             return (
               <label key={field.name}>{field.label}
@@ -695,7 +734,7 @@ function CreateRecordDialog({
                   <select
                     required={field.required}
                     value={values[field.name] || ""}
-                    disabled={(isReservationRoom || isEmployeeDept) && !values.hotelId}
+                    disabled={(isReservationRoom || isEmployeeDept || isHousekeepingRoom) && !values.hotelId}
                     onChange={(event) => {
                       const val = event.target.value;
                       setValues((current) => ({
@@ -703,19 +742,22 @@ function CreateRecordDialog({
                         [field.name]: val,
                         ...(field.name === "hotelId" && section === "reservations" ? { roomTypeId: "" } : {}),
                         ...(field.name === "hotelId" && section === "employees" ? { departmentId: "" } : {}),
+                        ...(field.name === "hotelId" && section === "housekeeping" ? { roomNumber: "" } : {}),
                       }));
                     }}
                   >
                     <option value="">
                       {loadingLookups
                         ? "Loading choices…"
-                        : (isReservationRoom || isEmployeeDept) && !values.hotelId
+                        : (isReservationRoom || isEmployeeDept || isHousekeepingRoom) && !values.hotelId
                           ? "Select a hotel first"
                           : isReservationRoom && options.length === 0
                             ? "No rooms available for this hotel"
                             : isEmployeeDept && options.length === 0
                               ? "No departments for this hotel"
-                              : "Select an option"}
+                              : isHousekeepingRoom && options.length === 0
+                                ? "No rooms available for this hotel"
+                                : "Select an option"}
                     </option>
                     {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                   </select>
