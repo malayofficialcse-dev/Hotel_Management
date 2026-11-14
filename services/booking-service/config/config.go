@@ -29,7 +29,7 @@ func Load() *Config {
 		RabbitMQURL:       getEnv("RABBITMQ_URL", "amqp://hotel_admin:hotel_rabbit_pass@localhost:5672"),
 		AuthServiceURL:    mustEnv("AUTH_SERVICE_URL"),
 		PaymentServiceURL: mustEnv("PAYMENT_SERVICE_URL"),
-		HotelServiceURL:   mustEnv("HOTEL_SERVICE_URL"),
+		HotelServiceURL:   getEnv("ROOM_SERVICE_URL", getEnv("HOTEL_SERVICE_URL", "http://localhost:8004")),
 	}
 	return cfg
 }

@@ -353,37 +353,6 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
     audit: "No persistent audit-log API is connected here.",
   };
 
-  if (section === "settings") {
-    return (
-      <>
-        <PageHeader section={section} notice={notice} onAction={onAction} />
-        <Stats section={section} records={records} unavailable={loadFailed} />
-        <div className="admin-settings-grid">
-          <section className="admin-panel admin-settings-panel">
-            <h2>Workspace details</h2><p className="admin-panel-subtitle">Manage the details used across your portfolio.</p>
-            <div className="admin-form-grid">
-              <label>Workspace name<input defaultValue="StayEase" /></label>
-              <label>Default currency<select defaultValue="INR — Indian Rupee"><option>INR — Indian Rupee</option><option>USD — US Dollar</option></select></label>
-              <label>Timezone<select defaultValue="Asia/Kolkata (IST)"><option>Asia/Kolkata (IST)</option><option>Asia/Dubai (GST)</option></select></label>
-              <label>Language<select defaultValue="English"><option>English</option><option>Hindi</option></select></label>
-            </div>
-            <h2 className="admin-settings-heading">Guest communications</h2>
-            <ToggleRow title="Reservation confirmations" detail="Send an email when a booking is confirmed." />
-            <ToggleRow title="Payment updates" detail="Notify guests when a payment is settled or refunded." />
-            <ToggleRow title="Review reminders" detail="Invite guests to share feedback after checkout." />
-          </section>
-          <section className="admin-panel admin-settings-panel">
-            <h2>Workspace preferences</h2><p className="admin-panel-subtitle">A few defaults for your team.</p>
-            <ToggleRow title="Require manager approval" detail="For reservations with special requests." />
-            <ToggleRow title="Show guest phone numbers" detail="Limit visibility to authorized staff." />
-            <ToggleRow title="Two-step sign-in" detail="Add an extra layer of account security." />
-            <div className="admin-info-card"><span>✓</span><div><strong>All systems operational</strong><p>Your workspace and connected properties are up to date.</p></div></div>
-          </section>
-        </div>
-      </>
-    );
-  }
-
   return (
     <>
       <PageHeader section={section} notice={notice} onAction={onAction} actionAvailable={actionAvailable} />
@@ -481,17 +450,17 @@ function Stats({
     const active = records.filter((row) => !inactiveStatuses.includes(row.status.toUpperCase())).length;
     cards = unavailable
       ? [
-          { label: "Total records", value: "Unavailable", note: "Service connection failed" },
-          { label: "Active", value: "Unavailable", note: "Service connection failed" },
-          { label: "Inactive", value: "Unavailable", note: "Service connection failed" },
-          { label: "Latest record", value: "Unavailable", note: "Service connection failed" },
-        ]
+        { label: "Total records", value: "Unavailable", note: "Service connection failed" },
+        { label: "Active", value: "Unavailable", note: "Service connection failed" },
+        { label: "Inactive", value: "Unavailable", note: "Service connection failed" },
+        { label: "Latest record", value: "Unavailable", note: "Service connection failed" },
+      ]
       : [
-          { label: "Total records", value: formatNumber(records.length), note: "Stored in service database" },
-          { label: "Active", value: formatNumber(active), note: "From returned records" },
-          { label: "Inactive", value: formatNumber(records.length - active), note: "From returned records" },
-          { label: "Latest record", value: records[0]?.date || "—", note: records.length ? "Created date" : "No records yet" },
-        ];
+        { label: "Total records", value: formatNumber(records.length), note: "Stored in service database" },
+        { label: "Active", value: formatNumber(active), note: "From returned records" },
+        { label: "Inactive", value: formatNumber(records.length - active), note: "From returned records" },
+        { label: "Latest record", value: records[0]?.date || "—", note: records.length ? "Created date" : "No records yet" },
+      ];
   }
   if (!cards) return null;
   return <div className="admin-stats-grid">{cards.map((stat, index) => <div key={stat.label} className="admin-stat-card"><div className="admin-stat-top"><span>{stat.label}</span><span className={`admin-stat-icon tone-${index % 4}`}>{["↗", "⌂", "▤", "◷"][index % 4]}</span></div><strong>{stat.value}</strong><small>{stat.note}</small></div>)}</div>;
@@ -525,6 +494,8 @@ function CreateRecordDialog({
   const [lookupOptions, setLookupOptions] = useState<Record<string, { value: string; label: string }[]>>({});
   const [lookupErrors, setLookupErrors] = useState<string[]>([]);
   const [loadingLookups, setLoadingLookups] = useState(false);
+  const [reservationHotels, setReservationHotels] = useState<AdminHotel[]>([]);
+  const [reservationRooms, setReservationRooms] = useState<AdminRoom[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -535,12 +506,14 @@ function CreateRecordDialog({
       )]);
     }
     if (section === "reservations") {
-      lookups.push(["hotelId", "hotels", api.getAdminHotels().then((rows) =>
-        rows.map((hotel) => ({ value: hotel.slug || hotel._id, label: `${hotel.name} · ${hotel.city}` })),
-      )]);
-      lookups.push(["roomTypeId", "room types", api.getAdminRooms().then((rows) =>
-        rows.map((room) => ({ value: room._id, label: `${room.name} · ${room.hotelId}` })),
-      )]);
+      lookups.push(["hotelId", "hotels", api.getAdminHotels().then((rows) => {
+        if (active) setReservationHotels(rows);
+        return rows.map((hotel) => ({ value: hotel.slug || hotel._id, label: `${hotel.name} · ${hotel.city}` }));
+      })]);
+      lookups.push(["roomTypeId", "room types", api.getAdminRooms().then((rows) => {
+        if (active) setReservationRooms(rows);
+        return rows.map((room) => ({ value: room._id, label: `${room.name} · ${room.hotelId}` }));
+      })]);
     }
     if (section === "employees") {
       lookups.push(["departmentId", "departments", api.getAdminDepartments().then((rows) =>
@@ -580,13 +553,41 @@ function CreateRecordDialog({
     return () => { active = false; };
   }, [section]);
 
+  const reservationRoomOptions = useMemo(() => {
+    if (section !== "reservations") return [];
+    const selectedHotelId = values.hotelId;
+    if (!selectedHotelId) return [];
+    const selectedHotel = reservationHotels.find(
+      (h) => (h.slug || h._id) === selectedHotelId || h._id === selectedHotelId || h.slug === selectedHotelId,
+    );
+    return reservationRooms
+      .filter((room) => {
+        if (selectedHotel) {
+          return room.hotelId === selectedHotel.slug || room.hotelId === selectedHotel._id || room.hotelId === selectedHotelId;
+        }
+        return room.hotelId === selectedHotelId;
+      })
+      .map((room) => ({
+        value: room._id,
+        label: `${room.name} · ₹${room.price.toLocaleString("en-IN")}/night (${room.capacity} guests)`,
+      }));
+  }, [section, values.hotelId, reservationHotels, reservationRooms]);
+
   const requiredLookupsReady = fields
     .filter((field) => field.required && ["hotelId", "departmentId", "roomTypeId"].includes(field.name))
-    .every((field) => Boolean(lookupOptions[field.name]?.length));
+    .every((field) => {
+      if (field.name === "roomTypeId" && section === "reservations") {
+        return Boolean(values.hotelId && reservationRoomOptions.length > 0);
+      }
+      return Boolean(lookupOptions[field.name]?.length);
+    });
   const hasRequiredLookups = fields.some((field) => field.required && ["hotelId", "departmentId", "roomTypeId"].includes(field.name));
-  const missingRequiredOptions = fields.some(
-    (field) => field.required && ["hotelId", "departmentId", "roomTypeId"].includes(field.name) && !lookupOptions[field.name]?.length,
-  );
+  const missingRequiredOptions = fields.some((field) => {
+    if (field.name === "roomTypeId" && section === "reservations") {
+      return Boolean(values.hotelId && reservationRoomOptions.length === 0);
+    }
+    return field.required && ["hotelId", "departmentId"].includes(field.name) && !lookupOptions[field.name]?.length;
+  });
 
   return (
     <div className="admin-dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
@@ -600,46 +601,70 @@ function CreateRecordDialog({
       }}>
         <div className="admin-dialog-heading"><div><span className="admin-eyebrow">NEW RECORD</span><h2>{sectionTitles[section].action}</h2></div><button type="button" className="admin-row-menu" aria-label="Close dialog" onClick={onClose}>×</button></div>
         <div className="admin-dialog-fields">
-          {fields.map((field) => (
-            <label key={field.name}>{field.label}
-              {lookupOptions[field.name] ? (
-                <select
-                  required={field.required}
-                  value={values[field.name] || ""}
-                  onChange={(event) => setValues((current) => ({ ...current, [field.name]: event.target.value }))}
-                >
-                  <option value="">{loadingLookups ? "Loading choices…" : "Select an option"}</option>
-                  {lookupOptions[field.name].map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                </select>
-              ) : field.options ? (
-                <select
-                  required={field.required}
-                  value={values[field.name] || ""}
-                  onChange={(event) => setValues((current) => ({ ...current, [field.name]: event.target.value }))}
-                >
-                  <option value="">Select an option</option>
-                  {field.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                </select>
-              ) : (
-                <input
-                  autoComplete="off"
-                  required={field.required}
-                  type={field.type || "text"}
-                  min={field.min}
-                  step={field.step}
-                  placeholder={field.placeholder}
-                  pattern={field.pattern}
-                  title={field.title}
-                  value={values[field.name] || ""}
-                  onChange={(event) => setValues((current) => ({ ...current, [field.name]: event.target.value }))}
-                />
-              )}
-            </label>
-          ))}
+          {fields.map((field) => {
+            const isReservationRoom = field.name === "roomTypeId" && section === "reservations";
+            const options = isReservationRoom ? reservationRoomOptions : lookupOptions[field.name];
+            return (
+              <label key={field.name}>{field.label}
+                {options ? (
+                  <select
+                    required={field.required}
+                    value={values[field.name] || ""}
+                    disabled={isReservationRoom && !values.hotelId}
+                    onChange={(event) => {
+                      const val = event.target.value;
+                      setValues((current) => ({
+                        ...current,
+                        [field.name]: val,
+                        ...(field.name === "hotelId" && section === "reservations" ? { roomTypeId: "" } : {}),
+                      }));
+                    }}
+                  >
+                    <option value="">
+                      {loadingLookups
+                        ? "Loading choices…"
+                        : isReservationRoom && !values.hotelId
+                          ? "Select a hotel first"
+                          : isReservationRoom && options.length === 0
+                            ? "No rooms available for this hotel"
+                            : "Select an option"}
+                    </option>
+                    {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </select>
+                ) : field.options ? (
+                  <select
+                    required={field.required}
+                    value={values[field.name] || ""}
+                    onChange={(event) => setValues((current) => ({ ...current, [field.name]: event.target.value }))}
+                  >
+                    <option value="">Select an option</option>
+                    {field.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </select>
+                ) : (
+                  <input
+                    autoComplete="off"
+                    required={field.required}
+                    type={field.type || "text"}
+                    min={field.min}
+                    step={field.step}
+                    placeholder={field.placeholder}
+                    pattern={field.pattern}
+                    title={field.title}
+                    value={values[field.name] || ""}
+                    onChange={(event) => setValues((current) => ({ ...current, [field.name]: event.target.value }))}
+                  />
+                )}
+              </label>
+            );
+          })}
         </div>
         {lookupErrors.length > 0 && <p className="admin-dialog-error" role="alert">Could not load record choices: {lookupErrors.join("; ")}. Start the related services and retry.</p>}
         {!loadingLookups && lookupErrors.length === 0 && hasRequiredLookups && missingRequiredOptions &&
-          <p className="admin-dialog-error" role="alert">No matching records exist yet. Create the required hotel or department first.</p>}
+          <p className="admin-dialog-error" role="alert">
+            {section === "reservations" && values.hotelId && reservationRoomOptions.length === 0
+              ? "No rooms exist for the selected hotel yet. Create rooms for this hotel first under the Rooms tab."
+              : "No matching records exist yet. Create the required hotel or department first."}
+          </p>}
         {section === "housekeeping" && (
           <label className="admin-dialog-select">Priority
             <select value={values.priority || "NORMAL"} onChange={(event) => setValues((current) => ({ ...current, priority: event.target.value }))}>
