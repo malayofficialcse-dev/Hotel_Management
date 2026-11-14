@@ -41,7 +41,11 @@ export class EmployeeController {
   }
 
   async deactivate(req: Request, res: Response) {
-    await service.deactivate(req.params.id);
-    return res.status(204).end();
+    try {
+      await service.deactivate(req.params.id);
+      return res.status(204).end();
+    } catch (error) {
+      return res.status(dependencyStatus(error)).json({ message: error instanceof Error ? error.message : "Invalid employee" });
+    }
   }
 }

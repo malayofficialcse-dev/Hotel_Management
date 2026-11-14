@@ -45,7 +45,6 @@ export class DepartmentClientService {
     const parsed: unknown = JSON.parse(reply.json || "null");
     if (!parsed || typeof parsed !== "object") throw new Error("Department not found");
     const department = parsed as DepartmentSummary;
-    if (department.isActive === false) throw new Error("Department is inactive");
     return department;
   }
 }

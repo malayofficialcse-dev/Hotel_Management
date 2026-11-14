@@ -49,12 +49,18 @@ export interface AdminDepartment {
 
 export interface AdminEmployee {
   id: string;
+  employeeCode?: string;
+  userId?: string;
+  hotelId?: string;
   departmentId: string;
   name: string;
   email: string;
+  phone?: string;
   position: string;
+  joiningDate?: string;
+  salary?: number | null;
   isActive: boolean;
-  department?: { id?: string; _id?: string; name: string } | null;
+  department?: { id?: string; _id?: string; name: string; hotelId?: string } | null;
 }
 
 export interface HousekeepingTask {

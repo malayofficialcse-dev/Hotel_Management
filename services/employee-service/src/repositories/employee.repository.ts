@@ -11,12 +11,29 @@ export class EmployeeRepository {
     });
   }
 
-  findById(id: string) {
-    return prisma.employee.findUnique({ where: { id } });
+  findById(idOrCode: string) {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrCode);
+    if (isUuid) {
+      return prisma.employee.findUnique({ where: { id: idOrCode } });
+    }
+    return prisma.employee.findUnique({ where: { employeeCode: idOrCode } });
+  }
+
+  countByPrefixOrHotel(prefix: string, hotelId?: string) {
+    return prisma.employee.count({
+      where: {
+        OR: [
+          { employeeCode: { startsWith: prefix } },
+          ...(hotelId ? [{ hotelId }] : []),
+        ],
+      },
+    });
   }
 
   create(data: {
     userId: string;
+    employeeCode?: string;
+    hotelId?: string;
     departmentId: string;
     name: string;
     email: string;
@@ -28,11 +45,19 @@ export class EmployeeRepository {
     return prisma.employee.create({ data });
   }
 
-  update(id: string, data: Record<string, unknown>) {
-    return prisma.employee.update({ where: { id }, data });
+  update(idOrCode: string, data: Record<string, unknown>) {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrCode);
+    if (isUuid) {
+      return prisma.employee.update({ where: { id: idOrCode }, data });
+    }
+    return prisma.employee.update({ where: { employeeCode: idOrCode }, data });
   }
 
-  deactivate(id: string) {
-    return prisma.employee.update({ where: { id }, data: { isActive: false } });
+  deactivate(idOrCode: string) {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrCode);
+    if (isUuid) {
+      return prisma.employee.update({ where: { id: idOrCode }, data: { isActive: false } });
+    }
+    return prisma.employee.update({ where: { employeeCode: idOrCode }, data: { isActive: false } });
   }
 }

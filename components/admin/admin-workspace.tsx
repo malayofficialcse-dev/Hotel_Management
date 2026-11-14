@@ -63,12 +63,14 @@ async function loadLiveRecords(section: AdminSection): Promise<AdminRecord[] | n
   if (section === "employees") {
     const rows = await api.getAdminEmployees();
     return rows.map((employee: AdminEmployee) => ({
-      id: employee.id,
+      id: employee.employeeCode || employee.id,
       name: employee.name,
       detail: `${employee.department?.name || employee.departmentId} · ${employee.email}`,
       status: employee.isActive ? "Active" : "Inactive",
       value: employee.position,
-      date,
+      date: employee.joiningDate
+        ? new Date(employee.joiningDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+        : date,
     }));
   }
   if (section === "housekeeping") {
@@ -150,19 +152,14 @@ const createFields: Partial<Record<AdminSection, CreateField[]>> = {
     { name: "description", label: "Description" },
   ],
   employees: [
-    {
-      name: "userId",
-      label: "Auth user ID (UUID)",
-      required: true,
-      placeholder: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-      pattern: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
-      title: "Enter the UUID of an existing auth user.",
-    },
-    { name: "departmentId", label: "Department ID", required: true },
-    { name: "name", label: "Full name", required: true },
-    { name: "email", label: "Email", type: "email", required: true },
-    { name: "position", label: "Position", required: true },
+    { name: "hotelId", label: "Hotel", required: true },
+    { name: "departmentId", label: "Department", required: true },
+    { name: "name", label: "Full name", required: true, placeholder: "e.g. Rahul Sharma" },
+    { name: "email", label: "Email", type: "email", required: true, placeholder: "e.g. rahul@stayease.com" },
+    { name: "phone", label: "Phone number", placeholder: "e.g. 9876543210" },
+    { name: "position", label: "Position / Role", required: true, placeholder: "e.g. Front Desk Officer" },
     { name: "joiningDate", label: "Joining date", type: "date", required: true },
+    { name: "salary", label: "Salary", type: "number", placeholder: "e.g. 35000" },
   ],
   housekeeping: [
     { name: "hotelId", label: "Hotel slug / ID", required: true },
@@ -269,7 +266,22 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
         };
       }
       else if (section === "departments") await api.createDepartment(data);
-      else if (section === "employees") await api.createEmployee(data);
+      else if (section === "employees") {
+        const hotels = await api.getAdminHotels();
+        const hotel = hotels.find((h) => (h.slug || h._id) === data.hotelId || h._id === data.hotelId || h.slug === data.hotelId);
+        const created = await api.createEmployee({
+          ...data,
+          hotelName: hotel ? hotel.name : undefined,
+        });
+        createdRecord = {
+          id: created.employeeCode || created.id,
+          name: created.name,
+          detail: `${created.department?.name || created.departmentId} · ${created.email}`,
+          status: created.isActive ? "Active" : "Inactive",
+          value: created.position,
+          date: new Date().toLocaleDateString("en-IN"),
+        };
+      }
       else if (section === "housekeeping") await api.createHousekeepingTask(data);
       else if (section === "offers") await api.createOffer(data);
     } catch (error) {
@@ -531,6 +543,8 @@ function CreateRecordDialog({
   const [loadingLookups, setLoadingLookups] = useState(false);
   const [reservationHotels, setReservationHotels] = useState<AdminHotel[]>([]);
   const [reservationRooms, setReservationRooms] = useState<AdminRoom[]>([]);
+  const [employeeHotels, setEmployeeHotels] = useState<AdminHotel[]>([]);
+  const [employeeDepartments, setEmployeeDepartments] = useState<AdminDepartment[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -551,9 +565,14 @@ function CreateRecordDialog({
       })]);
     }
     if (section === "employees") {
-      lookups.push(["departmentId", "departments", api.getAdminDepartments().then((rows) =>
-        rows.map((department) => ({ value: department._id, label: `${department.name} · ${department.hotelId}` })),
-      )]);
+      lookups.push(["hotelId", "hotels", api.getAdminHotels().then((rows) => {
+        if (active) setEmployeeHotels(rows);
+        return rows.map((hotel) => ({ value: hotel.slug || hotel._id, label: `${hotel.name} · ${hotel.city}` }));
+      })]);
+      lookups.push(["departmentId", "departments", api.getAdminDepartments().then((rows) => {
+        if (active) setEmployeeDepartments(rows);
+        return rows.map((department) => ({ value: department._id, label: department.name }));
+      })]);
     }
     if (section === "housekeeping") {
       lookups.push(["assignedTo", "employees", api.getAdminEmployees().then((rows) =>
@@ -608,11 +627,34 @@ function CreateRecordDialog({
       }));
   }, [section, values.hotelId, reservationHotels, reservationRooms]);
 
+  const employeeDepartmentOptions = useMemo(() => {
+    if (section !== "employees") return [];
+    const selectedHotelId = values.hotelId;
+    if (!selectedHotelId) return [];
+    const selectedHotel = employeeHotels.find(
+      (h) => (h.slug || h._id) === selectedHotelId || h._id === selectedHotelId || h.slug === selectedHotelId,
+    );
+    return employeeDepartments
+      .filter((dept) => {
+        if (selectedHotel) {
+          return dept.hotelId === selectedHotel.slug || dept.hotelId === selectedHotel._id || dept.hotelId === selectedHotelId;
+        }
+        return dept.hotelId === selectedHotelId;
+      })
+      .map((dept) => ({
+        value: dept._id,
+        label: dept.isActive === false ? `${dept.name} (Inactive)` : dept.name,
+      }));
+  }, [section, values.hotelId, employeeHotels, employeeDepartments]);
+
   const requiredLookupsReady = fields
     .filter((field) => field.required && ["hotelId", "departmentId", "roomTypeId"].includes(field.name))
     .every((field) => {
       if (field.name === "roomTypeId" && section === "reservations") {
         return Boolean(values.hotelId && reservationRoomOptions.length > 0);
+      }
+      if (field.name === "departmentId" && section === "employees") {
+        return Boolean(values.hotelId && employeeDepartmentOptions.length > 0);
       }
       return Boolean(lookupOptions[field.name]?.length);
     });
@@ -620,6 +662,9 @@ function CreateRecordDialog({
   const missingRequiredOptions = fields.some((field) => {
     if (field.name === "roomTypeId" && section === "reservations") {
       return Boolean(values.hotelId && reservationRoomOptions.length === 0);
+    }
+    if (field.name === "departmentId" && section === "employees") {
+      return Boolean(values.hotelId && employeeDepartmentOptions.length === 0);
     }
     return field.required && ["hotelId", "departmentId"].includes(field.name) && !lookupOptions[field.name]?.length;
   });
@@ -638,31 +683,39 @@ function CreateRecordDialog({
         <div className="admin-dialog-fields">
           {fields.map((field) => {
             const isReservationRoom = field.name === "roomTypeId" && section === "reservations";
-            const options = isReservationRoom ? reservationRoomOptions : lookupOptions[field.name];
+            const isEmployeeDept = field.name === "departmentId" && section === "employees";
+            const options = isReservationRoom
+              ? reservationRoomOptions
+              : isEmployeeDept
+              ? employeeDepartmentOptions
+              : lookupOptions[field.name];
             return (
               <label key={field.name}>{field.label}
                 {options ? (
                   <select
                     required={field.required}
                     value={values[field.name] || ""}
-                    disabled={isReservationRoom && !values.hotelId}
+                    disabled={(isReservationRoom || isEmployeeDept) && !values.hotelId}
                     onChange={(event) => {
                       const val = event.target.value;
                       setValues((current) => ({
                         ...current,
                         [field.name]: val,
                         ...(field.name === "hotelId" && section === "reservations" ? { roomTypeId: "" } : {}),
+                        ...(field.name === "hotelId" && section === "employees" ? { departmentId: "" } : {}),
                       }));
                     }}
                   >
                     <option value="">
                       {loadingLookups
                         ? "Loading choices…"
-                        : isReservationRoom && !values.hotelId
+                        : (isReservationRoom || isEmployeeDept) && !values.hotelId
                           ? "Select a hotel first"
                           : isReservationRoom && options.length === 0
                             ? "No rooms available for this hotel"
-                            : "Select an option"}
+                            : isEmployeeDept && options.length === 0
+                              ? "No departments for this hotel"
+                              : "Select an option"}
                     </option>
                     {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                   </select>
@@ -705,11 +758,6 @@ function CreateRecordDialog({
             <select value={values.priority || "NORMAL"} onChange={(event) => setValues((current) => ({ ...current, priority: event.target.value }))}>
               <option value="LOW">Low</option><option value="NORMAL">Normal</option><option value="HIGH">High</option><option value="URGENT">Urgent</option>
             </select>
-          </label>
-        )}
-        {section === "employees" && (
-          <label className="admin-dialog-select">Salary
-            <input type="number" min="0" value={values.salary || ""} onChange={(event) => setValues((current) => ({ ...current, salary: event.target.value }))} />
           </label>
         )}
         <div className="admin-dialog-actions"><button type="button" className="admin-secondary-button" onClick={onClose}>Cancel</button><button type="submit" className="admin-primary-button" disabled={loadingLookups || !requiredLookupsReady}>Save record</button></div>

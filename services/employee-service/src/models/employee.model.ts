@@ -1,5 +1,8 @@
 export interface EmployeeInput {
-  userId: string;
+  userId?: string;
+  employeeCode?: string;
+  hotelId?: string;
+  hotelName?: string;
   departmentId: string;
   name: string;
   email: string;
@@ -11,6 +14,9 @@ export interface EmployeeInput {
 
 export const employeeFields = [
   "userId",
+  "employeeCode",
+  "hotelId",
+  "hotelName",
   "departmentId",
   "name",
   "email",

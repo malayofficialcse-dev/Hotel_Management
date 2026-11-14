@@ -1,9 +1,28 @@
+import { randomUUID } from "node:crypto";
 import { DepartmentClientService } from "./department-client.service.js";
 import { EmployeeRepository } from "../repositories/employee.repository.js";
 import { employeeFields } from "../models/employee.model.js";
 
 const repository = new EmployeeRepository();
 const departments = new DepartmentClientService();
+
+function getHotelShortCode(hotelName?: string, hotelId?: string): string {
+  if (hotelName && hotelName.trim()) {
+    const words = hotelName.trim().split(/[\s-_]+/);
+    if (words.length > 1) {
+      return words.map((w) => w[0]).join("").toUpperCase().slice(0, 4);
+    }
+    return hotelName.trim().slice(0, 3).toUpperCase();
+  }
+  if (hotelId && hotelId.trim()) {
+    const words = hotelId.trim().split(/[\s-_]+/);
+    if (words.length > 1) {
+      return words.map((w) => w[0]).join("").toUpperCase().slice(0, 4);
+    }
+    return hotelId.trim().slice(0, 3).toUpperCase();
+  }
+  return "HTL";
+}
 
 function pickFields(body: Record<string, unknown>) {
   return Object.fromEntries(employeeFields.filter((field) => body[field] !== undefined).map((field) => [field, body[field]]));
@@ -28,12 +47,15 @@ export class EmployeeService {
 
   async create(body: Record<string, unknown>) {
     const data = pickFields(body);
-    for (const field of ["userId", "departmentId", "name", "email", "position", "joiningDate"]) {
+    for (const field of ["departmentId", "name", "email", "position", "joiningDate"]) {
       if (typeof data[field] !== "string" || !data[field]) throw new Error(`${field} is required`);
     }
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(data.userId))) {
-      throw new Error("userId must be a valid UUID for an existing auth user");
+
+    let userId = typeof data.userId === "string" && data.userId.trim() ? data.userId.trim() : "";
+    if (!userId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) {
+      userId = randomUUID();
     }
+
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(data.email).trim())) {
       throw new Error("email must be valid");
     }
@@ -42,9 +64,23 @@ export class EmployeeService {
     if (salary !== undefined && (!Number.isFinite(salary) || salary < 0)) {
       throw new Error("salary must be a non-negative number");
     }
+
     const department = await departments.requireDepartment(String(data.departmentId));
+    const hotelId = String(data.hotelId || department.hotelId || "");
+
+    const hotelShort = getHotelShortCode(
+      typeof data.hotelName === "string" ? data.hotelName : undefined,
+      hotelId
+    );
+    const prefix = `${hotelShort}/EMP/`;
+    const count = await repository.countByPrefixOrHotel(prefix, hotelId);
+    const seq = String(count + 1).padStart(4, "0");
+    const employeeCode = `${prefix}${seq}`;
+
     const employee = await repository.create({
-      userId: String(data.userId),
+      userId,
+      employeeCode,
+      hotelId: hotelId || undefined,
       departmentId: department.id || department._id || String(data.departmentId),
       name: String(data.name).trim(),
       email: String(data.email).trim().toLowerCase(),
