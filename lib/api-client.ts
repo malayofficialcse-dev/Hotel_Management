@@ -108,7 +108,25 @@ export interface PublicRoom {
   totalInventory: number;
 }
 
+export interface UserSession {
+  id: string;
+  email: string;
+  name: string;
+  role: "ADMIN" | "CUSTOMER" | "HOTEL_STAFF";
+  phone?: string;
+}
+
 function getToken() { return typeof window === "undefined" ? undefined : window.localStorage.getItem("stayease-token") || undefined; }
+
+function getUser(): UserSession | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem("stayease-user");
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
 
 function toPublicHotel(hotel: AdminHotel): Hotel {
   const categories: Hotel["category"][] = [
@@ -147,9 +165,40 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
-  async register(data: { email: string; password: string; name: string; phone?: string }) { const result = await request<{ user: unknown; token: string }>("/auth/register", { method: "POST", body: JSON.stringify(data) }); if (typeof window !== "undefined" && result.token) window.localStorage.setItem("stayease-token", result.token); return result; },
-  async login(data: { email: string; password: string }) { const result = await request<{ user: unknown; token: string }>("/auth/login", { method: "POST", body: JSON.stringify(data) }); if (typeof window !== "undefined" && result.token) window.localStorage.setItem("stayease-token", result.token); return result; },
-  logout() { if (typeof window !== "undefined") window.localStorage.removeItem("stayease-token"); },
+  getToken() { return getToken(); },
+  getUser() { return getUser(); },
+  async register(data: { email: string; password: string; name: string; phone?: string }) {
+    const result = await request<{
+      user: UserSession;
+      token?: string;
+      tokens?: { accessToken: string; refreshToken: string };
+    }>("/auth/register", { method: "POST", body: JSON.stringify(data) });
+    const token = result.tokens?.accessToken || result.token;
+    if (typeof window !== "undefined") {
+      if (token) window.localStorage.setItem("stayease-token", token);
+      if (result.user) window.localStorage.setItem("stayease-user", JSON.stringify(result.user));
+    }
+    return { ...result, token };
+  },
+  async login(data: { email: string; password: string }) {
+    const result = await request<{
+      user: UserSession;
+      token?: string;
+      tokens?: { accessToken: string; refreshToken: string };
+    }>("/auth/login", { method: "POST", body: JSON.stringify(data) });
+    const token = result.tokens?.accessToken || result.token;
+    if (typeof window !== "undefined") {
+      if (token) window.localStorage.setItem("stayease-token", token);
+      if (result.user) window.localStorage.setItem("stayease-user", JSON.stringify(result.user));
+    }
+    return { ...result, token };
+  },
+  logout() {
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem("stayease-token");
+      window.localStorage.removeItem("stayease-user");
+    }
+  },
   async getHotels(filters?: { city?: string; category?: string; search?: string; minPrice?: number; maxPrice?: number }): Promise<Hotel[]> { const params = new URLSearchParams(); Object.entries(filters || {}).forEach(([key, value]) => { if (value && value !== "All" && value !== "All Stays") params.set(key, String(value)); }); return (await request<AdminHotel[]>(`/hotels?${params}`)).map(toPublicHotel); },
   async getHotel(identifier: string): Promise<Hotel> { return toPublicHotel(await request<AdminHotel>(`/hotels/${encodeURIComponent(identifier)}`)); },
   getAdminHotels() { return request<AdminHotel[]>("/hotels?includeInactive=true"); },

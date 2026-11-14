@@ -19,6 +19,17 @@ export default function GuestDetailsPage() {
   } = useBooking();
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [user, setUser] = useState<{ name: string; email: string; phone?: string } | null>(null);
+
+  useEffect(() => {
+    const token = api.getToken();
+    if (!token) {
+      router.push(`/auth/login?returnUrl=${encodeURIComponent("/booking/guest")}`);
+      return;
+    }
+    const loggedInUser = api.getUser();
+    if (loggedInUser) setUser(loggedInUser);
+  }, [router]);
 
   useEffect(() => {
     if (!roomId || selectedRoom?.id === roomId) return;
@@ -91,16 +102,16 @@ export default function GuestDetailsPage() {
         <form onSubmit={continueToReview}>
           <PageHeading title="Let’s make it your stay." description="A few details, and you’re one step closer to Goa." />
           <div className="mt-6 rounded-[4px] bg-sky p-4 text-[10px]">
-            <p className="flex items-center gap-2 font-semibold"><FigmaIcon name="shield" className="h-4 w-4" /> You’re booking as Aarav Mehta</p>
-            <p className="mt-1 pl-6 text-muted">We’ve filled in your saved details. You can update them below.</p>
+            <p className="flex items-center gap-2 font-semibold"><FigmaIcon name="shield" className="h-4 w-4" /> You’re booking as {user?.name || "StayEase Guest"}</p>
+            <p className="mt-1 pl-6 text-muted">We’ve filled in your verified details. You can review or adjust them below.</p>
           </div>
           <Surface className="mt-4 p-5">
             <h2 className="text-sm font-semibold">Lead guest details</h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <TextField name="firstName" label="First name *" defaultValue="Aarav" required />
-              <TextField name="lastName" label="Last name *" defaultValue="Mehta" required />
-              <TextField name="email" label="Email address *" type="email" defaultValue="aarav.mehta@gmail.com" required />
-              <TextField name="phone" label="Mobile number *" type="tel" defaultValue="+91 98765 43210" required />
+              <TextField name="firstName" label="First name *" key={`fn-${user?.name}`} defaultValue={user?.name ? user.name.split(" ")[0] : "Aarav"} required />
+              <TextField name="lastName" label="Last name *" key={`ln-${user?.name}`} defaultValue={user?.name ? user.name.split(" ").slice(1).join(" ") || "Guest" : "Mehta"} required />
+              <TextField name="email" label="Email address *" type="email" key={`em-${user?.email}`} defaultValue={user?.email || "aarav.mehta@gmail.com"} required />
+              <TextField name="phone" label="Mobile number *" type="tel" key={`ph-${user?.phone}`} defaultValue={user?.phone || "+91 98765 43210"} required />
             </div>
             <p className="mt-3 text-[10px] text-muted">Your confirmation and stay updates will be sent here.</p>
             <div className="mt-4 flex flex-wrap gap-5 text-[11px]">

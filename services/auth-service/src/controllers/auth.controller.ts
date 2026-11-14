@@ -1,10 +1,10 @@
-import { Controller, Post, Body, Get, Headers, UnauthorizedException, HttpCode, HttpStatus } from "@nestjs/common";
+import { Controller, Post, Body, Get, Headers, UnauthorizedException, HttpCode, HttpStatus, Inject } from "@nestjs/common";
 import { AuthService } from "../services/auth.service.js";
 import { RegisterDto, LoginDto, RefreshTokenDto } from "../models/auth.dto.js";
 
 @Controller()
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(@Inject(AuthService) private readonly authService: AuthService) { }
 
   @Get("health")
   healthCheck() {

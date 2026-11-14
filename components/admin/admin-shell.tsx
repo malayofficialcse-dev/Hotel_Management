@@ -32,7 +32,18 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const current = pathname.split("/")[2] || "dashboard";
+  const [adminUser, setAdminUser] = useState<{ name: string; email: string } | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
+
+  useEffect(() => {
+    const user = api.getUser();
+    if (user) setAdminUser(user);
+  }, []);
+
+  function handleLogout() {
+    api.logout();
+    router.push("/admin/login");
+  }
   const [searchQuery, setSearchQuery] = useState("");
   const [searchItems, setSearchItems] = useState<SearchItem[]>([]);
   const [searchErrors, setSearchErrors] = useState<string[]>([]);
@@ -167,12 +178,12 @@ export function AdminShell({ children }: { children: ReactNode }) {
         <div className="admin-sidebar-bottom">
           <div className="admin-sidebar-note">Portfolio operations</div>
           <Link href="/" className="admin-customer-link">← View customer website</Link>
-          <div className="admin-user">
-            <span className="admin-user-avatar">A</span>
-            <span><strong>Workspace admin</strong><small>Administrator</small></span>
-            <span className="admin-picker-arrow">···</span>
+            <div className="admin-user" style={{ cursor: "pointer" }} onClick={handleLogout} title="Click to log out">
+              <span className="admin-user-avatar">{adminUser?.name?.[0] || "M"}</span>
+              <span><strong>{adminUser?.name || "Mala Admin"}</strong><small>{adminUser?.email || "mala@gmail.com"} &middot; Log out</small></span>
+              <span className="admin-picker-arrow">⎋</span>
+            </div>
           </div>
-        </div>
       </aside>
       <div className="admin-main">
         <header className="admin-topbar">
@@ -181,7 +192,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
             <button type="button" className="admin-search-global" aria-label="Search workspace" onClick={() => setSearchOpen(true)}>⌕ <span>Search anything...</span><kbd>⌘ K</kbd></button>
             <button type="button" className="admin-icon-button" aria-label="Help">?</button>
             <button type="button" className="admin-icon-button admin-bell" aria-label="Open notifications" onClick={() => router.push("/admin/notifications")}>♧</button>
-            <span className="admin-top-avatar">A</span>
+            <button type="button" onClick={handleLogout} className="admin-secondary-button" style={{ padding: "4px 10px", fontSize: "11px", height: "auto" }}>Log out</button>
+            <span className="admin-top-avatar" title={`Signed in as ${adminUser?.name || "Admin"}`}>{adminUser?.name?.[0] || "M"}</span>
           </div>
         </header>
         <main className="admin-content">{children}</main>

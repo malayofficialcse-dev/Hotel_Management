@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { BookingStepper } from "@/components/booking-stepper";
 import { BookingSummary } from "@/components/booking-summary";
 import { FigmaIcon } from "@/components/figma-icon";
@@ -12,6 +13,7 @@ import { api, type PublicRoom } from "@/lib/api-client";
 import { formatPrice } from "@/lib/data";
 
 export default function RoomSelectionPage() {
+  const router = useRouter();
   const {
     roomId, hotelId, checkInDate, checkOutDate, guestsCount, roomCount,
     selectedRoom, setSelectedRoom, setBookingDetails,
@@ -138,7 +140,20 @@ export default function RoomSelectionPage() {
           {error && <p role="alert" className="mt-3 rounded-[4px] bg-blush p-3 text-[10px] text-red-800">{error}</p>}
           <div className="mt-5 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
             <p className="text-[10px] text-muted">No payment needed just yet.</p>
-            <Button href={canContinue ? "/booking/guest" : undefined} disabled={!canContinue}>Continue to guest details <FigmaIcon name="arrow-right" className="h-4 w-4" /></Button>
+            <Button
+              disabled={!canContinue}
+              onClick={() => {
+                if (!canContinue) return;
+                const token = api.getToken();
+                if (!token) {
+                  router.push(`/auth/login?returnUrl=${encodeURIComponent("/booking/guest")}`);
+                } else {
+                  router.push("/booking/guest");
+                }
+              }}
+            >
+              Continue to guest details <FigmaIcon name="arrow-right" className="h-4 w-4" />
+            </Button>
           </div>
         </div>
         <div className="lg:sticky lg:top-24 lg:h-fit"><BookingSummary /></div>

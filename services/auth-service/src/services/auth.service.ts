@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, ConflictException } from "@nestjs/common";
+import { Injectable, UnauthorizedException, ConflictException, Inject } from "@nestjs/common";
 import { AuthRepository } from "../repository/auth.repository.js";
 import { RegisterDto, LoginDto } from "../models/auth.dto.js";
 import { generateTokenPair, verifyAccessToken, verifyRefreshToken } from "../utils/token.util.js";
@@ -6,7 +6,7 @@ import bcrypt from "bcryptjs";
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly repo: AuthRepository) {}
+  constructor(@Inject(AuthRepository) private readonly repo: AuthRepository) { }
 
   async register(dto: RegisterDto) {
     const existing = await this.repo.findByEmail(dto.email);
