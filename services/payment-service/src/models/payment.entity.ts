@@ -53,13 +53,14 @@ export interface UpdatePaymentStatusData {
   status: PaymentStatus;
   paymentMethod?: string;
   receiptUrl?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface CreateRefundData {
   paymentId: string;
   amount: number;
   reason?: string;
-  stripeRefundId: string;
+  stripeRefundId?: string | null;
 }
 
 export interface PaymentIntentResponse {

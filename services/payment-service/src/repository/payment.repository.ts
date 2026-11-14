@@ -37,6 +37,28 @@ export class PaymentRepository extends PrismaClient implements OnModuleInit, OnM
     }) as Promise<PaymentEntity | null>;
   }
 
+  async findByBookingCode(bookingCode: string): Promise<PaymentEntity | null> {
+    return this.payment.findFirst({
+      where: { bookingCode },
+      include: { refunds: true },
+      orderBy: { createdAt: 'desc' },
+    }) as Promise<PaymentEntity | null>;
+  }
+
+  async countConfirmedInYear(year: number): Promise<number> {
+    const startOfYear = new Date(`${year}-01-01T00:00:00.000Z`);
+    const endOfYear = new Date(`${year + 1}-01-01T00:00:00.000Z`);
+    return this.payment.count({
+      where: {
+        status: PaymentStatus.SUCCESS,
+        createdAt: {
+          gte: startOfYear,
+          lt: endOfYear,
+        },
+      },
+    });
+  }
+
   async findByStripeIntentId(stripeIntentId: string): Promise<PaymentEntity | null> {
     return this.payment.findUnique({
       where: { stripeIntentId },
@@ -83,6 +105,7 @@ export class PaymentRepository extends PrismaClient implements OnModuleInit, OnM
         status: data.status,
         ...(data.paymentMethod && { paymentMethod: data.paymentMethod }),
         ...(data.receiptUrl && { receiptUrl: data.receiptUrl }),
+        ...(data.metadata && { metadata: data.metadata as any }),
       },
       include: { refunds: true },
     }) as Promise<PaymentEntity>;
@@ -98,6 +121,7 @@ export class PaymentRepository extends PrismaClient implements OnModuleInit, OnM
         status: data.status,
         ...(data.paymentMethod && { paymentMethod: data.paymentMethod }),
         ...(data.receiptUrl && { receiptUrl: data.receiptUrl }),
+        ...(data.metadata && { metadata: data.metadata as any }),
       },
       include: { refunds: true },
     }) as Promise<PaymentEntity>;

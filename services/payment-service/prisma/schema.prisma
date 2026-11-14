@@ -10,19 +10,19 @@ datasource db {
 
 model Payment {
   id             String   @id @default(uuid())
-  bookingId      String   @unique
-  bookingCode    String
-  userId         String?
+  bookingId      String   @unique @map("booking_id")
+  bookingCode    String   @map("booking_code")
+  userId         String?  @map("user_id")
   amount         Float
   currency       String   @default("INR")
   status         String   @default("PENDING") // PENDING | SUCCESS | FAILED | REFUNDED
   provider       String   @default("STRIPE")
-  stripeIntentId String?  @unique
-  paymentMethod  String?
-  receiptUrl     String?
+  stripeIntentId String?  @unique @map("stripe_intent_id")
+  paymentMethod  String?  @map("payment_method")
+  receiptUrl     String?  @map("receipt_url")
   metadata       Json?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
   refunds        Refund[]
 
   @@map("payments")
@@ -30,12 +30,12 @@ model Payment {
 
 model Refund {
   id             String   @id @default(uuid())
-  paymentId      String
+  paymentId      String   @map("payment_id")
   amount         Float
   reason         String?
-  stripeRefundId String?
+  stripeRefundId String?  @map("stripe_refund_id")
   status         String   @default("PENDING")
-  createdAt      DateTime @default(now())
+  createdAt      DateTime @default(now()) @map("created_at")
   payment        Payment  @relation(fields: [paymentId], references: [id])
 
   @@map("refunds")

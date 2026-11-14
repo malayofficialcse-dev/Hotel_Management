@@ -160,7 +160,16 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const accessToken = getToken(); if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
   const response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers, cache: "no-store" });
   const body = (await response.json().catch(() => ({}))) as { data?: T; message?: string } & T;
-  if (!response.ok) throw new Error(body.message || `Request failed (${response.status})`);
+  if (!response.ok) {
+    if (response.status === 401 && typeof window !== "undefined") {
+      window.localStorage.removeItem("stayease-token");
+      window.localStorage.removeItem("stayease-user");
+      if (window.location.pathname.startsWith("/admin") && !window.location.pathname.startsWith("/admin/login")) {
+        window.location.href = "/admin/login?reason=expired";
+      }
+    }
+    throw new Error(body.message || `Request failed (${response.status})`);
+  }
   return (body.data === undefined ? body : body.data) as T;
 }
 
@@ -279,9 +288,28 @@ export const api = {
     }
   },
   confirmBooking(bookingId: string) { return request<{ success: boolean }>(`/bookings/${bookingId}/confirm`, { method: "POST" }).then(() => true).catch(() => false); },
-  getBookingByCode(code: string) { return request<any>(`/bookings/code/${encodeURIComponent(code)}`); },
-  createPaymentIntent(bookingId: string, bookingCode: string, amount: number) { return request<any>("/payments/intent", { method: "POST", body: JSON.stringify({ bookingId, bookingCode, amount }) }); },
-  confirmPaymentIntent(paymentId: string) { return request<any>("/payments/confirm", { method: "POST", body: JSON.stringify({ paymentId }) }); },
+  async getBookingByCode(code: string) {
+    try {
+      const res = await request<any>(`/bookings/code?code=${encodeURIComponent(code)}`);
+      return res?.data || res;
+    } catch {
+      const res = await request<any>(`/bookings/code/${encodeURIComponent(code)}`);
+      return res?.data || res;
+    }
+  },
+  getPaymentByBookingCode(code: string) {
+    return request<any>(`/payments/lookup?code=${encodeURIComponent(code)}`);
+  },
+  createPaymentIntent(bookingId: string, bookingCode: string, amount: number, paymentMethod?: string) {
+    return request<any>("/payments/intent", { method: "POST", body: JSON.stringify({ bookingId, bookingCode, amount, paymentMethod }) });
+  },
+  confirmPaymentIntent(data: string | { paymentId: string; paymentMethod?: string;[key: string]: unknown }) {
+    const body = typeof data === "string" ? { paymentId: data } : data;
+    return request<{ success: boolean; message: string; payment: any; billNumber?: string; receiptUrl?: string }>("/payments/confirm", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  },
   getUserProfile(userId = "default-guest") { return request<any>("/users/me", { headers: { "x-user-id": userId } }); },
   updateUserProfile(data: Record<string, unknown>, userId = "default-guest") { return request<any>("/users/me", { method: "PATCH", headers: { "x-user-id": userId }, body: JSON.stringify(data) }); },
   getWishlist(userId = "default-guest") { return request<any[]>("/users/me/wishlist", { headers: { "x-user-id": userId } }); },
@@ -295,5 +323,24 @@ export const api = {
   getAnalyticsOverview() { return request<any>("/analytics/overview"); },
 };
 
-export interface AdminPayment { id: string; bookingCode: string; amount: number; currency: string; status: string; provider: string; paymentMethod?: string | null; createdAt: string; refunds?: { amount: number; status: string }[]; }
+export interface AdminPayment {
+  id: string;
+  bookingCode: string;
+  amount: number;
+  currency: string;
+  status: string;
+  provider: string;
+  paymentMethod?: string | null;
+  receiptUrl?: string | null;
+  metadata?: {
+    billNumber?: string;
+    invoiceNumber?: string;
+    transactionId?: string;
+    guestName?: string;
+    hotelName?: string;
+    [key: string]: unknown;
+  } | null;
+  createdAt: string;
+  refunds?: { amount: number; status: string }[];
+}
 export interface AdminReview { _id: string; hotelId: string; userName: string; rating: number; title?: string; comment: string; isApproved: boolean; isHidden: boolean; createdAt: string; }

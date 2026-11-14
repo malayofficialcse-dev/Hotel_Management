@@ -137,6 +137,12 @@ func (c *BookingController) GetBookingByID(w http.ResponseWriter, r *http.Reques
 
 func (c *BookingController) GetBookingByCode(w http.ResponseWriter, r *http.Request) {
 	code := chi.URLParam(r, "code")
+	if code == "" {
+		code = chi.URLParam(r, "*")
+	}
+	if code == "" {
+		code = r.URL.Query().Get("code")
+	}
 	booking, err := c.bookingService.GetBookingByCode(r.Context(), code)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")

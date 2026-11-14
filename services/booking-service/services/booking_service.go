@@ -10,7 +10,9 @@ import (
 	"math"
 	"math/rand"
 	"net/http"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/google/uuid"
 
@@ -129,9 +131,18 @@ func (s *BookingService) HoldRoom(ctx context.Context, req *models.HoldBookingRe
 	now := time.Now().UTC()
 	nights := int(checkOut.Sub(checkIn).Hours() / 24)
 	taxesAndFees := math.Round(pricePerNight*float64(nights)*float64(req.RoomCount)*0.12*100) / 100
+
+	seq, err := s.repo.GetNextBookingSequence(ctx, tx, req.HotelID, now.Year())
+	if err != nil || seq < 1 {
+		seq = 1
+	}
+	hotelShort := getHotelShortCode(req.HotelName, req.HotelID)
+	roomNum := extractRoomNumber(req.RoomTypeName, req.RoomTypeID)
+	bookingCode := fmt.Sprintf("%s/%d/%s/%04d", hotelShort, now.Year(), roomNum, seq)
+
 	booking := &models.Booking{
 		ID:                uuid.New(),
-		BookingCode:       generateBookingCode(),
+		BookingCode:       bookingCode,
 		UserID:            userID,
 		HotelID:           req.HotelID,
 		HotelName:         req.HotelName,
@@ -215,13 +226,8 @@ func (s *BookingService) ConfirmBooking(ctx context.Context, bookingID uuid.UUID
 		return booking, nil // idempotent
 	}
 
-	if booking.Status != models.StatusPendingPayment {
+	if booking.Status != models.StatusPendingPayment && booking.Status != models.StatusExpired {
 		return nil, fmt.Errorf("cannot confirm booking in status %q", booking.Status)
-	}
-
-	if time.Now().After(booking.ExpiresAt) {
-		_ = s.repo.UpdateStatus(ctx, bookingID, models.StatusExpired)
-		return nil, fmt.Errorf("booking hold has expired")
 	}
 
 	if err := s.repo.UpdateStatus(ctx, bookingID, models.StatusConfirmed); err != nil {
@@ -384,6 +390,77 @@ func (s *BookingService) fetchInventory(ctx context.Context, roomTypeID string) 
 		return 0, 0, fmt.Errorf("decode inventory response: %w", err)
 	}
 	return inv.Inventory, inv.PricePerNight, nil
+}
+
+// getHotelShortCode extracts a 2-4 letter uppercase short code from hotel name or hotel ID.
+func getHotelShortCode(name string, id string) string {
+	clean := strings.TrimSpace(name)
+	if clean == "" {
+		clean = strings.TrimSpace(id)
+	}
+	if clean == "" {
+		return "HTL"
+	}
+
+	words := strings.FieldsFunc(clean, func(r rune) bool {
+		return r == ' ' || r == '-' || r == '_'
+	})
+
+	if len(words) > 1 {
+		var sb strings.Builder
+		for _, w := range words {
+			w = strings.TrimSpace(w)
+			if len(w) > 0 {
+				sb.WriteRune(unicode.ToUpper(rune(w[0])))
+			}
+			if sb.Len() >= 4 {
+				break
+			}
+		}
+		if sb.Len() >= 2 {
+			return sb.String()
+		}
+	}
+
+	var letters []rune
+	for _, r := range clean {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			letters = append(letters, unicode.ToUpper(r))
+		}
+	}
+	if len(letters) >= 3 {
+		return string(letters[:3])
+	}
+	if len(letters) > 0 {
+		return string(letters)
+	}
+	return "HTL"
+}
+
+// extractRoomNumber extracts 2-4 numeric digits from room type name, room ID, or defaults to 101.
+func extractRoomNumber(roomTypeName string, roomTypeID string) string {
+	var digits []rune
+	for _, r := range roomTypeName {
+		if unicode.IsDigit(r) {
+			digits = append(digits, r)
+		}
+	}
+	if len(digits) >= 2 {
+		if len(digits) > 4 {
+			return string(digits[:4])
+		}
+		return string(digits)
+	}
+	digits = nil
+	for _, r := range roomTypeID {
+		if unicode.IsDigit(r) {
+			digits = append(digits, r)
+		}
+	}
+	if len(digits) >= 3 {
+		return string(digits[:3])
+	}
+	return "101"
 }
 
 // generateBookingCode returns "SE-" followed by 6 random chars from bookingCodeChars.

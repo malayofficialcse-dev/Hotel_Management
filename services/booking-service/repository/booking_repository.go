@@ -62,6 +62,22 @@ func (r *BookingRepository) CreateBooking(ctx context.Context, tx pgx.Tx, b *mod
 	return err
 }
 
+// GetNextBookingSequence counts bookings for the hotel and year to produce the next sequential booking number.
+func (r *BookingRepository) GetNextBookingSequence(ctx context.Context, tx pgx.Tx, hotelID string, year int) (int, error) {
+	const q = `
+		SELECT COUNT(*) 
+		FROM bookings 
+		WHERE (hotel_id = $1 OR hotel_name = $1)
+		  AND EXTRACT(YEAR FROM created_at) = $2
+	`
+	var count int
+	row := tx.QueryRow(ctx, q, hotelID, year)
+	if err := row.Scan(&count); err != nil {
+		return 1, err
+	}
+	return count + 1, nil
+}
+
 // GetBookingByID fetches a booking by its UUID primary key.
 func (r *BookingRepository) GetBookingByID(ctx context.Context, id uuid.UUID) (*models.Booking, error) {
 	const q = `SELECT ` + bookingColumns + ` FROM bookings WHERE id = $1`

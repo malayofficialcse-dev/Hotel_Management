@@ -97,7 +97,19 @@ async function loadLiveRecords(section: AdminSection): Promise<AdminRecord[] | n
     for (const booking of bookings) if (!customers.has(booking.guest_email.toLowerCase())) customers.set(booking.guest_email.toLowerCase(), booking);
     return [...customers.values()].map((booking) => ({ id: booking.guest_email, name: `${booking.guest_first_name} ${booking.guest_last_name}`.trim(), detail: booking.guest_email, status: "Guest", value: `${bookings.filter((item) => item.guest_email.toLowerCase() === booking.guest_email.toLowerCase()).length} reservations`, date: new Date(booking.created_at || booking.check_in_date).toLocaleDateString("en-IN") }));
   }
-  if (section === "payments") return (await api.getAdminPayments()).map((payment: AdminPayment) => ({ id: payment.id, name: payment.bookingCode, detail: `${payment.provider}${payment.paymentMethod ? ` · ${payment.paymentMethod}` : ""}`, status: payment.status, value: `${payment.currency} ${payment.amount.toLocaleString("en-IN")}`, date: new Date(payment.createdAt).toLocaleDateString("en-IN") }));
+  if (section === "payments") {
+    return (await api.getAdminPayments()).map((payment: AdminPayment) => {
+      const billNo = payment.metadata?.billNumber || payment.metadata?.invoiceNumber;
+      return {
+        id: payment.id,
+        name: payment.bookingCode,
+        detail: `${billNo ? `Bill #${billNo} · ` : ""}${payment.paymentMethod || payment.provider}`,
+        status: payment.status,
+        value: `${payment.currency} ${payment.amount.toLocaleString("en-IN")}`,
+        date: new Date(payment.createdAt).toLocaleDateString("en-IN"),
+      };
+    });
+  }
   if (section === "reviews") return (await api.getAdminReviews()).map((review: AdminReview) => ({ id: review._id, name: review.userName, detail: `${review.hotelId} · ${review.title || review.comment}`, status: review.isHidden ? "Hidden" : review.isApproved ? "Published" : "Pending", value: `${review.rating} / 5`, date: new Date(review.createdAt).toLocaleDateString("en-IN") }));
   return null;
 }
@@ -386,21 +398,66 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
                 <td><StatusBadge status={row.status} /></td>
                 <td className="admin-value-cell">{row.value}</td>
                 <td className="admin-date-cell">{row.date}</td>
-                <td>{section === "housekeeping" || ["hotels", "rooms", "departments", "employees", "offers"].includes(section) ?
-                  <button className="admin-row-menu" type="button" aria-label={`Actions for ${row.name}`} onClick={() => void onRecordAction(row)}>{section === "housekeeping" ? "Update" : "Remove"}</button>
-                  : null}</td>
+                <td>
+                  {section === "housekeeping" || ["hotels", "rooms", "departments", "employees", "offers"].includes(section) ? (
+                    <button className="admin-row-menu" type="button" aria-label={`Actions for ${row.name}`} onClick={() => void onRecordAction(row)}>
+                      {section === "housekeeping" ? "Update" : "Remove"}
+                    </button>
+                  ) : section === "reservations" ? (
+                    <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                      {row.status.toUpperCase().includes("PENDING") ? (
+                        <Link
+                          href={`/booking/payment?code=${encodeURIComponent(row.id)}`}
+                          className="admin-primary-button"
+                          style={{ fontSize: "11px", padding: "4px 10px", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap" }}
+                        >
+                          💳 Pay
+                        </Link>
+                      ) : (
+                        <Link
+                          href={`/booking/bill?code=${encodeURIComponent(row.id)}`}
+                          className="admin-secondary-button"
+                          style={{ fontSize: "11px", padding: "4px 8px", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap" }}
+                        >
+                          📄 Bill
+                        </Link>
+                      )}
+                    </div>
+                  ) : section === "payments" ? (
+                    <Link
+                      href={`/booking/bill?code=${encodeURIComponent(row.name)}`}
+                      className="admin-secondary-button"
+                      style={{ fontSize: "11px", padding: "4px 8px", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap" }}
+                    >
+                      📄 View Bill
+                    </Link>
+                  ) : null}
+                </td>
               </tr>
             ))}</tbody>
           </table>
           {!loading && filtered.length === 0 && (
             <div className="admin-empty">
-              {loadFailed
-                ? `Could not load ${content.title.toLowerCase()}. Check the service connection and retry.`
-                : query
-                  ? `No database records match “${query}”.`
-                  : live
-                    ? `No ${content.title.toLowerCase()} have been saved yet. Use “${content.action}” to add the first record.`
-                    : unsupportedMessage[section] || `No ${content.title.toLowerCase()} are stored.`}
+              {loadFailed ? (
+                <div>
+                  <p>Could not load {content.title.toLowerCase()}. {notice || "Check the service connection."}</p>
+                  <p style={{ marginTop: "12px" }}>
+                    <Link
+                      href="/admin/login?relogin=1"
+                      className="admin-primary-button"
+                      style={{ fontSize: "12px", padding: "6px 14px", textDecoration: "none", display: "inline-block" }}
+                    >
+                      🔑 Sign In Again as Admin
+                    </Link>
+                  </p>
+                </div>
+              ) : query ? (
+                `No database records match “${query}”.`
+              ) : live ? (
+                `No ${content.title.toLowerCase()} have been saved yet. Use “${content.action}” to add the first record.`
+              ) : (
+                unsupportedMessage[section] || `No ${content.title.toLowerCase()} are stored.`
+              )}
             </div>
           )}
         </div>

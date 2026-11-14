@@ -13,7 +13,17 @@ export default function AdminLoginPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // If already logged in as admin, redirect to admin dashboard
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("reason") === "expired") {
+      setError("Your previous session expired or was invalid. Please sign in again.");
+      api.logout();
+      return;
+    }
+    if (params.get("relogin")) {
+      api.logout();
+      return;
+    }
+    // If already logged in as admin with active token, redirect to admin dashboard
     const user = api.getUser();
     const token = api.getToken();
     if (token && user && user.role === "ADMIN") {

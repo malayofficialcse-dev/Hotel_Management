@@ -72,7 +72,7 @@ export default function BookingConfirmationPage() {
               <h2 className="text-sm font-semibold">All the details, delivered</h2>
               <p className="mt-3 flex items-center gap-2 text-[10px]"><FigmaIcon name="mail" className="h-4 w-4" /> Your confirmation and payment receipt have been sent to aarav.mehta@gmail.com.</p>
               <div className="mt-4 flex flex-wrap gap-2">
-                <a href="#invoice" download="stayease-invoice.txt" className="inline-flex min-h-9 items-center gap-2 rounded-[4px] bg-white px-3 text-[10px] font-semibold">Download invoice <FigmaIcon name="download" className="h-3.5 w-3.5" /></a>
+                <a href={`/booking/bill?code=${encodeURIComponent(bookingCode)}`} className="inline-flex min-h-9 items-center gap-2 rounded-[4px] bg-white px-3 text-[10px] font-semibold text-charcoal shadow-sm hover:bg-mist">View & Print Tax Invoice <FigmaIcon name="download" className="h-3.5 w-3.5" /></a>
                 <a href={`data:text/calendar;charset=utf-8,${encodeURIComponent(calendarEvent)}`} download="stayease-stay.ics" className="inline-flex min-h-9 items-center gap-2 rounded-[4px] bg-white px-3 text-[10px] font-semibold">Add to calendar <FigmaIcon name="calendar-plus" className="h-3.5 w-3.5" /></a>
               </div>
             </Surface>

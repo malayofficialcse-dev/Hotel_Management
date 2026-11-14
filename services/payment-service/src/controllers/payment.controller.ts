@@ -1,11 +1,11 @@
-import { Controller, Post, Body, Get, Param, Req, ForbiddenException } from "@nestjs/common";
+import { Controller, Post, Body, Get, Param, Req, ForbiddenException, Inject } from "@nestjs/common";
 import type { Request } from "express";
 import { PaymentService } from "../services/payment.service.js";
 import { CreatePaymentIntentDto, ConfirmPaymentDto, RefundDto } from "../models/payment.dto.js";
 
 @Controller("api/v1/payments")
 export class PaymentController {
-  constructor(private readonly paymentService: PaymentService) {}
+  constructor(@Inject(PaymentService) private readonly paymentService: PaymentService) { }
 
   @Get("health")
   healthCheck() {
@@ -30,6 +30,17 @@ export class PaymentController {
   @Get("booking/:bookingId")
   getByBooking(@Param("bookingId") bookingId: string) {
     return this.paymentService.getByBookingId(bookingId);
+  }
+
+  @Get("lookup")
+  lookupByCode(@Req() request: Request) {
+    const code = (request.query.code as string) || "";
+    return this.paymentService.getByBookingCode(code);
+  }
+
+  @Get("code/:code")
+  getByBookingCode(@Param("code") code: string) {
+    return this.paymentService.getByBookingCode(code);
   }
 
   @Get("admin")

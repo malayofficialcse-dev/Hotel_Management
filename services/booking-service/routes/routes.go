@@ -1,8 +1,8 @@
 package routes
 
 import (
-	bookingMiddleware "booking-service/middleware"
 	"booking-service/controllers"
+	bookingMiddleware "booking-service/middleware"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -30,7 +30,9 @@ func SetupRoutes(c *controllers.BookingController, authServiceURL string) *chi.M
 		api.Post("/{id}/confirm", c.ConfirmBooking)
 		api.With(bookingMiddleware.OptionalAuth(authServiceURL)).Post("/{id}/cancel", c.CancelBooking)
 		api.Get("/{id}", c.GetBookingByID)
+		api.Get("/code", c.GetBookingByCode)
 		api.Get("/code/{code}", c.GetBookingByCode)
+		api.Get("/code/*", c.GetBookingByCode)
 	})
 
 	// Internal endpoint for Hotel/Room service availability checks
