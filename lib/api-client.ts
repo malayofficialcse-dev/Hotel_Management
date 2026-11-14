@@ -76,11 +76,14 @@ export interface AdminBooking {
   room_type_name: string;
   check_in_date: string;
   check_out_date: string;
+  guests_count?: number;
+  room_count?: number;
   total_price: number;
   status: string;
   guest_first_name: string;
   guest_last_name: string;
   guest_email: string;
+  guest_phone?: string;
   created_at: string;
 }
 

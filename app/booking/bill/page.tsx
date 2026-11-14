@@ -6,6 +6,7 @@ import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { api, AdminPayment } from "@/lib/api-client";
 import { FigmaIcon } from "@/components/figma-icon";
+import { PrinterIcon } from "@/components/icons";
 
 interface BillData {
   billNumber: string;
@@ -143,7 +144,8 @@ export default function BillPage() {
               type="button"
               className="flex items-center gap-1.5 rounded bg-forest px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-[#344d40]"
             >
-              <span>🖨️</span> Print / Save PDF
+              <PrinterIcon size={14} />
+              <span>Print / Save PDF</span>
             </button>
             <Link
               href="/admin/reservations"

@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { api, type AdminDepartment, type AdminEmployee, type AdminHotel, type AdminRoom, type HousekeepingTask } from "@/lib/api-client";
+import { FigmaIcon } from "@/components/figma-icon";
 import { adminNavigation, type AdminSection } from "./admin-data";
 
 type SearchItem = { label: string; detail: string; href: string };
@@ -178,12 +179,12 @@ export function AdminShell({ children }: { children: ReactNode }) {
         <div className="admin-sidebar-bottom">
           <div className="admin-sidebar-note">Portfolio operations</div>
           <Link href="/" className="admin-customer-link">← View customer website</Link>
-            <div className="admin-user" style={{ cursor: "pointer" }} onClick={handleLogout} title="Click to log out">
-              <span className="admin-user-avatar">{adminUser?.name?.[0] || "M"}</span>
-              <span><strong>{adminUser?.name || "Mala Admin"}</strong><small>{adminUser?.email || "mala@gmail.com"} &middot; Log out</small></span>
-              <span className="admin-picker-arrow">⎋</span>
-            </div>
+          <div className="admin-user" style={{ cursor: "pointer" }} onClick={handleLogout} title="Click to log out">
+            <span className="admin-user-avatar">{adminUser?.name?.[0] || "M"}</span>
+            <span><strong>{adminUser?.name || "Mala Admin"}</strong><small>{adminUser?.email || "mala@gmail.com"} &middot; Log out</small></span>
+            <span className="admin-picker-arrow">⎋</span>
           </div>
+        </div>
       </aside>
       <div className="admin-main">
         <header className="admin-topbar">
@@ -191,7 +192,9 @@ export function AdminShell({ children }: { children: ReactNode }) {
           <div className="admin-top-actions">
             <button type="button" className="admin-search-global" aria-label="Search workspace" onClick={() => setSearchOpen(true)}>⌕ <span>Search anything...</span><kbd>⌘ K</kbd></button>
             <button type="button" className="admin-icon-button" aria-label="Help">?</button>
-            <button type="button" className="admin-icon-button admin-bell" aria-label="Open notifications" onClick={() => router.push("/admin/notifications")}>♧</button>
+            <button type="button" className="admin-icon-button admin-bell" aria-label="Open notifications" onClick={() => router.push("/admin/notifications")}>
+              <FigmaIcon name="bell" className="h-4 w-4" />
+            </button>
             <button type="button" onClick={handleLogout} className="admin-secondary-button" style={{ padding: "4px 10px", fontSize: "11px", height: "auto" }}>Log out</button>
             <span className="admin-top-avatar" title={`Signed in as ${adminUser?.name || "Admin"}`}>{adminUser?.name?.[0] || "M"}</span>
           </div>

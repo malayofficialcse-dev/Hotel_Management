@@ -6,6 +6,7 @@ import Link from "next/link";
 import { QRCodeSVG } from "qrcode.react";
 import { BookingStepper } from "@/components/booking-stepper";
 import { FigmaIcon } from "@/components/figma-icon";
+import { BuildingIcon } from "@/components/icons";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { Button, PageHeading, Surface, TextField } from "@/components/ui";
@@ -380,7 +381,7 @@ export default function PaymentPage() {
               {paymentMethod === "Cash / Pay at Desk" && (
                 <div className="rounded-[4px] border border-forest/30 bg-mint/50 p-4 text-xs">
                   <h3 className="font-semibold text-forest flex items-center gap-1.5">
-                    <span>🏢</span> Pay at Hotel Front Desk
+                    <BuildingIcon size={14} /> Pay at Hotel Front Desk
                   </h3>
                   <p className="mt-2 text-muted">
                     Your reservation will be held and guaranteed immediately. You can pay ₹{totalPrice.toLocaleString("en-IN")} via Cash, Card, or UPI upon arrival during check-in.

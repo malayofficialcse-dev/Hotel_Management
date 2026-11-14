@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { api, type AdminBooking, type AdminDepartment, type AdminEmployee, type AdminHotel, type AdminOffer, type AdminPayment, type AdminReview, type AdminRoom, type HousekeepingTask } from "@/lib/api-client";
+import { PaymentsWorkspace } from "./payments-workspace";
+import { ReservationsWorkspace } from "./reservations-workspace";
 import {
   sectionTabs,
   sectionTitles,
@@ -346,6 +348,10 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
 
   if (section === "reports") return <Reports />;
 
+  if (section === "payments") return <PaymentsWorkspace />;
+
+  if (section === "reservations") return <ReservationsWorkspace />;
+
   if (section === "settings") {
     return (
       <>
@@ -372,7 +378,7 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
       {unsupportedMessage[section] && <div className="admin-inline-notice" role="status">{unsupportedMessage[section]}</div>}
       <section className="admin-panel admin-table-panel">
         <div className="admin-panel-heading">
-          <div><h2>{section === "reservations" ? "All reservations" : `All ${content.title.toLowerCase()}`}</h2><p>{formatNumber(filtered.length)} database record{filtered.length === 1 ? "" : "s"}</p></div>
+          <div><h2>{`All ${content.title.toLowerCase()}`}</h2><p>{formatNumber(filtered.length)} database record{filtered.length === 1 ? "" : "s"}</p></div>
         </div>
         {sectionTabs[section] && (
           <div className="admin-tabs" role="tablist" aria-label={`${content.title} views`}>
@@ -384,7 +390,7 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
         </div>
         <div className="admin-table-scroll">
           <table className="admin-table">
-            <thead><tr><th><input type="checkbox" aria-label="Select all rows" /></th><th>{section === "reservations" ? "BOOKING ID" : "ID"}</th><th>{section === "customers" || section === "employees" ? "GUEST / TEAM MEMBER" : "NAME"}</th><th>DETAILS</th><th>STATUS</th><th>{section === "hotels" ? "RATING" : "VALUE"}</th><th>UPDATED</th><th><span className="sr-only">Actions</span></th></tr></thead>
+            <thead><tr><th><input type="checkbox" aria-label="Select all rows" /></th><th>ID</th><th>{section === "customers" || section === "employees" ? "GUEST / TEAM MEMBER" : "NAME"}</th><th>DETAILS</th><th>STATUS</th><th>{section === "hotels" ? "RATING" : "VALUE"}</th><th>UPDATED</th><th><span className="sr-only">Actions</span></th></tr></thead>
             <tbody>{loading ? <tr><td colSpan={8}>Loading records…</td></tr> : filtered.map((row) => (
               <tr key={row.id}>
                 <td><input type="checkbox" aria-label={`Select ${row.name}`} /></td>
@@ -403,34 +409,6 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
                     <button className="admin-row-menu" type="button" aria-label={`Actions for ${row.name}`} onClick={() => void onRecordAction(row)}>
                       {section === "housekeeping" ? "Update" : "Remove"}
                     </button>
-                  ) : section === "reservations" ? (
-                    <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                      {row.status.toUpperCase().includes("PENDING") ? (
-                        <Link
-                          href={`/booking/payment?code=${encodeURIComponent(row.id)}`}
-                          className="admin-primary-button"
-                          style={{ fontSize: "11px", padding: "4px 10px", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap" }}
-                        >
-                          💳 Pay
-                        </Link>
-                      ) : (
-                        <Link
-                          href={`/booking/bill?code=${encodeURIComponent(row.id)}`}
-                          className="admin-secondary-button"
-                          style={{ fontSize: "11px", padding: "4px 8px", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap" }}
-                        >
-                          📄 Bill
-                        </Link>
-                      )}
-                    </div>
-                  ) : section === "payments" ? (
-                    <Link
-                      href={`/booking/bill?code=${encodeURIComponent(row.name)}`}
-                      className="admin-secondary-button"
-                      style={{ fontSize: "11px", padding: "4px 8px", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap" }}
-                    >
-                      📄 View Bill
-                    </Link>
                   ) : null}
                 </td>
               </tr>
@@ -447,7 +425,7 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
                       className="admin-primary-button"
                       style={{ fontSize: "12px", padding: "6px 14px", textDecoration: "none", display: "inline-block" }}
                     >
-                      🔑 Sign In Again as Admin
+                      Sign In Again as Admin
                     </Link>
                   </p>
                 </div>
