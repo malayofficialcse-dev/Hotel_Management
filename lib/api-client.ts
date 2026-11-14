@@ -66,6 +66,8 @@ export interface AdminEmployee {
 export interface HousekeepingTask {
   _id: string;
   hotelId: string;
+  departmentId?: string;
+  departmentName?: string;
   roomNumber: string;
   taskDate?: string;
   scheduledDate?: string;
@@ -225,7 +227,27 @@ export const api = {
     if (typeof window !== "undefined") {
       window.localStorage.removeItem("stayease-token");
       window.localStorage.removeItem("stayease-user");
+      window.dispatchEvent(new Event("stayease-user-updated"));
     }
+  },
+  async getProfile(): Promise<UserSession & { phone?: string; createdAt?: string }> {
+    const res = await request<{ success: boolean; user: UserSession & { phone?: string; createdAt?: string } }>("/auth/me");
+    if (res.user && typeof window !== "undefined") {
+      window.localStorage.setItem("stayease-user", JSON.stringify(res.user));
+      window.dispatchEvent(new Event("stayease-user-updated"));
+    }
+    return res.user;
+  },
+  async updateProfile(data: { name?: string; phone?: string; currentPassword?: string; newPassword?: string }): Promise<UserSession & { phone?: string; createdAt?: string }> {
+    const res = await request<{ success: boolean; message: string; user: UserSession & { phone?: string; createdAt?: string } }>("/auth/me", {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+    if (res.user && typeof window !== "undefined") {
+      window.localStorage.setItem("stayease-user", JSON.stringify(res.user));
+      window.dispatchEvent(new Event("stayease-user-updated"));
+    }
+    return res.user;
   },
   async getHotels(filters?: { city?: string; category?: string; search?: string; minPrice?: number; maxPrice?: number }): Promise<Hotel[]> { const params = new URLSearchParams(); Object.entries(filters || {}).forEach(([key, value]) => { if (value && value !== "All" && value !== "All Stays") params.set(key, String(value)); }); return (await request<AdminHotel[]>(`/hotels?${params}`)).map(toPublicHotel); },
   async getHotel(identifier: string): Promise<Hotel> { return toPublicHotel(await request<AdminHotel>(`/hotels/${encodeURIComponent(identifier)}`)); },

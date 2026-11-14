@@ -12,7 +12,21 @@ export class AuthRepository {
   async findById(id: string) {
     return this.prisma.user.findUnique({
       where: { id },
-      select: { id: true, email: true, name: true, phone: true, role: true, isActive: true },
+      select: { id: true, email: true, name: true, phone: true, role: true, isActive: true, createdAt: true, updatedAt: true },
+    });
+  }
+
+  async findFullUserById(id: string) {
+    return this.prisma.user.findUnique({
+      where: { id },
+    });
+  }
+
+  async updateProfile(id: string, data: { name?: string; phone?: string; passwordHash?: string }) {
+    return this.prisma.user.update({
+      where: { id },
+      data,
+      select: { id: true, email: true, name: true, phone: true, role: true, isActive: true, createdAt: true, updatedAt: true },
     });
   }
 

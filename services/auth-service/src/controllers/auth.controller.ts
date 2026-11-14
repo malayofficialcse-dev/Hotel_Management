@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, Headers, UnauthorizedException, HttpCode, HttpStatus, Inject } from "@nestjs/common";
+import { Controller, Post, Body, Get, Patch, Headers, UnauthorizedException, HttpCode, HttpStatus, Inject } from "@nestjs/common";
 import { AuthService } from "../services/auth.service.js";
 import { RegisterDto, LoginDto, RefreshTokenDto } from "../models/auth.dto.js";
 
@@ -65,5 +65,34 @@ export class AuthController {
       throw new UnauthorizedException("Invalid or expired token");
     }
     return result;
+  }
+
+  @Get("api/v1/auth/me")
+  async getProfile(@Headers("authorization") authHeader?: string) {
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      throw new UnauthorizedException("Missing Bearer token");
+    }
+    const token = authHeader.split(" ")[1];
+    const validation = await this.authService.validateToken(token);
+    if (!validation.valid || !validation.user) {
+      throw new UnauthorizedException("Invalid or expired token");
+    }
+    return this.authService.getProfile(validation.user.id);
+  }
+
+  @Patch("api/v1/auth/me")
+  async updateProfile(
+    @Headers("authorization") authHeader: string | undefined,
+    @Body() dto: { name?: string; phone?: string; currentPassword?: string; newPassword?: string }
+  ) {
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      throw new UnauthorizedException("Missing Bearer token");
+    }
+    const token = authHeader.split(" ")[1];
+    const validation = await this.authService.validateToken(token);
+    if (!validation.valid || !validation.user) {
+      throw new UnauthorizedException("Invalid or expired token");
+    }
+    return this.authService.updateProfile(validation.user.id, dto);
   }
 }

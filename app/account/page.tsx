@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { Button, PageHeading, Surface, TextField } from "@/components/ui";
 import { FigmaIcon } from "@/components/figma-icon";
+import { api, type UserSession } from "@/lib/api-client";
 
 const sideNav = [
   ["user", "Personal information"],
@@ -16,8 +18,87 @@ const sideNav = [
 ];
 
 export default function AccountPage() {
+  const router = useRouter();
+  const [user, setUser] = useState<UserSession | null>(null);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [phone, setPhone] = useState("");
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const [active, setActive] = useState("Personal information");
+
+  useEffect(() => {
+    let activeEffect = true;
+    async function loadUser() {
+      const current = api.getUser();
+      if (!current) {
+        router.push("/auth/login");
+        return;
+      }
+      setUser(current);
+      const parts = (current.name || "").split(" ");
+      setFirstName(parts[0] || "");
+      setLastName(parts.slice(1).join(" ") || "");
+      setPhone(current.phone || "");
+
+      try {
+        const live = await api.getProfile();
+        if (!activeEffect) return;
+        setUser(live);
+        const liveParts = (live.name || "").split(" ");
+        setFirstName(liveParts[0] || "");
+        setLastName(liveParts.slice(1).join(" ") || "");
+        if (live.phone) setPhone(live.phone);
+      } catch {
+        // use local
+      }
+    }
+    void loadUser();
+    return () => {
+      activeEffect = false;
+    };
+  }, [router]);
+
+  async function handleSaveChanges() {
+    setSaving(true);
+    setError("");
+    setSaved(false);
+    try {
+      const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
+      if (!fullName) {
+        setError("Name cannot be empty.");
+        setSaving(false);
+        return;
+      }
+      const updated = await api.updateProfile({
+        name: fullName,
+        phone: phone.trim(),
+      });
+      setUser((prev) => (prev ? { ...prev, ...updated } : updated));
+      setSaved(true);
+      setTimeout(() => setSaved(false), 4000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update profile.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function handleSignOut() {
+    api.logout();
+    router.push("/auth/login");
+  }
+
+  const initials = user?.name
+    ? user.name
+      .split(" ")
+      .map((p) => p[0])
+      .slice(0, 2)
+      .join("")
+      .toUpperCase()
+    : "ST";
+
   return (
     <>
       <SiteHeader />
@@ -26,18 +107,31 @@ export default function AccountPage() {
         <div className="mt-6 grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)]">
           <aside>
             <div className="rounded-[4px] bg-lilac p-5">
-              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-sm font-semibold">AM</span>
-              <h2 className="mt-3 text-sm font-semibold">Aarav Mehta</h2>
-              <p className="mt-1 text-[10px] text-muted">Member since July 2026</p>
-              <span className="mt-3 inline-block rounded-[4px] bg-white px-2 py-1 text-[9px]">StayEase Explorer</span>
+              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-sm font-semibold text-forest">
+                {initials}
+              </span>
+              <h2 className="mt-3 text-sm font-semibold">{user?.name || "StayEase Guest"}</h2>
+              <p className="mt-1 text-[10px] text-muted">{user?.email || "guest@stayease.com"}</p>
+              <span className="mt-3 inline-block rounded-[4px] bg-white px-2 py-1 text-[9px] font-semibold text-forest">
+                {user?.role === "ADMIN" ? "Administrator" : "StayEase Explorer"}
+              </span>
             </div>
             <nav className="mt-3 space-y-1" aria-label="Account settings">
               {sideNav.map(([icon, label]) => (
-                <button key={label} type="button" onClick={() => setActive(label)} className={`flex w-full items-center gap-3 rounded-[4px] px-3 py-2.5 text-left text-[10px] ${active === label ? "bg-mint font-semibold text-forest" : "text-ink hover:bg-mist"}`}>
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => setActive(label)}
+                  className={`flex w-full items-center gap-3 rounded-[4px] px-3 py-2.5 text-left text-[10px] ${active === label ? "bg-mint font-semibold text-forest" : "text-ink hover:bg-mist"}`}
+                >
                   <FigmaIcon name={icon as "user"} className="h-3.5 w-3.5" />{label}
                 </button>
               ))}
-              <button type="button" onClick={() => setActive("Sign out")} className={`flex w-full items-center gap-3 rounded-[4px] px-3 py-2.5 text-left text-[10px] ${active === "Sign out" ? "bg-mint font-semibold text-forest" : "text-ink hover:bg-mist"}`}>
+              <button
+                type="button"
+                onClick={handleSignOut}
+                className="flex w-full items-center gap-3 rounded-[4px] px-3 py-2.5 text-left text-[10px] text-red-600 hover:bg-red-50"
+              >
                 <span aria-hidden="true">↪</span> Sign out
               </button>
             </nav>
@@ -49,17 +143,50 @@ export default function AccountPage() {
                 <span className="rounded-[4px] bg-mint px-2 py-1 text-[9px] font-semibold text-forest">Email verified</span>
               </div>
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <TextField label="First name" defaultValue="Aarav" />
-                <TextField label="Last name" defaultValue="Mehta" />
-                <TextField label="Email address" type="email" defaultValue="aarav.mehta@gmail.com" />
-                <TextField label="Phone number" type="tel" defaultValue="+91 98765 43210" />
+                <TextField
+                  label="First name"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  placeholder="First name"
+                />
+                <TextField
+                  label="Last name"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  placeholder="Last name"
+                />
+                <TextField
+                  label="Email address"
+                  type="email"
+                  value={user?.email || ""}
+                  disabled
+                  className="opacity-75"
+                />
+                <TextField
+                  label="Phone number"
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="+91 98765 43210"
+                />
                 <TextField label="Date of birth" type="text" defaultValue="14 August 1994" />
-                <label className="block text-[11px] font-medium">Country of residence<select className="mt-2 h-10 w-full rounded-[4px] border border-line px-3 text-xs font-normal"><option>India</option><option>United Kingdom</option></select></label>
-                <TextField label="Address" defaultValue="24, Palm Avenue, Indiranagar, Bengaluru, Karnataka 560038" className="sm:col-span-2" />
+                <label className="block text-[11px] font-medium">
+                  Country of residence
+                  <select className="mt-2 h-10 w-full rounded-[4px] border border-line px-3 text-xs font-normal">
+                    <option>India</option>
+                    <option>United Kingdom</option>
+                    <option>United States</option>
+                  </select>
+                </label>
               </div>
+              {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
               <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                <p className="text-[9px] text-muted">{saved ? "Your details have been saved." : "Your details are only used to make your stays smoother."}</p>
-                <Button onClick={() => setSaved(true)}>Save changes</Button>
+                <p className="text-[9px] text-muted">
+                  {saved ? "Your details have been saved successfully." : "Your details are only used to make your stays smoother."}
+                </p>
+                <Button onClick={() => void handleSaveChanges()} disabled={saving}>
+                  {saving ? "Saving…" : "Save changes"}
+                </Button>
               </div>
             </Surface>
             <Surface className="p-5">
@@ -81,7 +208,9 @@ export default function AccountPage() {
               <h2 className="text-sm font-semibold">Security &amp; privacy</h2>
               <div className="flex items-center justify-between border-b border-line py-4 text-[10px]">
                 <div><p className="font-semibold">Password</p><p className="mt-1 text-muted">Last updated 12 July 2026</p></div>
-                <Button variant="outline" className="min-h-8">Change password</Button>
+                <Button variant="outline" className="min-h-8" onClick={() => router.push(user?.role === "ADMIN" ? "/admin/profile" : "/account")}>
+                  Change password
+                </Button>
               </div>
               <ToggleRow title="Two-step verification" description="Add an extra layer of security with a one-time code." />
               <div className="flex justify-between pt-4 text-[10px]"><button type="button" className="text-forest">Manage my data</button><button type="button" className="text-muted">Delete account</button></div>

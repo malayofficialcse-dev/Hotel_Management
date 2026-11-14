@@ -8,6 +8,7 @@ import {
   type AdminHotel,
   type AdminRoom,
 } from "@/lib/api-client";
+import { exportToExcel } from "@/lib/export-excel";
 import {
   BuildingIcon,
   BedIcon,
@@ -316,8 +317,8 @@ export function ReservationsWorkspace() {
     setDatePreset("all");
   }
 
-  // CSV Export
-  function exportCSV() {
+  // Excel Export
+  function exportExcel() {
     if (filteredBookings.length === 0) {
       setNotice("No reservations match the current filters to export.");
       return;
@@ -339,30 +340,28 @@ export function ReservationsWorkspace() {
     ];
 
     const rows = filteredBookings.map((b) => [
-      `"${b.booking_code}"`,
-      `"${b.hotel_name || ""}"`,
-      `"${b.room_type_name || ""}"`,
-      `"${b.guest_first_name} ${b.guest_last_name}"`,
-      `"${b.guest_email || ""}"`,
-      `"${b.guest_phone || ""}"`,
-      `"${b.check_in_date}"`,
-      `"${b.check_out_date}"`,
+      b.booking_code,
+      b.hotel_name || "",
+      b.room_type_name || "",
+      `${b.guest_first_name} ${b.guest_last_name}`,
+      b.guest_email || "",
+      b.guest_phone || "",
+      b.check_in_date,
+      b.check_out_date,
       b.guests_count ?? 1,
       b.room_count ?? 1,
       b.total_price,
-      `"${b.status}"`,
-      `"${b.created_at}"`,
+      b.status,
+      b.created_at,
     ]);
 
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `reservations_export_${new Date().toISOString().split("T")[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    setNotice(`Exported ${filteredBookings.length} reservations to CSV.`);
+    exportToExcel({
+      filename: `reservations_export_${new Date().toISOString().split("T")[0]}`,
+      sheetName: "Reservations",
+      headers,
+      rows,
+    });
+    setNotice(`Exported ${filteredBookings.length} reservations to Excel.`);
   }
 
   // Handle Create Reservation Submit
@@ -439,11 +438,11 @@ export function ReservationsWorkspace() {
           <button
             type="button"
             className="admin-secondary-button"
-            onClick={exportCSV}
-            title="Export filtered records to CSV"
+            onClick={exportExcel}
+            title="Export filtered records to Excel"
             style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
           >
-            <DownloadIcon size={13} /> <span>Export CSV</span>
+            <DownloadIcon size={13} /> <span>Export to Excel</span>
           </button>
           <button
             type="button"
@@ -1158,18 +1157,18 @@ export function ReservationsWorkspace() {
 
                   const checkInFormatted = row.check_in_date
                     ? new Date(row.check_in_date).toLocaleDateString("en-IN", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                      })
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                    })
                     : "—";
 
                   const checkOutFormatted = row.check_out_date
                     ? new Date(row.check_out_date).toLocaleDateString("en-IN", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                      })
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                    })
                     : "—";
 
                   return (
@@ -1246,9 +1245,8 @@ export function ReservationsWorkspace() {
                       {/* Status */}
                       <td>
                         <span
-                          className={`admin-status ${
-                            isConfirmed ? "status-green" : isPending ? "status-amber" : isCancelled ? "status-rose" : "status-gray"
-                          }`}
+                          className={`admin-status ${isConfirmed ? "status-green" : isPending ? "status-amber" : isCancelled ? "status-rose" : "status-gray"
+                            }`}
                           style={{ fontSize: "9px", padding: "3px 7px", fontWeight: 600 }}
                         >
                           <i />
@@ -1260,10 +1258,10 @@ export function ReservationsWorkspace() {
                       <td style={{ color: "#77857e", fontSize: "10px" }}>
                         {row.created_at
                           ? new Date(row.created_at).toLocaleDateString("en-IN", {
-                              day: "2-digit",
-                              month: "short",
-                              year: "numeric",
-                            })
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                          })
                           : "—"}
                       </td>
 

@@ -3,8 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { api, type AdminBooking, type AdminDepartment, type AdminEmployee, type AdminHotel, type AdminOffer, type AdminPayment, type AdminReview, type AdminRoom, type HousekeepingTask } from "@/lib/api-client";
+import { exportToExcel } from "@/lib/export-excel";
+import { DownloadIcon } from "@/components/icons";
 import { PaymentsWorkspace } from "./payments-workspace";
 import { ReservationsWorkspace } from "./reservations-workspace";
+import { HousekeepingWorkspace } from "./housekeeping-workspace";
+import { EmployeesWorkspace } from "./employees-workspace";
+import { ProfileWorkspace } from "./profile-workspace";
 import {
   sectionTabs,
   sectionTitles,
@@ -384,6 +389,12 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
 
   if (section === "reservations") return <ReservationsWorkspace />;
 
+  if (section === "housekeeping") return <HousekeepingWorkspace />;
+
+  if (section === "employees") return <EmployeesWorkspace />;
+
+  if (section === "profile") return <ProfileWorkspace />;
+
   if (section === "settings") {
     return (
       <>
@@ -403,9 +414,46 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
     audit: "No persistent audit-log API is connected here.",
   };
 
+  const handleExportExcel = () => {
+    if (!filtered || filtered.length === 0) {
+      setNotice(`No ${content.title.toLowerCase()} records to export.`);
+      return;
+    }
+    const headers = [
+      "ID",
+      section === "customers" ? "Guest Name" : "Name",
+      "Details",
+      "Status",
+      section === "hotels" ? "Rating" : "Value",
+      "Updated Date",
+    ];
+    const rows = filtered.map((r) => [
+      r.id,
+      r.name,
+      r.detail,
+      r.status,
+      r.value,
+      r.date,
+    ]);
+    const dateStr = new Date().toISOString().split("T")[0];
+    exportToExcel({
+      filename: `${section}_export_${dateStr}`,
+      sheetName: content.title.slice(0, 31),
+      headers,
+      rows,
+    });
+    setNotice(`Exported ${filtered.length} ${content.title.toLowerCase()} records to Excel.`);
+  };
+
   return (
     <>
-      <PageHeader section={section} notice={notice} onAction={onAction} actionAvailable={actionAvailable} />
+      <PageHeader
+        section={section}
+        notice={notice}
+        onAction={onAction}
+        actionAvailable={actionAvailable}
+        onExportExcel={handleExportExcel}
+      />
       {live && <Stats section={section} records={records} unavailable={loadFailed} />}
       {unsupportedMessage[section] && <div className="admin-inline-notice" role="status">{unsupportedMessage[section]}</div>}
       <section className="admin-panel admin-table-panel">
@@ -422,13 +470,13 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
         </div>
         <div className="admin-table-scroll">
           <table className="admin-table">
-            <thead><tr><th><input type="checkbox" aria-label="Select all rows" /></th><th>ID</th><th>{section === "customers" || section === "employees" ? "GUEST / TEAM MEMBER" : "NAME"}</th><th>DETAILS</th><th>STATUS</th><th>{section === "hotels" ? "RATING" : "VALUE"}</th><th>UPDATED</th><th><span className="sr-only">Actions</span></th></tr></thead>
+            <thead><tr><th><input type="checkbox" aria-label="Select all rows" /></th><th>ID</th><th>{section === "customers" ? "GUEST" : "NAME"}</th><th>DETAILS</th><th>STATUS</th><th>{section === "hotels" ? "RATING" : "VALUE"}</th><th>UPDATED</th><th><span className="sr-only">Actions</span></th></tr></thead>
             <tbody>{loading ? <tr><td colSpan={8}>Loading records…</td></tr> : filtered.map((row) => (
               <tr key={row.id}>
                 <td><input type="checkbox" aria-label={`Select ${row.name}`} /></td>
                 <td className="admin-id">{row.id}</td>
                 <td><strong className="admin-row-name">
-                  {section === "employees" || section === "roles"
+                  {section === "roles"
                     ? <Link className="admin-row-detail-link" href={`/admin/${section}/${encodeURIComponent(row.id)}`}>{row.name}</Link>
                     : row.name}
                 </strong></td>
@@ -437,9 +485,9 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
                 <td className="admin-value-cell">{row.value}</td>
                 <td className="admin-date-cell">{row.date}</td>
                 <td>
-                  {section === "housekeeping" || ["hotels", "rooms", "departments", "employees", "offers"].includes(section) ? (
+                  {(["hotels", "rooms", "departments", "offers"] as string[]).includes(section) ? (
                     <button className="admin-row-menu" type="button" aria-label={`Actions for ${row.name}`} onClick={() => void onRecordAction(row)}>
-                      {section === "housekeeping" ? "Update" : "Remove"}
+                      Remove
                     </button>
                   ) : null}
                 </td>
@@ -486,13 +534,37 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
   );
 }
 
-function PageHeader({ section, notice, onAction, actionAvailable = true }: { section: AdminSection; notice: string; onAction: () => void; actionAvailable?: boolean }) {
+function PageHeader({
+  section,
+  notice,
+  onAction,
+  actionAvailable = true,
+  onExportExcel,
+}: {
+  section: AdminSection;
+  notice: string;
+  onAction: () => void;
+  actionAvailable?: boolean;
+  onExportExcel?: () => void;
+}) {
   const content = sectionTitles[section];
   return (
     <div className="admin-page-heading">
       <div><div className="admin-eyebrow">WORKSPACE&nbsp; / &nbsp;{content.title.toUpperCase()}</div><h1>{content.title}</h1><p>{content.subtitle}</p></div>
       <div className="admin-heading-actions">
-        <button type="button" className="admin-secondary-button" onClick={() => window.print()}>↓ <span>Export</span></button>
+        {onExportExcel ? (
+          <button
+            type="button"
+            className="admin-secondary-button"
+            onClick={onExportExcel}
+            title="Export to Excel (.xlsx)"
+            style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+          >
+            <DownloadIcon size={13} /> <span>Export to Excel</span>
+          </button>
+        ) : (
+          <button type="button" className="admin-secondary-button" onClick={() => window.print()}>↓ <span>Export</span></button>
+        )}
         <button type="button" className="admin-primary-button" onClick={onAction} disabled={!actionAvailable} title={actionAvailable ? undefined : "This section is not connected to a persistent API"}>＋ {content.action}</button>
         {notice && <span className="admin-action-notice" role="status">{notice}</span>}
       </div>
@@ -908,10 +980,10 @@ function CreateRecordDialog({
               {matchedGuest ? (
                 <span
                   className={`admin-occupancy-badge ${values.taskDate.slice(0, 10) === matchedGuest.check_in_date.slice(0, 10)
-                      ? "arriving"
-                      : values.taskDate.slice(0, 10) === matchedGuest.check_out_date.slice(0, 10)
-                        ? "departing"
-                        : "occupied"
+                    ? "arriving"
+                    : values.taskDate.slice(0, 10) === matchedGuest.check_out_date.slice(0, 10)
+                      ? "departing"
+                      : "occupied"
                     }`}
                 >
                   {values.taskDate.slice(0, 10) === matchedGuest.check_in_date.slice(0, 10)
@@ -1006,11 +1078,74 @@ function Dashboard() {
   }
   const upcoming = overview?.reservations?.slice(0, 4) || [];
   const today = new Date().toLocaleDateString("en-IN", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+
+  function handleExportExcel() {
+    const todayStr = new Date().toISOString().split("T")[0];
+    const headers = ["Category", "Item / Property", "Details", "Metric / Status", "Notes"];
+    const rows: (string | number)[][] = [
+      ["METRICS", "Properties", "Hotel database", overview?.hotels?.length ?? 0, "Connected hotels"],
+      ["METRICS", "Room Inventory", "Room database", overview?.rooms?.reduce((sum, room) => sum + room.totalInventory, 0) ?? 0, "Total rooms across all properties"],
+      ["METRICS", "Reservations", "Booking database", overview?.reservations?.length ?? 0, "Total bookings"],
+      ["METRICS", "Team Members", "Employee database", overview?.employees?.length ?? 0, "Total staff"],
+      ["METRICS", "Open Housekeeping", "Housekeeping database", overview?.tasks?.filter((task) => task.status !== "INSPECTED").length ?? 0, "Pending tasks"],
+      ["METRICS", "Guest Rating", "Average from properties", overview?.hotels?.length ? (overview.hotels.reduce((sum, hotel) => sum + hotel.rating, 0) / overview.hotels.length).toFixed(1) : "—", "Out of 5.0"],
+      ["", "", "", "", ""],
+      ["ROOM INVENTORY", "Property", "Room Types", "Total Rooms", "Status"],
+    ];
+
+    if (overview?.rooms && overview.hotels) {
+      for (const [hotelId, inventory] of roomInventory.entries()) {
+        const hotel = overview.hotels.find((item) => item.slug === hotelId || item._id === hotelId);
+        rows.push([
+          "ROOM INVENTORY",
+          hotel?.name || hotelId,
+          `${inventory.types} types`,
+          inventory.rooms,
+          "Active Property",
+        ]);
+      }
+    }
+
+    rows.push(["", "", "", "", ""]);
+    rows.push(["RECENT RESERVATIONS", "Guest Name", "Hotel & Room", "Amount", "Status"]);
+
+    if (overview?.reservations) {
+      for (const b of overview.reservations.slice(0, 50)) {
+        rows.push([
+          "RECENT RESERVATIONS",
+          `${b.guest_first_name} ${b.guest_last_name}`,
+          `${b.hotel_name} · ${b.room_type_name}`,
+          `₹${b.total_price.toLocaleString("en-IN")}`,
+          b.status,
+        ]);
+      }
+    }
+
+    exportToExcel({
+      filename: `dashboard_overview_${todayStr}`,
+      sheetName: "Workspace Overview",
+      headers,
+      rows,
+    });
+    setNotice("Exported workspace overview to Excel.");
+  }
+
   return (
     <>
       <div className="admin-page-heading">
         <div><div className="admin-eyebrow">{today}&nbsp; · &nbsp;DATABASE OVERVIEW</div><h1>Workspace overview</h1><p>Counts below come from connected service databases.</p></div>
-        <div className="admin-heading-actions"><button type="button" className="admin-secondary-button" onClick={() => window.print()}>Print</button></div>
+        <div className="admin-heading-actions">
+          <button
+            type="button"
+            className="admin-secondary-button"
+            onClick={handleExportExcel}
+            title="Export workspace summary to Excel (.xlsx)"
+            style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+          >
+            <DownloadIcon size={13} /> <span>Export to Excel</span>
+          </button>
+          <button type="button" className="admin-secondary-button" onClick={() => window.print()}>Print</button>
+        </div>
       </div>
       {notice && <div className="admin-inline-notice" role="status">{notice}</div>}
       <Stats section="dashboard" cards={dashboardCards} />
@@ -1059,8 +1194,30 @@ function Reports() {
     return () => { active = false; };
   }, []);
   const revenue = payments?.filter((payment) => ["SUCCESS", "REFUNDED"].includes(payment.status)).reduce((sum, payment) => sum + payment.amount - (payment.refunds || []).filter((refund) => refund.status === "SUCCESS").reduce((refundTotal, refund) => refundTotal + refund.amount, 0), 0);
+
+  function handleExportExcel() {
+    const todayStr = new Date().toISOString().split("T")[0];
+    const headers = ["Booking Code", "Guest Name", "Hotel", "Room Type", "Status", "Amount (INR)", "Check-in", "Check-out"];
+    const rows: (string | number)[][] = (bookings || []).map((b) => [
+      b.booking_code,
+      `${b.guest_first_name} ${b.guest_last_name}`,
+      b.hotel_name,
+      b.room_type_name,
+      b.status,
+      b.total_price,
+      b.check_in_date,
+      b.check_out_date,
+    ]);
+    exportToExcel({
+      filename: `reports_summary_${todayStr}`,
+      sheetName: "Summary Report",
+      headers,
+      rows,
+    });
+  }
+
   return <>
-    <PageHeader section="reports" notice={error} onAction={() => window.print()} actionAvailable={false} />
+    <PageHeader section="reports" notice={error} onAction={() => window.print()} actionAvailable={false} onExportExcel={handleExportExcel} />
     <section className="admin-panel admin-table-panel">
       <div className="admin-panel-heading"><div><h2>Reservation and payment summary</h2><p>Calculated from current service database records.</p></div></div>
       {!bookings || !payments ? <div className="admin-empty">{error || "Loading report data…"}</div> : <div className="admin-dashboard-grid">

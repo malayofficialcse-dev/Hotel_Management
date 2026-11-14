@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import Link from "next/link";
 import { api, type AdminPayment, type AdminBooking } from "@/lib/api-client";
+import { exportToExcel } from "@/lib/export-excel";
 import { FigmaIcon } from "@/components/figma-icon";
 import {
   BuildingIcon,
@@ -311,8 +312,8 @@ export function PaymentsWorkspace() {
     selectedStatuses.length +
     (startDate || endDate ? 1 : 0);
 
-  // CSV Export
-  function exportCSV() {
+  // Excel Export
+  function exportExcel() {
     if (filteredPayments.length === 0) return;
     const headers = [
       "Payment ID",
@@ -328,27 +329,25 @@ export function PaymentsWorkspace() {
       "Payment Date",
     ];
     const rows = filteredPayments.map((p) => [
-      `"${p.id}"`,
-      `"${p.billNumber}"`,
-      `"${p.bookingCode}"`,
-      `"${p.hotelName}"`,
-      `"${p.guestName}"`,
-      `"${p.guestEmail}"`,
-      `"${p.paymentMethod}"`,
+      p.id,
+      p.billNumber,
+      p.bookingCode,
+      p.hotelName,
+      p.guestName,
+      p.guestEmail,
+      p.paymentMethod,
       p.amount,
-      `"${p.status}"`,
-      `"${new Date(p.bookingDate).toLocaleString("en-IN")}"`,
-      `"${new Date(p.paymentDate).toLocaleString("en-IN")}"`,
+      p.status,
+      new Date(p.bookingDate).toLocaleString("en-IN"),
+      new Date(p.paymentDate).toLocaleString("en-IN"),
     ]);
 
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `stayease-payments-${new Date().toISOString().split("T")[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    exportToExcel({
+      filename: `stayease-payments-${new Date().toISOString().split("T")[0]}`,
+      sheetName: "Payments",
+      headers,
+      rows,
+    });
   }
 
   return (
@@ -363,8 +362,8 @@ export function PaymentsWorkspace() {
           </p>
         </div>
         <div className="admin-heading-actions">
-          <button type="button" className="admin-secondary-button" onClick={exportCSV} title="Export filtered records to CSV" style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-            <DownloadIcon size={13} /> <span>Export CSV</span>
+          <button type="button" className="admin-secondary-button" onClick={exportExcel} title="Export filtered records to Excel" style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+            <DownloadIcon size={13} /> <span>Export to Excel</span>
           </button>
           <button type="button" className="admin-secondary-button" onClick={() => window.print()} title="Print transaction sheet" style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
             <PrinterIcon size={13} /> <span>Print</span>

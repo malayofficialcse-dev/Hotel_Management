@@ -6,6 +6,8 @@ export type TaskStatus = (typeof taskStatuses)[number];
 const housekeepingTaskSchema = new mongoose.Schema(
   {
     hotelId: { type: String, required: true, trim: true, index: true },
+    departmentId: { type: String, trim: true, default: "", index: true },
+    departmentName: { type: String, trim: true, default: "" },
     roomNumber: { type: String, required: true, trim: true, index: true },
     taskDate: { type: String, trim: true, default: "", index: true },
     scheduledDate: { type: Date },

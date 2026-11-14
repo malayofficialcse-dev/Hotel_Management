@@ -5,6 +5,8 @@ import { requireEmployee } from "./employee-client.service.js";
 const repository = new HousekeepingRepository();
 const editableFields = [
   "hotelId",
+  "departmentId",
+  "departmentName",
   "roomNumber",
   "taskDate",
   "scheduledDate",
@@ -28,9 +30,9 @@ function pickFields(body: Record<string, unknown>) {
 }
 
 export class HousekeepingService {
-  list(hotelId?: string, status?: string, taskDate?: string) {
+  list(hotelId?: string, status?: string, taskDate?: string, departmentId?: string) {
     if (status && !taskStatuses.includes(status as TaskStatus)) throw new Error("status is invalid");
-    return repository.list({ hotelId, status: status as TaskStatus | undefined, taskDate });
+    return repository.list({ hotelId, status: status as TaskStatus | undefined, taskDate, departmentId });
   }
 
   async create(body: Record<string, unknown>) {

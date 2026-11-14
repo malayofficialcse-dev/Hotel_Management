@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, ConflictException, Inject } from "@nestjs/common";
+import { Injectable, UnauthorizedException, ConflictException, NotFoundException, BadRequestException, Inject } from "@nestjs/common";
 import { AuthRepository } from "../repository/auth.repository.js";
 import { RegisterDto, LoginDto } from "../models/auth.dto.js";
 import { generateTokenPair, verifyAccessToken, verifyRefreshToken } from "../utils/token.util.js";
@@ -99,6 +99,51 @@ export class AuthService {
     } catch {
       return { valid: false, user: null };
     }
+  }
+
+  async getProfile(userId: string) {
+    const user = await this.repo.findById(userId);
+    if (!user) {
+      throw new NotFoundException("User profile not found");
+    }
+    return { success: true, user };
+  }
+
+  async updateProfile(userId: string, dto: { name?: string; phone?: string; currentPassword?: string; newPassword?: string }) {
+    const user = await this.repo.findFullUserById(userId);
+    if (!user) {
+      throw new NotFoundException("User not found");
+    }
+
+    const updateData: { name?: string; phone?: string; passwordHash?: string } = {};
+    if (dto.name !== undefined && dto.name.trim()) {
+      updateData.name = dto.name.trim();
+    }
+    if (dto.phone !== undefined) {
+      updateData.phone = dto.phone.trim();
+    }
+
+    if (dto.newPassword) {
+      if (!dto.currentPassword) {
+        throw new BadRequestException("Current password is required to change password");
+      }
+      const isMatch = await bcrypt.compare(dto.currentPassword, user.passwordHash);
+      if (!isMatch) {
+        throw new BadRequestException("Current password is incorrect");
+      }
+      if (dto.newPassword.length < 6) {
+        throw new BadRequestException("New password must be at least 6 characters");
+      }
+      const salt = await bcrypt.genSalt(10);
+      updateData.passwordHash = await bcrypt.hash(dto.newPassword, salt);
+    }
+
+    const updated = await this.repo.updateProfile(userId, updateData);
+    return {
+      success: true,
+      message: "Profile updated successfully",
+      user: updated,
+    };
   }
 }
 

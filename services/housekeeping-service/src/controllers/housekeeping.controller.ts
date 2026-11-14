@@ -17,6 +17,7 @@ export class HousekeepingController {
           typeof req.query.hotelId === "string" ? req.query.hotelId : undefined,
           typeof req.query.status === "string" ? req.query.status : undefined,
           typeof req.query.taskDate === "string" ? req.query.taskDate : undefined,
+          typeof req.query.departmentId === "string" ? req.query.departmentId : undefined,
         ),
       );
     } catch (error) {

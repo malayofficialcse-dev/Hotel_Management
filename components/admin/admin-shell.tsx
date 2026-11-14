@@ -27,6 +27,7 @@ const icons: Record<AdminSection, string> = {
   notifications: "♧",
   audit: "◷",
   settings: "⚙",
+  profile: "♙",
 };
 
 export function AdminShell({ children }: { children: ReactNode }) {
@@ -37,8 +38,13 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const [searchOpen, setSearchOpen] = useState(false);
 
   useEffect(() => {
-    const user = api.getUser();
-    if (user) setAdminUser(user);
+    const syncUser = () => {
+      const user = api.getUser();
+      if (user) setAdminUser(user);
+    };
+    syncUser();
+    window.addEventListener("stayease-user-updated", syncUser);
+    return () => window.removeEventListener("stayease-user-updated", syncUser);
   }, []);
 
   function handleLogout() {
@@ -179,12 +185,17 @@ export function AdminShell({ children }: { children: ReactNode }) {
         <div className="admin-sidebar-bottom">
           <div className="admin-sidebar-note">Portfolio operations</div>
           <Link href="/" className="admin-customer-link">← View customer website</Link>
-          <div className="admin-user" style={{ cursor: "pointer" }} onClick={handleLogout} title="Click to log out">
-            <span className="admin-user-avatar">{adminUser?.name?.[0] || "M"}</span>
-            <span><strong>{adminUser?.name || "Mala Admin"}</strong><small>{adminUser?.email || "mala@gmail.com"} &middot; Log out</small></span>
-            <span className="admin-picker-arrow">⎋</span>
+            <div
+              className="admin-user"
+              style={{ cursor: "pointer" }}
+              onClick={() => router.push("/admin/profile")}
+              title="Click to view and edit administrator profile"
+            >
+              <span className="admin-user-avatar">{adminUser?.name?.[0] || "M"}</span>
+              <span><strong>{adminUser?.name || "Mala Admin"}</strong><small>{adminUser?.email || "mala@gmail.com"} &middot; Profile</small></span>
+              <span className="admin-picker-arrow">→</span>
+            </div>
           </div>
-        </div>
       </aside>
       <div className="admin-main">
         <header className="admin-topbar">
@@ -195,8 +206,24 @@ export function AdminShell({ children }: { children: ReactNode }) {
             <button type="button" className="admin-icon-button admin-bell" aria-label="Open notifications" onClick={() => router.push("/admin/notifications")}>
               <FigmaIcon name="bell" className="h-4 w-4" />
             </button>
+            <button
+              type="button"
+              onClick={() => router.push("/admin/profile")}
+              className="admin-secondary-button"
+              style={{ padding: "4px 10px", fontSize: "11px", height: "auto" }}
+              title="View and edit profile"
+            >
+              My Profile
+            </button>
             <button type="button" onClick={handleLogout} className="admin-secondary-button" style={{ padding: "4px 10px", fontSize: "11px", height: "auto" }}>Log out</button>
-            <span className="admin-top-avatar" title={`Signed in as ${adminUser?.name || "Admin"}`}>{adminUser?.name?.[0] || "M"}</span>
+            <Link
+              href="/admin/profile"
+              className="admin-top-avatar"
+              title={`Signed in as ${adminUser?.name || "Admin"} · View profile`}
+              style={{ textDecoration: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+            >
+              {adminUser?.name?.[0] || "M"}
+            </Link>
           </div>
         </header>
         <main className="admin-content">{children}</main>

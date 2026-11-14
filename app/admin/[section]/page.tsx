@@ -18,6 +18,7 @@ const sections: AdminSection[] = [
   "notifications",
   "audit",
   "settings",
+  "profile",
 ];
 
 export function generateStaticParams() {
