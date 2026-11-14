@@ -75,14 +75,22 @@ async function loadLiveRecords(section: AdminSection): Promise<AdminRecord[] | n
   }
   if (section === "housekeeping") {
     const rows = await api.getAdminHousekeepingTasks();
-    return rows.map((task: HousekeepingTask) => ({
-      id: task._id,
-      name: `Room ${task.roomNumber}`,
-      detail: `${task.hotelId} · ${task.taskType || "STANDARD"}`,
-      status: task.status.replaceAll("_", " "),
-      value: task.assignedTo || "Unassigned",
-      date,
-    }));
+    return rows.map((task: HousekeepingTask) => {
+      const guestText = task.guestName && task.guestName !== "Vacant"
+        ? ` · Guest: ${task.guestName}${task.bookingReference ? ` (${task.bookingReference})` : ""}`
+        : task.guestName === "Vacant"
+          ? " · Vacant"
+          : "";
+      const taskDateText = task.taskDate ? ` · Scheduled: ${task.taskDate}` : "";
+      return {
+        id: task._id,
+        name: `Room ${task.roomNumber}`,
+        detail: `${task.hotelId} · ${task.taskType || "STANDARD"}${taskDateText}${guestText}`,
+        status: task.status.replaceAll("_", " "),
+        value: task.assignedTo || "Unassigned",
+        date: task.taskDate || (task.updatedAt ? new Date(task.updatedAt).toLocaleDateString("en-IN") : date),
+      };
+    });
   }
   if (section === "offers") {
     const rows = await api.getAdminOffers();
@@ -164,7 +172,19 @@ const createFields: Partial<Record<AdminSection, CreateField[]>> = {
   housekeeping: [
     { name: "hotelId", label: "Hotel", required: true },
     { name: "roomNumber", label: "Room", required: true },
-    { name: "taskType", label: "Task type", placeholder: "e.g. CLEAN, REPAIR, INSPECTION" },
+    { name: "taskDate", label: "Task date", type: "date", required: true },
+    {
+      name: "taskType",
+      label: "Task type",
+      options: [
+        { value: "CLEAN", label: "Daily Clean" },
+        { value: "CHECKOUT CLEAN", label: "Checkout Clean" },
+        { value: "DEEP CLEAN", label: "Deep Clean" },
+        { value: "INSPECTION", label: "Room Inspection" },
+        { value: "REPAIR", label: "Maintenance / Repair" },
+        { value: "TURNDOWN", label: "Evening Turndown" },
+      ],
+    },
     { name: "assignedTo", label: "Assigned employee" },
   ],
   offers: [
@@ -537,7 +557,12 @@ function CreateRecordDialog({
   onClose: () => void;
   onSubmit: (data: Record<string, unknown>) => void;
 }) {
-  const [values, setValues] = useState<Record<string, string>>({});
+  const [values, setValues] = useState<Record<string, string>>(() => {
+    if (section === "housekeeping") {
+      return { taskDate: new Date().toISOString().slice(0, 10), taskType: "CLEAN", priority: "NORMAL" };
+    }
+    return {} as Record<string, string>;
+  });
   const [lookupOptions, setLookupOptions] = useState<Record<string, { value: string; label: string }[]>>({});
   const [lookupErrors, setLookupErrors] = useState<string[]>([]);
   const [loadingLookups, setLoadingLookups] = useState(false);
@@ -547,6 +572,7 @@ function CreateRecordDialog({
   const [employeeDepartments, setEmployeeDepartments] = useState<AdminDepartment[]>([]);
   const [housekeepingHotels, setHousekeepingHotels] = useState<AdminHotel[]>([]);
   const [housekeepingRooms, setHousekeepingRooms] = useState<AdminRoom[]>([]);
+  const [housekeepingReservations, setHousekeepingReservations] = useState<AdminBooking[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -588,6 +614,9 @@ function CreateRecordDialog({
       lookups.push(["assignedTo", "employees", api.getAdminEmployees().then((rows) =>
         rows.map((employee) => ({ value: employee.employeeCode || employee.id, label: `${employee.name} · ${employee.position}` })),
       )]);
+      api.getAdminReservations().then((res) => {
+        if (active && res?.bookings) setHousekeepingReservations(res.bookings);
+      }).catch(() => { });
     }
     if (lookups.length === 0) return () => { active = false; };
 
@@ -677,6 +706,64 @@ function CreateRecordDialog({
       }));
   }, [section, values.hotelId, housekeepingHotels, housekeepingRooms]);
 
+  const selectedHousekeepingHotel = useMemo(() => {
+    if (section !== "housekeeping" || !values.hotelId) return null;
+    return (
+      housekeepingHotels.find(
+        (h) => (h.slug || h._id) === values.hotelId || h._id === values.hotelId || h.slug === values.hotelId,
+      ) || null
+    );
+  }, [section, values.hotelId, housekeepingHotels]);
+
+  const selectedHousekeepingRoom = useMemo(() => {
+    if (section !== "housekeeping" || !values.roomNumber) return null;
+    return (
+      housekeepingRooms.find(
+        (r) =>
+          r.name === values.roomNumber &&
+          (selectedHousekeepingHotel
+            ? r.hotelId === selectedHousekeepingHotel.slug ||
+            r.hotelId === selectedHousekeepingHotel._id ||
+            r.hotelId === values.hotelId
+            : true),
+      ) || null
+    );
+  }, [section, values.roomNumber, selectedHousekeepingHotel, housekeepingRooms, values.hotelId]);
+
+  const matchedGuest = useMemo(() => {
+    if (section !== "housekeeping" || !values.hotelId || !values.roomNumber || !values.taskDate) return null;
+    const dateStr = values.taskDate.slice(0, 10);
+    return (
+      housekeepingReservations.find((b) => {
+        if (b.status === "CANCELLED" || b.status === "EXPIRED") return false;
+        const hotelMatch =
+          b.hotel_id === values.hotelId ||
+          (selectedHousekeepingHotel &&
+            (b.hotel_id === selectedHousekeepingHotel.slug ||
+              b.hotel_id === selectedHousekeepingHotel._id ||
+              b.hotel_name.toLowerCase() === selectedHousekeepingHotel.name.toLowerCase()));
+        if (!hotelMatch) return false;
+
+        const roomMatch =
+          (b.room_type_name && b.room_type_name.toLowerCase() === values.roomNumber.toLowerCase()) ||
+          (selectedHousekeepingRoom && b.room_type_id === selectedHousekeepingRoom._id);
+        if (!roomMatch) return false;
+
+        const checkIn = b.check_in_date.slice(0, 10);
+        const checkOut = b.check_out_date.slice(0, 10);
+        return dateStr >= checkIn && dateStr <= checkOut;
+      }) || null
+    );
+  }, [
+    section,
+    values.hotelId,
+    values.roomNumber,
+    values.taskDate,
+    housekeepingReservations,
+    selectedHousekeepingHotel,
+    selectedHousekeepingRoom,
+  ]);
+
   const requiredLookupsReady = fields
     .filter((field) => field.required && ["hotelId", "departmentId", "roomTypeId", "roomNumber"].includes(field.name))
     .every((field) => {
@@ -713,6 +800,18 @@ function CreateRecordDialog({
         for (const field of ["basePrice", "price", "capacity", "totalInventory", "salary", "guestsCount", "roomCount", "discountValue"]) {
           if (data[field] !== undefined) data[field] = Number(data[field]);
         }
+        if (section === "housekeeping") {
+          if (matchedGuest) {
+            data.guestName = `${matchedGuest.guest_first_name} ${matchedGuest.guest_last_name}`.trim();
+            data.guestEmail = matchedGuest.guest_email || "";
+            data.guestPhone = matchedGuest.guest_phone || "";
+            data.bookingReference = matchedGuest.booking_code || "";
+            data.checkInDate = matchedGuest.check_in_date;
+            data.checkOutDate = matchedGuest.check_out_date;
+          } else {
+            data.guestName = "Vacant";
+          }
+        }
         onSubmit(data);
       }}>
         <div className="admin-dialog-heading"><div><span className="admin-eyebrow">NEW RECORD</span><h2>{sectionTitles[section].action}</h2></div><button type="button" className="admin-row-menu" aria-label="Close dialog" onClick={onClose}>×</button></div>
@@ -724,10 +823,10 @@ function CreateRecordDialog({
             const options = isReservationRoom
               ? reservationRoomOptions
               : isEmployeeDept
-              ? employeeDepartmentOptions
-              : isHousekeepingRoom
-              ? housekeepingRoomOptions
-              : lookupOptions[field.name];
+                ? employeeDepartmentOptions
+                : isHousekeepingRoom
+                  ? housekeepingRoomOptions
+                  : lookupOptions[field.name];
             return (
               <label key={field.name}>{field.label}
                 {options ? (
@@ -801,6 +900,55 @@ function CreateRecordDialog({
               <option value="LOW">Low</option><option value="NORMAL">Normal</option><option value="HIGH">High</option><option value="URGENT">Urgent</option>
             </select>
           </label>
+        )}
+        {section === "housekeeping" && values.hotelId && values.roomNumber && values.taskDate && (
+          <div className={`admin-occupancy-card ${matchedGuest ? "is-occupied" : "is-vacant"}`}>
+            <div className="admin-occupancy-card-header">
+              <span className="admin-occupancy-title">Guest Occupancy ({values.taskDate})</span>
+              {matchedGuest ? (
+                <span
+                  className={`admin-occupancy-badge ${values.taskDate.slice(0, 10) === matchedGuest.check_in_date.slice(0, 10)
+                      ? "arriving"
+                      : values.taskDate.slice(0, 10) === matchedGuest.check_out_date.slice(0, 10)
+                        ? "departing"
+                        : "occupied"
+                    }`}
+                >
+                  {values.taskDate.slice(0, 10) === matchedGuest.check_in_date.slice(0, 10)
+                    ? "Arriving today"
+                    : values.taskDate.slice(0, 10) === matchedGuest.check_out_date.slice(0, 10)
+                      ? "Departing today"
+                      : "In-House (Stayover)"}
+                </span>
+              ) : (
+                <span className="admin-occupancy-badge vacant">Vacant</span>
+              )}
+            </div>
+            {matchedGuest ? (
+              <div className="admin-occupancy-grid">
+                <div className="admin-occupancy-item">
+                  <span className="admin-occupancy-label">Guest</span>
+                  <span className="admin-occupancy-val">{matchedGuest.guest_first_name} {matchedGuest.guest_last_name}</span>
+                </div>
+                <div className="admin-occupancy-item">
+                  <span className="admin-occupancy-label">Booking Reference</span>
+                  <span className="admin-occupancy-val">{matchedGuest.booking_code}</span>
+                </div>
+                <div className="admin-occupancy-item">
+                  <span className="admin-occupancy-label">Contact</span>
+                  <span className="admin-occupancy-val">{matchedGuest.guest_email || "—"}{matchedGuest.guest_phone ? ` · ${matchedGuest.guest_phone}` : ""}</span>
+                </div>
+                <div className="admin-occupancy-item">
+                  <span className="admin-occupancy-label">Stay Window</span>
+                  <span className="admin-occupancy-val">{matchedGuest.check_in_date} → {matchedGuest.check_out_date}</span>
+                </div>
+              </div>
+            ) : (
+              <p style={{ margin: "4px 0 0", color: "#617169", fontSize: "9px" }}>
+                Room is vacant. No active guest reservation occupying this room on this date.
+              </p>
+            )}
+          </div>
         )}
         <div className="admin-dialog-actions"><button type="button" className="admin-secondary-button" onClick={onClose}>Cancel</button><button type="submit" className="admin-primary-button" disabled={loadingLookups || !requiredLookupsReady}>Save record</button></div>
       </form>

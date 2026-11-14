@@ -16,6 +16,7 @@ export class HousekeepingController {
         await service.list(
           typeof req.query.hotelId === "string" ? req.query.hotelId : undefined,
           typeof req.query.status === "string" ? req.query.status : undefined,
+          typeof req.query.taskDate === "string" ? req.query.taskDate : undefined,
         ),
       );
     } catch (error) {

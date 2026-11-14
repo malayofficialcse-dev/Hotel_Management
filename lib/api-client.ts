@@ -67,10 +67,20 @@ export interface HousekeepingTask {
   _id: string;
   hotelId: string;
   roomNumber: string;
+  taskDate?: string;
+  scheduledDate?: string;
+  guestName?: string;
+  guestEmail?: string;
+  guestPhone?: string;
+  bookingReference?: string;
+  checkInDate?: string;
+  checkOutDate?: string;
   status: string;
   assignedTo?: string;
   taskType?: string;
   priority?: string;
+  updatedAt?: string;
+  createdAt?: string;
 }
 
 export interface AdminBooking {

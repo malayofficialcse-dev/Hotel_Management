@@ -2,12 +2,13 @@ import mongoose from "mongoose";
 import { HousekeepingTaskModel, type TaskStatus } from "../models/housekeeping-task.model.js";
 
 export class HousekeepingRepository {
-  list(filters: { hotelId?: string; status?: TaskStatus }) {
+  list(filters: { hotelId?: string; status?: TaskStatus; taskDate?: string }) {
     return HousekeepingTaskModel.find({
       ...(filters.hotelId ? { hotelId: filters.hotelId } : {}),
       ...(filters.status ? { status: filters.status } : {}),
+      ...(filters.taskDate ? { taskDate: filters.taskDate } : {}),
     })
-      .sort({ priority: -1, updatedAt: -1 })
+      .sort({ taskDate: -1, priority: -1, updatedAt: -1 })
       .lean();
   }
 
