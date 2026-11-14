@@ -9,6 +9,7 @@ import {
   type AdminDepartment,
 } from "@/lib/api-client";
 import { exportToExcel } from "@/lib/export-excel";
+import { getEffectivePermissions } from "@/lib/rbac";
 import {
   BuildingIcon,
   BriefcaseIcon,
@@ -25,6 +26,10 @@ import {
 } from "@/components/icons";
 
 export function EmployeesWorkspace() {
+  const modPerm = useMemo(() => {
+    return getEffectivePermissions(api.getUser()).employees;
+  }, []);
+
   const [employees, setEmployees] = useState<AdminEmployee[]>([]);
   const [hotels, setHotels] = useState<AdminHotel[]>([]);
   const [departments, setDepartments] = useState<AdminDepartment[]>([]);
@@ -539,14 +544,16 @@ export function EmployeesWorkspace() {
           >
             <RefreshIcon size={13} /> <span>Refresh</span>
           </button>
-          <button
-            type="button"
-            className="admin-primary-button"
-            onClick={() => setCreateOpen(true)}
-            style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
-          >
-            <PlusIcon size={13} /> <span>Add employee</span>
-          </button>
+          {modPerm.create && (
+            <button
+              type="button"
+              className="admin-primary-button"
+              onClick={() => setCreateOpen(true)}
+              style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+            >
+              <PlusIcon size={13} /> <span>Add employee</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -1357,15 +1364,17 @@ export function EmployeesWorkspace() {
 
                       {/* Actions */}
                       <td style={{ textAlign: "right" }}>
-                        <button
-                          type="button"
-                          className="admin-secondary-button"
-                          style={{ height: "24px", fontSize: "10px", padding: "0 8px", color: emp.isActive ? "#b91c1c" : "#64748b" }}
-                          onClick={() => handleDeactivateEmployee(emp)}
-                          title="Deactivate employee record"
-                        >
-                          {emp.isActive ? "Deactivate" : "Remove"}
-                        </button>
+                        {modPerm.delete && (
+                          <button
+                            type="button"
+                            className="admin-secondary-button"
+                            style={{ height: "24px", fontSize: "10px", padding: "0 8px", color: emp.isActive ? "#b91c1c" : "#64748b" }}
+                            onClick={() => handleDeactivateEmployee(emp)}
+                            title="Deactivate employee record"
+                          >
+                            {emp.isActive ? "Deactivate" : "Remove"}
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );

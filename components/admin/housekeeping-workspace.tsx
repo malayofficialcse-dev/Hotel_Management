@@ -11,6 +11,7 @@ import {
   type AdminBooking,
 } from "@/lib/api-client";
 import { exportToExcel } from "@/lib/export-excel";
+import { getEffectivePermissions } from "@/lib/rbac";
 import {
   BuildingIcon,
   BedIcon,
@@ -52,6 +53,10 @@ const PRIORITIES = [
 ];
 
 export function HousekeepingWorkspace() {
+  const modPerm = useMemo(() => {
+    return getEffectivePermissions(api.getUser()).housekeeping;
+  }, []);
+
   const [tasks, setTasks] = useState<HousekeepingTask[]>([]);
   const [hotels, setHotels] = useState<AdminHotel[]>([]);
   const [rooms, setRooms] = useState<AdminRoom[]>([]);
@@ -677,14 +682,16 @@ export function HousekeepingWorkspace() {
           >
             <RefreshIcon size={13} /> <span>Refresh</span>
           </button>
-          <button
-            type="button"
-            className="admin-primary-button"
-            onClick={() => setCreateOpen(true)}
-            style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
-          >
-            <PlusIcon size={13} /> <span>Create task</span>
-          </button>
+          {modPerm.create && (
+            <button
+              type="button"
+              className="admin-primary-button"
+              onClick={() => setCreateOpen(true)}
+              style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+            >
+              <PlusIcon size={13} /> <span>Create task</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -1670,24 +1677,28 @@ export function HousekeepingWorkspace() {
                       {/* Actions */}
                       <td style={{ textAlign: "right" }}>
                         <div style={{ display: "inline-flex", gap: "6px" }}>
-                          <button
-                            type="button"
-                            className="admin-secondary-button"
-                            style={{ height: "24px", fontSize: "10px", padding: "0 8px" }}
-                            onClick={() => handleStatusTransition(t)}
-                            title="Advance to next status"
-                          >
-                            Advance
-                          </button>
-                          <button
-                            type="button"
-                            className="admin-secondary-button"
-                            style={{ height: "24px", fontSize: "10px", padding: "0 6px", color: "#b91c1c" }}
-                            onClick={() => handleDeleteTask(t)}
-                            title="Remove task"
-                          >
-                            ×
-                          </button>
+                          {modPerm.edit && (
+                            <button
+                              type="button"
+                              className="admin-secondary-button"
+                              style={{ height: "24px", fontSize: "10px", padding: "0 8px" }}
+                              onClick={() => handleStatusTransition(t)}
+                              title="Advance to next status"
+                            >
+                              Advance
+                            </button>
+                          )}
+                          {modPerm.delete && (
+                            <button
+                              type="button"
+                              className="admin-secondary-button"
+                              style={{ height: "24px", fontSize: "10px", padding: "0 6px", color: "#b91c1c" }}
+                              onClick={() => handleDeleteTask(t)}
+                              title="Remove task"
+                            >
+                              ×
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1850,10 +1861,10 @@ export function HousekeepingWorkspace() {
                   {modalMatchedGuest ? (
                     <span
                       className={`admin-occupancy-badge ${createForm.taskDate.slice(0, 10) === modalMatchedGuest.check_in_date.slice(0, 10)
-                          ? "arriving"
-                          : createForm.taskDate.slice(0, 10) === modalMatchedGuest.check_out_date.slice(0, 10)
-                            ? "departing"
-                            : "occupied"
+                        ? "arriving"
+                        : createForm.taskDate.slice(0, 10) === modalMatchedGuest.check_out_date.slice(0, 10)
+                          ? "departing"
+                          : "occupied"
                         }`}
                     >
                       {createForm.taskDate.slice(0, 10) === modalMatchedGuest.check_in_date.slice(0, 10)

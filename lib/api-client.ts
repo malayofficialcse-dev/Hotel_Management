@@ -59,6 +59,8 @@ export interface AdminEmployee {
   position: string;
   joiningDate?: string;
   salary?: number | null;
+  role?: string;
+  permissions?: Record<string, { view: boolean; create: boolean; edit: boolean; delete: boolean }> | null;
   isActive: boolean;
   department?: { id?: string; _id?: string; name: string; hotelId?: string } | null;
 }
@@ -263,6 +265,7 @@ export const api = {
   deleteDepartment(id: string) { return request<void>(`/departments/${encodeURIComponent(id)}`, { method: "DELETE" }); },
   getAdminEmployees() { return request<AdminEmployee[]>("/employees"); },
   createEmployee(data: Record<string, unknown>) { return request<AdminEmployee>("/employees", { method: "POST", body: JSON.stringify(data) }); },
+  updateEmployee(id: string, data: Record<string, unknown>) { return request<AdminEmployee>(`/employees/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(data) }); },
   deleteEmployee(id: string) { return request<void>(`/employees/${encodeURIComponent(id)}`, { method: "DELETE" }); },
   getAdminHousekeepingTasks() { return request<HousekeepingTask[]>("/housekeeping"); },
   createHousekeepingTask(data: Record<string, unknown>) { return request<HousekeepingTask>("/housekeeping", { method: "POST", body: JSON.stringify(data) }); },

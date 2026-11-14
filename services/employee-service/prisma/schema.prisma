@@ -22,6 +22,8 @@ model Employee {
   position     String     @db.VarChar(64)
   joiningDate  DateTime   @db.Date @map("joining_date")
   salary       Float?
+  role         String?    @default("STAFF") @db.VarChar(64)
+  permissions  Json?
   isActive     Boolean    @default(true) @map("is_active")
   createdAt    DateTime   @default(now()) @db.Timestamptz(6) @map("created_at")
   updatedAt    DateTime   @updatedAt @db.Timestamptz(6) @map("updated_at")

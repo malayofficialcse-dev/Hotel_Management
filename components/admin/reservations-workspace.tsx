@@ -9,6 +9,7 @@ import {
   type AdminRoom,
 } from "@/lib/api-client";
 import { exportToExcel } from "@/lib/export-excel";
+import { getEffectivePermissions } from "@/lib/rbac";
 import {
   BuildingIcon,
   BedIcon,
@@ -26,6 +27,10 @@ import {
 } from "@/components/icons";
 
 export function ReservationsWorkspace() {
+  const modPerm = useMemo(() => {
+    return getEffectivePermissions(api.getUser()).reservations;
+  }, []);
+
   const [bookings, setBookings] = useState<AdminBooking[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -461,14 +466,16 @@ export function ReservationsWorkspace() {
           >
             <RefreshIcon size={13} /> <span>Refresh</span>
           </button>
-          <button
-            type="button"
-            className="admin-primary-button"
-            onClick={() => setCreateOpen(true)}
-            style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
-          >
-            <PlusIcon size={13} /> <span>New reservation</span>
-          </button>
+          {modPerm.create && (
+            <button
+              type="button"
+              className="admin-primary-button"
+              onClick={() => setCreateOpen(true)}
+              style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+            >
+              <PlusIcon size={13} /> <span>New reservation</span>
+            </button>
+          )}
           {notice && <span className="admin-action-notice" role="status">{notice}</span>}
         </div>
       </div>

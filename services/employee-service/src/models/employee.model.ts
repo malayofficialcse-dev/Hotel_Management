@@ -10,6 +10,8 @@ export interface EmployeeInput {
   position: string;
   joiningDate: string;
   salary?: number | null;
+  role?: string;
+  permissions?: Record<string, unknown> | null;
 }
 
 export const employeeFields = [
@@ -24,5 +26,7 @@ export const employeeFields = [
   "position",
   "joiningDate",
   "salary",
+  "role",
+  "permissions",
   "isActive",
 ] as const;

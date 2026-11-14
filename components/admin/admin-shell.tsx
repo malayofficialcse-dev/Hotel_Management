@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 import { api, type AdminDepartment, type AdminEmployee, type AdminHotel, type AdminRoom, type HousekeepingTask } from "@/lib/api-client";
 import { FigmaIcon } from "@/components/figma-icon";
 import { adminNavigation, type AdminSection } from "./admin-data";
+import { getEffectivePermissions, type AdminModule } from "@/lib/rbac";
 
 type SearchItem = { label: string; detail: string; href: string };
 
@@ -37,15 +38,28 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const [adminUser, setAdminUser] = useState<{ name: string; email: string } | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
 
+  const [rbacVersion, setRbacVersion] = useState(0);
+
   useEffect(() => {
     const syncUser = () => {
       const user = api.getUser();
       if (user) setAdminUser(user);
     };
+    const syncRbac = () => {
+      setRbacVersion((v) => v + 1);
+    };
     syncUser();
     window.addEventListener("stayease-user-updated", syncUser);
-    return () => window.removeEventListener("stayease-user-updated", syncUser);
+    window.addEventListener("stayease-rbac-updated", syncRbac);
+    return () => {
+      window.removeEventListener("stayease-user-updated", syncUser);
+      window.removeEventListener("stayease-rbac-updated", syncRbac);
+    };
   }, []);
+
+  const effectivePermissions = useMemo(() => {
+    return getEffectivePermissions(adminUser);
+  }, [adminUser, rbacVersion]);
 
   function handleLogout() {
     api.logout();
@@ -168,34 +182,39 @@ export function AdminShell({ children }: { children: ReactNode }) {
           <span className="admin-picker-arrow">⌄</span>
         </div>
         <nav className="admin-nav" aria-label="Admin navigation">
-          {adminNavigation.map((item) => (
-            <div key={item.id}>
-              {item.group && <div className="admin-nav-group">{item.group}</div>}
-              <Link
-                href={item.id === "dashboard" ? "/admin" : `/admin/${item.id}`}
-                className={`admin-nav-link ${current === item.id ? "is-active" : ""}`}
-                aria-current={current === item.id ? "page" : undefined}
-              >
-                <span className="admin-nav-icon" aria-hidden="true">{icons[item.id]}</span>
-                <span>{item.label}</span>
-              </Link>
-            </div>
-          ))}
+          {adminNavigation.map((item) => {
+            const modPerm = effectivePermissions[item.id as AdminModule];
+            const canView = modPerm === undefined || modPerm.view;
+            if (!canView) return null;
+            return (
+              <div key={item.id}>
+                {item.group && <div className="admin-nav-group">{item.group}</div>}
+                <Link
+                  href={item.id === "dashboard" ? "/admin" : `/admin/${item.id}`}
+                  className={`admin-nav-link ${current === item.id ? "is-active" : ""}`}
+                  aria-current={current === item.id ? "page" : undefined}
+                >
+                  <span className="admin-nav-icon" aria-hidden="true">{icons[item.id]}</span>
+                  <span>{item.label}</span>
+                </Link>
+              </div>
+            );
+          })}
         </nav>
         <div className="admin-sidebar-bottom">
           <div className="admin-sidebar-note">Portfolio operations</div>
           <Link href="/" className="admin-customer-link">← View customer website</Link>
-            <div
-              className="admin-user"
-              style={{ cursor: "pointer" }}
-              onClick={() => router.push("/admin/profile")}
-              title="Click to view and edit administrator profile"
-            >
-              <span className="admin-user-avatar">{adminUser?.name?.[0] || "M"}</span>
-              <span><strong>{adminUser?.name || "Mala Admin"}</strong><small>{adminUser?.email || "mala@gmail.com"} &middot; Profile</small></span>
-              <span className="admin-picker-arrow">→</span>
-            </div>
+          <div
+            className="admin-user"
+            style={{ cursor: "pointer" }}
+            onClick={() => router.push("/admin/profile")}
+            title="Click to view and edit administrator profile"
+          >
+            <span className="admin-user-avatar">{adminUser?.name?.[0] || "M"}</span>
+            <span><strong>{adminUser?.name || "Mala Admin"}</strong><small>{adminUser?.email || "mala@gmail.com"} &middot; Profile</small></span>
+            <span className="admin-picker-arrow">→</span>
           </div>
+        </div>
       </aside>
       <div className="admin-main">
         <header className="admin-topbar">

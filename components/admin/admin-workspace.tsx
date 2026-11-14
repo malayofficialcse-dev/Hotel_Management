@@ -10,6 +10,8 @@ import { ReservationsWorkspace } from "./reservations-workspace";
 import { HousekeepingWorkspace } from "./housekeeping-workspace";
 import { EmployeesWorkspace } from "./employees-workspace";
 import { ProfileWorkspace } from "./profile-workspace";
+import { RolesWorkspace } from "./roles-workspace";
+import { getEffectivePermissions, type AdminModule } from "@/lib/rbac";
 import {
   sectionTabs,
   sectionTitles,
@@ -393,6 +395,8 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
 
   if (section === "employees") return <EmployeesWorkspace />;
 
+  if (section === "roles") return <RolesWorkspace />;
+
   if (section === "profile") return <ProfileWorkspace />;
 
   if (section === "settings") {
@@ -406,7 +410,58 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
     );
   }
 
-  const actionAvailable = Boolean(createFields[section]);
+  const user = api.getUser();
+  const effectiveMatrix = getEffectivePermissions(user);
+  const modPerm = effectiveMatrix[section as AdminModule] || {
+    view: true,
+    create: true,
+    edit: true,
+    delete: true,
+  };
+
+  if (!modPerm.view) {
+    return (
+      <div
+        className="admin-panel"
+        style={{
+          padding: "48px 24px",
+          textAlign: "center",
+          maxWidth: "600px",
+          margin: "40px auto",
+          borderRadius: "8px",
+          border: "1px solid #E5EBE7",
+          backgroundColor: "#FFFFFF",
+        }}
+      >
+        <div
+          style={{
+            width: "52px",
+            height: "52px",
+            borderRadius: "50%",
+            backgroundColor: "#FEE2E2",
+            color: "#991B1B",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            margin: "0 auto 16px",
+            fontSize: "24px",
+            fontWeight: "bold",
+          }}
+        >
+          ⛨
+        </div>
+        <h2 style={{ fontSize: "18px", color: "#111827", marginBottom: "8px" }}>Access Restricted</h2>
+        <p style={{ color: "#617169", fontSize: "13px", lineHeight: 1.5, marginBottom: "20px" }}>
+          Your assigned role does not have permission to view the <strong>{content.title}</strong> module. Please contact a system administrator to request access privileges.
+        </p>
+        <Link href="/admin" className="admin-primary-button" style={{ display: "inline-block", textDecoration: "none" }}>
+          Return to Dashboard
+        </Link>
+      </div>
+    );
+  }
+
+  const actionAvailable = Boolean(createFields[section]) && modPerm.create;
   const unsupportedMessage: Partial<Record<AdminSection, string>> = {
     customers: "Guest records are derived from persisted reservations.",
     roles: "Custom role and permission records are not implemented in the auth database yet.",
@@ -475,21 +530,17 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
               <tr key={row.id}>
                 <td><input type="checkbox" aria-label={`Select ${row.name}`} /></td>
                 <td className="admin-id">{row.id}</td>
-                <td><strong className="admin-row-name">
-                  {section === "roles"
-                    ? <Link className="admin-row-detail-link" href={`/admin/${section}/${encodeURIComponent(row.id)}`}>{row.name}</Link>
-                    : row.name}
-                </strong></td>
+                <td><strong className="admin-row-name">{row.name}</strong></td>
                 <td className="admin-detail-cell">{row.detail}</td>
                 <td><StatusBadge status={row.status} /></td>
                 <td className="admin-value-cell">{row.value}</td>
                 <td className="admin-date-cell">{row.date}</td>
                 <td>
-                  {(["hotels", "rooms", "departments", "offers"] as string[]).includes(section) ? (
-                    <button className="admin-row-menu" type="button" aria-label={`Actions for ${row.name}`} onClick={() => void onRecordAction(row)}>
-                      Remove
-                    </button>
-                  ) : null}
+                    {(["hotels", "rooms", "departments", "offers"] as string[]).includes(section) && modPerm.delete ? (
+                      <button className="admin-row-menu" type="button" aria-label={`Actions for ${row.name}`} onClick={() => void onRecordAction(row)}>
+                        Remove
+                      </button>
+                    ) : null}
                 </td>
               </tr>
             ))}</tbody>
