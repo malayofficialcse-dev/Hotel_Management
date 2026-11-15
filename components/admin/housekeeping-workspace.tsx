@@ -9,6 +9,7 @@ import {
   type AdminDepartment,
   type AdminEmployee,
   type AdminBooking,
+  type UserSession,
 } from "@/lib/api-client";
 import { exportToExcel } from "@/lib/export-excel";
 import { getEffectivePermissions } from "@/lib/rbac";
@@ -53,9 +54,20 @@ const PRIORITIES = [
 ];
 
 export function HousekeepingWorkspace() {
-  const modPerm = useMemo(() => {
-    return getEffectivePermissions(api.getUser()).housekeeping;
+  const [currentUser, setCurrentUser] = useState<UserSession | null>(null);
+
+  useEffect(() => {
+    const sync = () => {
+      setCurrentUser(api.getUser());
+    };
+    sync();
+    window.addEventListener("stayease-user-updated", sync);
+    return () => window.removeEventListener("stayease-user-updated", sync);
   }, []);
+
+  const modPerm = useMemo(() => {
+    return getEffectivePermissions(currentUser).housekeeping;
+  }, [currentUser]);
 
   const [tasks, setTasks] = useState<HousekeepingTask[]>([]);
   const [hotels, setHotels] = useState<AdminHotel[]>([]);
@@ -194,6 +206,47 @@ export function HousekeepingWorkspace() {
     return map;
   }, [hotels]);
 
+  // Check if current user is manager / supervisor vs assigned staff
+  const isSupervisor = useMemo(() => {
+    if (!currentUser) return false;
+    if (currentUser.role === "ADMIN" || currentUser.email?.toLowerCase() === "mala@gmail.com") return true;
+    if (currentUser.role === "HOTEL_MANAGER" || currentUser.role === "HOUSEKEEPING_SUPERVISOR") return true;
+    return false;
+  }, [currentUser]);
+
+  // For housekeeping staff, filter tasks to only those assigned to them
+  const staffScopedTasks = useMemo(() => {
+    if (isSupervisor) return tasks;
+    if (!currentUser) return [];
+
+    const userCode = (currentUser.employeeCode || "").trim().toLowerCase();
+    const userId = (currentUser.id || "").trim().toLowerCase();
+    const userEmail = (currentUser.email || "").trim().toLowerCase();
+    const userName = (currentUser.name || "").trim().toLowerCase();
+
+    return tasks.filter((t) => {
+      const assigned = (t.assignedTo || "").trim().toLowerCase();
+      if (!assigned) return false;
+
+      // Direct match with employee code, user id, email, or name
+      if (userCode && assigned === userCode) return true;
+      if (userId && assigned === userId) return true;
+      if (userEmail && assigned === userEmail) return true;
+      if (userName && assigned === userName) return true;
+
+      // Match via employeeMap (e.g. task has employee id or code, mapped to employee record)
+      const emp = employeeMap.get(t.assignedTo || "");
+      if (emp) {
+        if (userCode && emp.employeeCode && emp.employeeCode.toLowerCase() === userCode) return true;
+        if (userId && emp.id && emp.id.toLowerCase() === userId) return true;
+        if (userEmail && emp.email && emp.email.toLowerCase() === userEmail) return true;
+        if (userName && emp.name && emp.name.toLowerCase() === userName) return true;
+      }
+
+      return false;
+    });
+  }, [tasks, isSupervisor, currentUser, employeeMap]);
+
   // Helper function: Resolve department for a housekeeping task
   function resolveTaskDepartment(task: HousekeepingTask): string {
     if (task.departmentName) return task.departmentName;
@@ -275,7 +328,7 @@ export function HousekeepingWorkspace() {
 
   // Filtered Tasks
   const filteredTasks = useMemo(() => {
-    return tasks.filter((t) => {
+    return staffScopedTasks.filter((t) => {
       // 1. Quick Tab Filter
       if (activeTab !== "ALL") {
         if (t.status.toUpperCase() !== activeTab) return false;
@@ -359,7 +412,7 @@ export function HousekeepingWorkspace() {
       return true;
     });
   }, [
-    tasks,
+    staffScopedTasks,
     activeTab,
     searchQuery,
     selectedHotels,
@@ -383,7 +436,7 @@ export function HousekeepingWorkspace() {
     let cleanCount = 0;
     let maintenanceCount = 0;
 
-    for (const t of tasks) {
+    for (const t of staffScopedTasks) {
       const st = t.status.toUpperCase();
       if (st === "DIRTY") dirtyCount++;
       else if (st === "IN_PROGRESS") inProgressCount++;
@@ -392,13 +445,13 @@ export function HousekeepingWorkspace() {
     }
 
     return {
-      total: tasks.length,
+      total: staffScopedTasks.length,
       dirty: dirtyCount,
       inProgress: inProgressCount,
       clean: cleanCount,
       maintenance: maintenanceCount,
     };
-  }, [tasks]);
+  }, [staffScopedTasks]);
 
   // Bulk Select
   const allSelected = filteredTasks.length > 0 && filteredTasks.every((t) => selectedIds.has(t._id));
@@ -752,9 +805,9 @@ export function HousekeepingWorkspace() {
       <section className="admin-panel admin-table-panel">
         <div className="admin-panel-heading">
           <div>
-            <h2>All Housekeeping Tasks</h2>
+            <h2>{isSupervisor ? "All Housekeeping Tasks" : "My Assigned Tasks"}</h2>
             <p>
-              Showing {filteredTasks.length} of {tasks.length} database records
+              Showing {filteredTasks.length} of {staffScopedTasks.length} {isSupervisor ? "database records" : "tasks assigned to you"}
             </p>
           </div>
           {activeFiltersCount > 0 && (
@@ -776,14 +829,52 @@ export function HousekeepingWorkspace() {
           )}
         </div>
 
+        {!isSupervisor && currentUser && (
+          <div
+            style={{
+              padding: "10px 14px",
+              margin: "0 14px 12px",
+              borderRadius: "6px",
+              backgroundColor: "#EFF6FF",
+              border: "1px solid #BFDBFE",
+              color: "#1E40AF",
+              fontSize: "12px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: "8px",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ fontWeight: 700 }}>Personal Task Queue:</span>
+              <span>
+                Showing only tasks assigned to <strong>{currentUser.name}</strong> ({currentUser.employeeCode || "Staff"}). Tasks for other staff members are filtered out.
+              </span>
+            </div>
+            <span
+              style={{
+                fontSize: "11px",
+                fontWeight: 700,
+                padding: "2px 8px",
+                borderRadius: "999px",
+                backgroundColor: "#DBEAFE",
+                color: "#1E3A8A",
+              }}
+            >
+              {staffScopedTasks.length} {staffScopedTasks.length === 1 ? "task" : "tasks"} assigned
+            </span>
+          </div>
+        )}
+
         {/* Quick Filter Tabs */}
         <div className="admin-tabs" role="tablist" style={{ borderBottom: "1px solid var(--admin-line)" }}>
           {[
-            { id: "ALL", label: `All tasks (${tasks.length})` },
+            { id: "ALL", label: `All tasks (${staffScopedTasks.length})` },
             { id: "DIRTY", label: `Dirty (${stats.dirty})` },
             { id: "IN_PROGRESS", label: `In Progress (${stats.inProgress})` },
-            { id: "CLEAN", label: `Clean (${tasks.filter((t) => t.status.toUpperCase() === "CLEAN").length})` },
-            { id: "INSPECTED", label: `Inspected (${tasks.filter((t) => t.status.toUpperCase() === "INSPECTED").length})` },
+            { id: "CLEAN", label: `Clean (${staffScopedTasks.filter((t) => t.status.toUpperCase() === "CLEAN").length})` },
+            { id: "INSPECTED", label: `Inspected (${staffScopedTasks.filter((t) => t.status.toUpperCase() === "INSPECTED").length})` },
             { id: "MAINTENANCE", label: `Maintenance (${stats.maintenance})` },
           ].map((tab) => (
             <button
@@ -1456,10 +1547,12 @@ export function HousekeepingWorkspace() {
                   <td colSpan={12}>
                     <div className="admin-empty" style={{ padding: "40px 16px", textAlign: "center" }}>
                       <p style={{ margin: "0 0 8px", fontWeight: 600, color: "#334155" }}>
-                        No housekeeping tasks match your filters
+                        {!isSupervisor ? "No housekeeping tasks assigned to you" : "No housekeeping tasks match your filters"}
                       </p>
                       <small style={{ color: "#64748b" }}>
-                        Try clearing filter selections or create a new housekeeping task.
+                        {!isSupervisor
+                          ? "You currently have zero pending housekeeping tasks assigned to your employee account."
+                          : "Try clearing filter selections or create a new housekeeping task."}
                       </small>
                     </div>
                   </td>

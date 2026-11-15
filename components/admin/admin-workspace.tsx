@@ -399,9 +399,9 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
   // Check section view access
   const hasViewAccess = isSuperAdmin || (
     section === "settings" ? isSuperAdmin :
-    section === "audit" ? isSuperAdmin || Boolean(effectiveMatrix.reports?.view) :
-    section === "notifications" ? Object.values(effectiveMatrix).some((p) => p && p.view) :
-    Boolean(modPerm.view)
+      section === "audit" ? isSuperAdmin || Boolean(effectiveMatrix.reports?.view) :
+        section === "notifications" ? Object.values(effectiveMatrix).some((p) => p && p.view) :
+          Boolean(modPerm.view)
   );
 
   if (!hasViewAccess) {
@@ -561,11 +561,11 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
                 <td className="admin-value-cell">{row.value}</td>
                 <td className="admin-date-cell">{row.date}</td>
                 <td>
-                    {(["hotels", "rooms", "departments", "offers"] as string[]).includes(section) && modPerm.delete ? (
-                      <button className="admin-row-menu" type="button" aria-label={`Actions for ${row.name}`} onClick={() => void onRecordAction(row)}>
-                        Remove
-                      </button>
-                    ) : null}
+                  {(["hotels", "rooms", "departments", "offers"] as string[]).includes(section) && modPerm.delete ? (
+                    <button className="admin-row-menu" type="button" aria-label={`Actions for ${row.name}`} onClick={() => void onRecordAction(row)}>
+                      Remove
+                    </button>
+                  ) : null}
                 </td>
               </tr>
             ))}</tbody>
