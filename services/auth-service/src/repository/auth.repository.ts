@@ -39,7 +39,6 @@ export class AuthRepository {
         phone: data.phone,
         role: data.role || "CUSTOMER",
       },
-      select: { id: true, email: true, name: true, phone: true, role: true, createdAt: true },
     });
   }
 

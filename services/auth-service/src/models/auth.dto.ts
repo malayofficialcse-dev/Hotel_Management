@@ -15,7 +15,7 @@ export class RegisterDto {
 }
 
 export class LoginDto {
-  @IsEmail()
+  @IsNotEmpty()
   email: string;
 
   @IsNotEmpty()

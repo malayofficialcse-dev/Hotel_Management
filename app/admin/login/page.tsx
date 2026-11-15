@@ -23,10 +23,10 @@ export default function AdminLoginPage() {
       api.logout();
       return;
     }
-    // If already logged in as admin with active token, redirect to admin dashboard
+    // If already logged in with active token, redirect to admin dashboard
     const user = api.getUser();
     const token = api.getToken();
-    if (token && user && user.role === "ADMIN") {
+    if (token && user && user.role !== "CUSTOMER") {
       router.replace("/admin");
     }
   }, [router]);
@@ -38,9 +38,9 @@ export default function AdminLoginPage() {
 
     try {
       const response = await api.login({ email, password });
-      if (response.user.role !== "ADMIN") {
+      if (response.user.role === "CUSTOMER") {
         api.logout();
-        setError("Access restricted: Only system administrators are authorized to access this console.");
+        setError("Access restricted: Customer accounts cannot access the administrative staff console.");
         return;
       }
       router.push("/admin");
@@ -62,7 +62,7 @@ export default function AdminLoginPage() {
         </div>
         <h1 className="text-3xl font-bold tracking-tight text-zinc-100">StayEase Admin Portal</h1>
         <p className="mt-2 text-sm text-zinc-400">
-          Enter administrative credentials to manage portfolio reservations, rooms, and hotel staff.
+          Enter administrative or employee credentials (email or employee ID) to access the console.
         </p>
       </div>
 
@@ -78,19 +78,19 @@ export default function AdminLoginPage() {
 
             <div>
               <label htmlFor="email" className="block text-xs font-medium uppercase tracking-wider text-zinc-300">
-                Administrator Email
+                Email Address or Employee ID
               </label>
               <div className="mt-1.5">
                 <input
                   id="email"
                   name="email"
-                  type="email"
-                  autoComplete="email"
+                  type="text"
+                  autoComplete="username"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="block w-full rounded-lg bg-[#0a1210] border border-zinc-700/60 px-3.5 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-colors"
-                  placeholder="admin@stayease.com"
+                  placeholder="admin@stayease.com or DFD/EMP/0004"
                 />
               </div>
             </div>
@@ -116,8 +116,13 @@ export default function AdminLoginPage() {
               </div>
             </div>
 
-            <div className="rounded-lg bg-emerald-950/40 border border-emerald-800/30 p-3 text-[11px] text-emerald-300/80">
-              <span className="font-semibold text-emerald-300">Admin Account:</span> <code className="text-white">mala@gmail.com</code> &middot; Pass: <code className="text-white">123456</code>
+            <div className="rounded-lg bg-emerald-950/40 border border-emerald-800/30 p-3 text-[11px] text-emerald-300/80 space-y-1">
+              <div>
+                <span className="font-semibold text-emerald-300">Admin Account:</span> <code className="text-white">mala@gmail.com</code> &middot; Pass: <code className="text-white">123456</code>
+              </div>
+              <div>
+                <span className="font-semibold text-emerald-300">Staff Login:</span> Use your <span className="text-white font-medium">Employee ID</span> (e.g. <code className="text-white">DFD/EMP/0004</code>) or work email.
+              </div>
             </div>
 
             <div>

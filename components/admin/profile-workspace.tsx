@@ -6,12 +6,15 @@ import { useRouter } from "next/navigation";
 import { api, type UserSession } from "@/lib/api-client";
 import { FigmaIcon } from "@/components/figma-icon";
 import { CheckIcon, UserIcon } from "@/components/icons";
+import { ADMIN_MODULES, getEffectivePermissions, ROLE_PRESETS } from "@/lib/rbac";
 
 interface AdminProfileData extends UserSession {
   phone?: string;
   createdAt?: string;
   updatedAt?: string;
   isActive?: boolean;
+  employeeCode?: string;
+  permissions?: any;
 }
 
 export function ProfileWorkspace() {
@@ -218,7 +221,7 @@ export function ProfileWorkspace() {
             {initials}
           </div>
           <div>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px", flexWrap: "wrap" }}>
               <h2 style={{ margin: 0, fontSize: "20px", fontWeight: 700, color: "#111827" }}>
                 {profile?.name || "Administrator"}
               </h2>
@@ -235,6 +238,22 @@ export function ProfileWorkspace() {
               >
                 {profile?.role || "ADMIN"}
               </span>
+              {profile?.employeeCode && (
+                <span
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    fontFamily: "monospace",
+                    padding: "2px 8px",
+                    borderRadius: "999px",
+                    backgroundColor: "#EEF2FF",
+                    color: "#3730A3",
+                    border: "1px solid #C7D2FE",
+                  }}
+                >
+                  EMP: {profile.employeeCode}
+                </span>
+              )}
               <span
                 style={{
                   fontSize: "11px",
@@ -252,8 +271,11 @@ export function ProfileWorkspace() {
             <p style={{ margin: "0 0 6px", fontSize: "13px", color: "#617169" }}>
               {profile?.email || "admin@stayease.com"}
             </p>
-            <div style={{ display: "flex", gap: "16px", fontSize: "11px", color: "#8E9E96" }}>
+            <div style={{ display: "flex", gap: "16px", fontSize: "11px", color: "#8E9E96", flexWrap: "wrap" }}>
               <span>User ID: <code style={{ backgroundColor: "#F3F6F4", padding: "1px 4px", borderRadius: "3px" }}>{profile?.id || "admin-root"}</code></span>
+              {profile?.employeeCode && (
+                <span>Employee Code: <strong style={{ color: "#111827" }}>{profile.employeeCode}</strong></span>
+              )}
               <span>Account Created: <strong>{memberSince}</strong></span>
             </div>
           </div>
@@ -266,7 +288,7 @@ export function ProfileWorkspace() {
           </div>
           <div style={{ padding: "10px 16px", backgroundColor: "#F9FAF9", borderRadius: "6px", border: "1px solid #E5EBE7", minWidth: "140px" }}>
             <span style={{ fontSize: "11px", color: "#617169", display: "block" }}>Access Scope</span>
-            <strong style={{ fontSize: "14px", color: "#1E3A2B" }}>Full Workspace</strong>
+            <strong style={{ fontSize: "14px", color: "#1E3A2B" }}>{profile?.role === "ADMIN" ? "Full Workspace" : `${profile?.role || "Staff"} Matrix`}</strong>
           </div>
         </div>
       </div>
@@ -414,9 +436,16 @@ export function ProfileWorkspace() {
               <ul style={{ margin: 0, paddingLeft: "18px" }}>
                 <li>At least 6 characters in length</li>
                 <li>Hashed with salt rounds using bcrypt before persisting</li>
-                <li>Applies to next login session across all admin panels</li>
+                <li>Applies to next login session across both Employee ID and Email</li>
               </ul>
             </div>
+
+            {profile?.employeeCode && (
+              <div style={{ backgroundColor: "#EFF6FF", padding: "12px 14px", borderRadius: "6px", border: "1px solid #BFDBFE", fontSize: "12px", color: "#1E40AF" }}>
+                <strong style={{ display: "block", marginBottom: "2px" }}>First Time Logging In as Staff?</strong>
+                If you have not set a custom password yet, enter your Employee ID (<code>{profile.employeeCode}</code>) or <code>123456</code> in the Current Password field. Once updated, your new password will be required for all future logins.
+              </div>
+            )}
 
             <div style={{ display: "flex", alignItems: "center", gap: "12px", marginTop: "12px" }}>
               <button
@@ -433,45 +462,91 @@ export function ProfileWorkspace() {
       )}
 
       {/* Tab 3: Permissions Matrix */}
-      {activeTab === "permissions" && (
-        <section className="admin-panel" style={{ padding: "24px", backgroundColor: "#FFFFFF", borderRadius: "8px", border: "1px solid #E5EBE7" }}>
-          <div style={{ marginBottom: "20px", borderBottom: "1px solid #E5EBE7", paddingBottom: "12px" }}>
-            <h3 style={{ margin: "0 0 4px", fontSize: "16px", fontWeight: 600 }}>Active Role &amp; Permission Scopes</h3>
-            <p style={{ margin: 0, fontSize: "12px", color: "#617169" }}>Privileges granted to your administrator role.</p>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px" }}>
-            {[
-              { title: "Hotel & Catalog", desc: "Create, edit, view, and delete properties and destinations.", level: "Full Access" },
-              { title: "Room Inventory", desc: "Manage room categories, amenities, pricing, and total inventory.", level: "Full Access" },
-              { title: "Reservations & Bookings", desc: "Audit live guest bookings, dates, stay windows, and codes.", level: "Full Access" },
-              { title: "Housekeeping Routing", desc: "Assign cleaning tasks, track live guest occupancy, advance status.", level: "Full Access" },
-              { title: "Human Resources (Staff)", desc: "Manage employees, departments, salaries, joining dates, and sequential codes.", level: "Full Access" },
-              { title: "Payment & Financials", desc: "Monitor checkout payments, settle transactions, review refunds.", level: "Full Access" },
-              { title: "Excel Data Export", desc: "Generate full .xlsx spreadsheets across all admin workspace records.", level: "Full Access" },
-              { title: "System Administration", desc: "Profile updates, password security, session management.", level: "Full Access" },
-            ].map((perm) => (
-              <div
-                key={perm.title}
-                style={{
-                  padding: "16px",
-                  borderRadius: "6px",
-                  border: "1px solid #E5EBE7",
-                  backgroundColor: "#F9FAF9",
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                  <strong style={{ fontSize: "13px", color: "#1E3A2B" }}>{perm.title}</strong>
-                  <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 6px", borderRadius: "4px", backgroundColor: "#EAF5EE", color: "#1E3A2B" }}>
-                    {perm.level}
-                  </span>
+      {activeTab === "permissions" && (() => {
+        const matrix = getEffectivePermissions(profile);
+        return (
+          <section className="admin-panel" style={{ padding: "24px", backgroundColor: "#FFFFFF", borderRadius: "8px", border: "1px solid #E5EBE7" }}>
+            <div style={{ marginBottom: "20px", borderBottom: "1px solid #E5EBE7", paddingBottom: "12px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+                <div>
+                  <h3 style={{ margin: "0 0 4px", fontSize: "16px", fontWeight: 600 }}>Active Role &amp; Permission Scopes</h3>
+                  <p style={{ margin: 0, fontSize: "12px", color: "#617169" }}>
+                    Granular View, Create, Edit, and Delete privileges assigned to your account ({profile?.role || "STAFF"}).
+                  </p>
                 </div>
-                <p style={{ margin: 0, fontSize: "11px", color: "#617169", lineHeight: 1.4 }}>{perm.desc}</p>
+                <span
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    padding: "4px 10px",
+                    borderRadius: "999px",
+                    backgroundColor: "#EAF5EE",
+                    color: "#1E3A2B",
+                    border: "1px solid #C6E4D1",
+                  }}
+                >
+                  {ROLE_PRESETS[profile?.role || ""]?.label || profile?.role || "Staff"}
+                </span>
               </div>
-            ))}
-          </div>
-        </section>
-      )}
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "16px" }}>
+              {ADMIN_MODULES.map((mod) => {
+                const perms = matrix[mod.id] || { view: false, create: false, edit: false, delete: false };
+                const hasAny = perms.view || perms.create || perms.edit || perms.delete;
+                return (
+                  <div
+                    key={mod.id}
+                    style={{
+                      padding: "16px",
+                      borderRadius: "6px",
+                      border: `1px solid ${hasAny ? "#E5EBE7" : "#F3F4F6"}`,
+                      backgroundColor: hasAny ? "#FFFFFF" : "#F9FAF9",
+                      opacity: hasAny ? 1 : 0.6,
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                      <strong style={{ fontSize: "13px", color: hasAny ? "#111827" : "#9CA3AF" }}>{mod.label}</strong>
+                      <span
+                        style={{
+                          fontSize: "10px",
+                          fontWeight: 700,
+                          padding: "2px 6px",
+                          borderRadius: "4px",
+                          backgroundColor: perms.view ? "#EAF5EE" : "#FEE2E2",
+                          color: perms.view ? "#1E3A2B" : "#991B1B",
+                        }}
+                      >
+                        {perms.view ? "Access Granted" : "No Access"}
+                      </span>
+                    </div>
+                    <p style={{ margin: "0 0 10px", fontSize: "11px", color: "#617169", lineHeight: 1.4 }}>{mod.description}</p>
+                    <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                      {(["view", "create", "edit", "delete"] as const).map((action) => (
+                        <span
+                          key={action}
+                          style={{
+                            fontSize: "10px",
+                            fontWeight: 600,
+                            padding: "2px 6px",
+                            borderRadius: "4px",
+                            textTransform: "capitalize",
+                            backgroundColor: perms[action] ? "#ECFDF5" : "#F3F4F6",
+                            color: perms[action] ? "#065F46" : "#9CA3AF",
+                            border: `1px solid ${perms[action] ? "#A7F3D0" : "#E5E7EB"}`,
+                          }}
+                        >
+                          {perms[action] ? "✓" : "–"} {action}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        );
+      })()}
     </div>
   );
 }

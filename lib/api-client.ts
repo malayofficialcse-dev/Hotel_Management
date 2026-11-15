@@ -135,8 +135,10 @@ export interface UserSession {
   id: string;
   email: string;
   name: string;
-  role: "ADMIN" | "CUSTOMER" | "HOTEL_STAFF";
+  role: string;
   phone?: string;
+  employeeCode?: string;
+  permissions?: any;
 }
 
 function getToken() { return typeof window === "undefined" ? undefined : window.localStorage.getItem("stayease-token") || undefined; }

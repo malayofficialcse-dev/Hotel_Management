@@ -20,7 +20,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       const token = api.getToken();
       const user = api.getUser();
 
-      if (!token || !user || user.role !== "ADMIN") {
+      if (!token || !user || user.role === "CUSTOMER") {
         router.replace("/admin/login");
       } else {
         setAuthorized(true);
