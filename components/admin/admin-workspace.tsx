@@ -49,6 +49,7 @@ async function loadLiveRecords(section: AdminSection): Promise<AdminRecord[] | n
     const rows = await api.getAdminRooms();
     return rows.map((room: AdminRoom) => ({
       id: room._id,
+      image: room.image,
       name: room.name,
       detail: `${room.hotelId} · ${room.bedType || `${room.capacity} guests`}`,
       status: room.isActive ? "Available" : "Inactive",
@@ -136,17 +137,33 @@ async function loadLiveRecords(section: AdminSection): Promise<AdminRecord[] | n
 const createFields: Partial<Record<AdminSection, CreateField[]>> = {
   hotels: [
     { name: "name", label: "Hotel name", required: true },
+    { name: "slug", label: "URL slug", placeholder: "Leave blank to generate from hotel name" },
     { name: "city", label: "City", required: true },
     { name: "location", label: "Location", required: true },
     { name: "category", label: "Category", required: true },
     { name: "basePrice", label: "Base price per night", type: "number", required: true },
+    { name: "description", label: "Description", type: "textarea" },
+    { name: "tag", label: "Tag", placeholder: "e.g. Beachfront" },
+    { name: "offer", label: "Offer", placeholder: "e.g. 20% off" },
+    { name: "rating", label: "Rating (0-5)", type: "number", min: 0, max: 5, step: 0.1 },
+    { name: "reviewsCount", label: "Review count", type: "number", min: 0, step: 1 },
+    { name: "amenities", label: "Amenities (comma-separated)", type: "list", placeholder: "Free Wi-Fi, Pool, Spa" },
+    { name: "isActive", label: "Status", options: [{ value: "true", label: "Active" }, { value: "false", label: "Inactive" }] },
+    { name: "mainImageFile", label: "Cover image", type: "file" },
+    { name: "galleryImagesFiles", label: "Gallery images", type: "file", multiple: true },
   ],
   rooms: [
     { name: "hotelId", label: "Hotel slug / ID", required: true },
     { name: "name", label: "Room name", required: true },
+    { name: "description", label: "Description", type: "textarea" },
     { name: "price", label: "Price per night", type: "number", required: true, min: 0, step: 0.01 },
     { name: "capacity", label: "Guest capacity", type: "number", required: true, min: 1, step: 1 },
     { name: "totalInventory", label: "Room inventory", type: "number", required: true, min: 0, step: 1 },
+    { name: "bedType", label: "Bed type", placeholder: "e.g. King" },
+    { name: "roomSize", label: "Room size", placeholder: "e.g. 42 m²" },
+    { name: "amenities", label: "Amenities (comma-separated)", type: "list", placeholder: "Balcony, Free Wi-Fi, Mini bar" },
+    { name: "isActive", label: "Status", options: [{ value: "true", label: "Active" }, { value: "false", label: "Inactive" }] },
+    { name: "imageFile", label: "Room image", type: "file" },
   ],
   reservations: [
     { name: "hotelId", label: "Hotel", required: true },
@@ -260,15 +277,28 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
     }
   }
 
-  async function submitCreate(data: Record<string, unknown>) {
+  async function submitCreate(data: Record<string, unknown>, files: Record<string, File[]> = {}) {
     if (!canPerform(api.getUser(), section as AdminModule, "create")) {
       setNotice("You do not have permission to create records in this module.");
       return;
     }
     let createdRecord: AdminRecord | undefined;
     try {
-      if (section === "hotels") await api.createHotel(data);
-      else if (section === "rooms") await api.createRoom(data);
+      if (section === "hotels") {
+        const payload = { ...data };
+        const cover = files.mainImageFile?.[0];
+        if (cover) payload.mainImage = (await api.uploadHotelImage(cover)).url;
+        const galleryFiles = files.galleryImagesFiles || [];
+        if (galleryFiles.length) {
+          payload.galleryImages = await Promise.all(galleryFiles.map(async (file) => (await api.uploadHotelImage(file)).url));
+        }
+        await api.createHotel(payload);
+      } else if (section === "rooms") {
+        const payload = { ...data };
+        const image = files.imageFile?.[0];
+        if (image) payload.image = (await api.uploadRoomImage(image)).url;
+        await api.createRoom(payload);
+      }
       else if (section === "reservations") {
         const [hotels, rooms] = await Promise.all([api.getAdminHotels(), api.getAdminRooms()]);
         const hotel = hotels.find((item) => item.slug === data.hotelId || item._id === data.hotelId);
@@ -336,6 +366,20 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
       setNotice(error instanceof Error ? `Record saved, but the list could not be refreshed: ${error.message}` : "Record saved, but the list could not be refreshed.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function updateRoomImage(row: AdminRecord, file: File) {
+    if (!canPerform(api.getUser(), "rooms", "edit")) {
+      setNotice("You do not have permission to edit room records.");
+      return;
+    }
+    try {
+      const uploaded = await api.uploadRoomImage(file);
+      await api.updateRoom(row.id, { image: uploaded.url });
+      setNotice(`Image saved for ${row.name}.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? `Could not update room image: ${error.message}` : "Could not update room image.");
     }
   }
 
@@ -563,17 +607,44 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
         </div>
         <div className="admin-table-scroll">
           <table className="admin-table">
-            <thead><tr><th><input type="checkbox" aria-label="Select all rows" /></th><th>ID</th><th>{section === "customers" ? "GUEST" : "NAME"}</th><th>DETAILS</th><th>STATUS</th><th>{section === "hotels" ? "RATING" : "VALUE"}</th><th>UPDATED</th><th><span className="sr-only">Actions</span></th></tr></thead>
+            <thead><tr><th><input type="checkbox" aria-label="Select all rows" /></th><th>{section === "rooms" ? "IMAGE" : "ID"}</th><th>{section === "customers" ? "GUEST" : "NAME"}</th><th>DETAILS</th><th>STATUS</th><th>{section === "hotels" ? "RATING" : "VALUE"}</th><th>UPDATED</th><th><span className="sr-only">Actions</span></th></tr></thead>
             <tbody>{loading ? <tr><td colSpan={8}>Loading records…</td></tr> : filtered.map((row) => (
               <tr key={row.id}>
                 <td><input type="checkbox" aria-label={`Select ${row.name}`} /></td>
-                <td className="admin-id">{row.id}</td>
-                <td><strong className="admin-row-name">{row.name}</strong></td>
+                <td className={section === "rooms" ? "admin-room-image-cell" : "admin-id"}>
+                  {section === "rooms" ? (
+                    row.image
+                      ? <img className="admin-room-thumbnail" src={row.image} alt={`${row.name} room`} loading="lazy" />
+                      : <span className="admin-room-thumbnail-empty" role="img" aria-label="No room image available">No image</span>
+                  ) : row.id}
+                </td>
+                <td>
+                  {section === "hotels" && (isSuperAdmin || modPerm.edit) ? (
+                    <Link href={`/admin/hotels/${encodeURIComponent(row.id)}`} className="admin-row-name">{row.name}</Link>
+                  ) : (
+                    <strong className="admin-row-name">{row.name}</strong>
+                  )}
+                </td>
                 <td className="admin-detail-cell">{row.detail}</td>
                 <td><StatusBadge status={row.status} /></td>
                 <td className="admin-value-cell">{row.value}</td>
                 <td className="admin-date-cell">{row.date}</td>
                 <td>
+                  {section === "rooms" && (isSuperAdmin || modPerm.edit) ? (
+                    <label className="admin-row-menu">
+                      Image
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/avif"
+                        hidden
+                        onChange={(event) => {
+                          const file = event.target.files?.[0];
+                          event.target.value = "";
+                          if (file) void updateRoomImage(row, file);
+                        }}
+                      />
+                    </label>
+                  ) : null}
                   {(["hotels", "rooms", "departments", "offers"] as string[]).includes(section) && modPerm.delete ? (
                     <button className="admin-row-menu" type="button" aria-label={`Actions for ${row.name}`} onClick={() => void onRecordAction(row)}>
                       Remove
@@ -616,7 +687,7 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
           section={section}
           fields={createFields[section] || []}
           onClose={() => setCreateOpen(false)}
-          onSubmit={(data) => void submitCreate(data)}
+          onSubmit={(data, files) => void submitCreate(data, files)}
         />
       )}
     </>
@@ -703,12 +774,14 @@ type CreateField = {
   label: string;
   type?: string;
   min?: number;
+  max?: number;
   step?: number;
   options?: { value: string; label: string }[];
   required?: boolean;
   placeholder?: string;
   pattern?: string;
   title?: string;
+  multiple?: boolean;
 };
 
 function CreateRecordDialog({
@@ -720,14 +793,16 @@ function CreateRecordDialog({
   section: AdminSection;
   fields: CreateField[];
   onClose: () => void;
-  onSubmit: (data: Record<string, unknown>) => void;
+  onSubmit: (data: Record<string, unknown>, files: Record<string, File[]>) => void;
 }) {
   const [values, setValues] = useState<Record<string, string>>(() => {
     if (section === "housekeeping") {
       return { taskDate: new Date().toISOString().slice(0, 10), taskType: "CLEAN", priority: "NORMAL" };
     }
+    if (section === "hotels" || section === "rooms") return { isActive: "true" };
     return {} as Record<string, string>;
   });
+  const [files, setFiles] = useState<Record<string, File[]>>({});
   const [lookupOptions, setLookupOptions] = useState<Record<string, { value: string; label: string }[]>>({});
   const [lookupErrors, setLookupErrors] = useState<string[]>([]);
   const [loadingLookups, setLoadingLookups] = useState(false);
@@ -965,6 +1040,16 @@ function CreateRecordDialog({
         for (const field of ["basePrice", "price", "capacity", "totalInventory", "salary", "guestsCount", "roomCount", "discountValue"]) {
           if (data[field] !== undefined) data[field] = Number(data[field]);
         }
+        for (const field of fields) {
+          const value = data[field.name];
+          if (field.type === "number" && value !== undefined) data[field.name] = Number(value);
+          if (field.type === "list" && typeof value === "string") {
+            data[field.name] = value.split(",").map((item) => item.trim()).filter(Boolean);
+          }
+          if (field.name === "isActive" && typeof data[field.name] === "string") {
+            data[field.name] = data[field.name] === "true";
+          }
+        }
         if (section === "housekeeping") {
           if (matchedGuest) {
             data.guestName = `${matchedGuest.guest_first_name} ${matchedGuest.guest_last_name}`.trim();
@@ -977,7 +1062,7 @@ function CreateRecordDialog({
             data.guestName = "Vacant";
           }
         }
-        onSubmit(data);
+        onSubmit(data, files);
       }}>
         <div className="admin-dialog-heading"><div><span className="admin-eyebrow">NEW RECORD</span><h2>{sectionTitles[section].action}</h2></div><button type="button" className="admin-row-menu" aria-label="Close dialog" onClick={onClose}>×</button></div>
         <div className="admin-dialog-fields">
@@ -994,7 +1079,29 @@ function CreateRecordDialog({
                   : lookupOptions[field.name];
             return (
               <label key={field.name}>{field.label}
-                {options ? (
+                {field.type === "file" ? (
+                  <>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/avif"
+                      multiple={field.multiple}
+                      onChange={(event) => setFiles((current) => ({
+                        ...current,
+                        [field.name]: Array.from(event.target.files || []),
+                      }))}
+                    />
+                    {files[field.name]?.length ? (
+                      <small>{files[field.name].map((file) => file.name).join(", ")}</small>
+                    ) : null}
+                  </>
+                ) : field.type === "textarea" ? (
+                  <textarea
+                    required={field.required}
+                    placeholder={field.placeholder}
+                    value={values[field.name] || ""}
+                    onChange={(event) => setValues((current) => ({ ...current, [field.name]: event.target.value }))}
+                  />
+                ) : options ? (
                   <select
                     required={field.required}
                     value={values[field.name] || ""}
@@ -1038,8 +1145,9 @@ function CreateRecordDialog({
                   <input
                     autoComplete="off"
                     required={field.required}
-                    type={field.type || "text"}
+                    type={field.type === "list" ? "text" : field.type || "text"}
                     min={field.min}
+                    max={field.max}
                     step={field.step}
                     placeholder={field.placeholder}
                     pattern={field.pattern}

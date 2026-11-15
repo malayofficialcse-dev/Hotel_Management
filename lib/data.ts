@@ -4,9 +4,11 @@ export type Hotel = {
   city: string;
   location: string;
   image: string;
+  galleryImages?: string[];
   price: number;
   rating: string;
   reviews: number;
+  description?: string;
   tag: string;
   features: string[];
   offer: string;

@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
+    "seed:departments-employees": "node scripts/seed-departments-employees.mjs",
     "services:up": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\start-services.ps1",
     "services:down": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\stop-services.ps1"
   },

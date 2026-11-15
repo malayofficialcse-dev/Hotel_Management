@@ -70,6 +70,48 @@ Check logs in each service window. The API Gateway is available at
 `npm run services:up` and `npm run services:down` are aliases for these
 PowerShell scripts.
 
+### Cloudinary hotel and room images
+
+Set the same Cloudinary API URL in both
+`services/hotel-service/.env` and `services/room-service/.env`:
+
+```env
+CLOUDINARY_URL=cloudinary://<api_key>:<api_secret>@<cloud_name>
+```
+
+Keep the real API secret in the ignored `.env` files; do not commit or paste it
+into chat. Restart both services after setting it. The admin Hotel and Room
+forms can upload JPEG, PNG, WebP, or AVIF files up to 8 MB. Hotel uploads set
+the cover and gallery image URLs; room uploads set that room type's image URL.
+Customer hotel cards, hotel detail pages, and room selection read those URLs
+from the hotel and room services, with local fallback images when an image is
+not set.
+
+### Seed hotels, rooms, departments, employees, reservations, and payments
+
+With the API Gateway, hotel, room, department, employee, booking, payment, and
+authentication services running, create or reactivate the three sample hotels,
+seed their room types, ensure ten standard departments per active hotel, and
+insert up to 20 linked employees, reservations, and matching payments. Redis
+must also be available to the Booking Service.
+
+```powershell
+$env:SEED_AUTH_TOKEN = "<admin-or-staff-access-token>"
+npm run seed:departments-employees
+```
+
+The access token is used to check existing reservations before creating new
+ones. The script reuses existing records, reactivates matching inactive catalog
+records, and links each reservation to a hotel and room type. Each payment is
+associated with its reservation and confirmed through the Payment Service.
+Access tokens expire after 15 minutes, so sign in immediately before running
+the seed command.
+These are sample guest/payment records for development; payment intents use the
+service's mock payment flow and do not charge a real card.
+
+Preview without writing by adding `-- --dry-run` (this does not require the
+access token). Set `SEED_API_URL` to use a different API Gateway URL.
+
 ### PostgreSQL authentication errors
 
 If a service exits with Prisma `P1000` or `password authentication failed`,

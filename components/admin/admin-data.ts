@@ -19,6 +19,7 @@ export type AdminSection =
 
 export type AdminRecord = {
   id: string;
+  image?: string;
   name: string;
   detail: string;
   status: string;

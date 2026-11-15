@@ -9,14 +9,15 @@ import { formatPrice } from "@/lib/data";
 export function HotelCard({ hotel }: { hotel: Hotel }) {
   const { savedHotelIds, toggleSavedHotel } = useBooking();
   const saved = savedHotelIds.includes(hotel.id);
+  const hotelHref = `/hotels/${encodeURIComponent(hotel.id)}`;
 
   return (
     <article className="overflow-hidden rounded-[4px] border border-line bg-white">
       <div className="relative h-[190px] overflow-hidden">
-        <Link href="/hotels/the-palm-house" aria-label={`View ${hotel.name}`}>
+        <Link href={hotelHref} aria-label={`View ${hotel.name}`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={hotel.image}
+            src={hotel.image || "/assets/figma/a0108.png"}
             alt={`${hotel.name} in ${hotel.city}`}
             className="h-full w-full object-cover transition-transform duration-300 hover:scale-[1.03]"
           />
@@ -39,7 +40,7 @@ export function HotelCard({ hotel }: { hotel: Hotel }) {
       <div className="p-4">
         <div className="flex items-start justify-between gap-2">
           <Link
-            href="/hotels/the-palm-house"
+            href={hotelHref}
             className="text-sm font-semibold text-ink hover:text-forest"
           >
             {hotel.name}
@@ -57,7 +58,7 @@ export function HotelCard({ hotel }: { hotel: Hotel }) {
             <p className="text-[9px] text-muted">per night + taxes</p>
           </div>
           <Link
-            href="/hotels/the-palm-house"
+            href={hotelHref}
             className="rounded-[4px] border border-line px-3 py-2 text-[11px] font-medium text-ink hover:border-forest hover:text-forest"
           >
             View details

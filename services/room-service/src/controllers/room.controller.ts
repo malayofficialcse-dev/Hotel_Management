@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { status as grpcStatus } from "@grpc/grpc-js";
 import { RoomService } from "../services/room.service.js";
+import { uploadRoomImage } from "../services/cloudinary.service.js";
 
 const service = new RoomService();
 
@@ -15,6 +16,18 @@ function dependencyStatus(error: unknown) {
 }
 
 export class RoomController {
+  async uploadImage(req: Request, res: Response) {
+    if (!req.file) return res.status(400).json({ message: "An image file is required." });
+    try {
+      return res.status(201).json(await uploadRoomImage(req.file));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Cloudinary image upload failed.";
+      const status = message.startsWith("CLOUDINARY_URL") ? 503 : 502;
+      if (status === 502) console.error("[Room Service] Cloudinary upload failed", error);
+      return res.status(status).json({ message });
+    }
+  }
+
   async list(req: Request, res: Response) {
     const hotelId = typeof req.query.hotelId === "string" ? req.query.hotelId : undefined;
     res.json(await service.list(hotelId, req.query.includeInactive === "true"));

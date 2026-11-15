@@ -17,6 +17,7 @@ export interface AdminHotel {
   city: string;
   location: string;
   mainImage?: string;
+  galleryImages?: string[];
   basePrice: number;
   rating: number;
   reviewsCount: number;
@@ -35,7 +36,11 @@ export interface AdminRoom {
   price: number;
   capacity: number;
   totalInventory: number;
+  description?: string;
+  amenities?: string[];
   bedType?: string;
+  roomSize?: string;
+  image?: string;
   isActive: boolean;
 }
 
@@ -199,9 +204,11 @@ function toPublicHotel(hotel: AdminHotel): Hotel {
     city: hotel.city,
     location: hotel.location,
     image: hotel.mainImage || "",
+    galleryImages: hotel.galleryImages || [],
     price: hotel.basePrice,
     rating: String(hotel.rating),
     reviews: hotel.reviewsCount,
+    description: hotel.description || "",
     tag: hotel.tag || "",
     features: hotel.amenities || [],
     offer: hotel.offer || "",
@@ -213,7 +220,8 @@ function toPublicHotel(hotel: AdminHotel): Hotel {
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers); headers.set("Accept", "application/json");
-  if (init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  const isFormData = typeof FormData !== "undefined" && init.body instanceof FormData;
+  if (init.body && !isFormData && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   const accessToken = getToken(); if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
   const response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers, cache: "no-store" });
   const body = (await response.json().catch(() => ({}))) as { data?: T; message?: string } & T;
@@ -291,6 +299,11 @@ export const api = {
     const rows = await request<AdminHotel[]>("/hotels?includeInactive=true");
     return scopeByHotel(rows, (hotel) => hotel.slug || hotel._id);
   },
+  uploadHotelImage(file: File) {
+    const form = new FormData();
+    form.append("image", file);
+    return request<{ url: string; publicId: string }>("/hotels/images", { method: "POST", body: form });
+  },
   createHotel(data: Record<string, unknown>) { return request<AdminHotel>("/hotels", { method: "POST", body: JSON.stringify(data) }); },
   updateHotel(id: string, data: Record<string, unknown>) { return request<AdminHotel>(`/hotels/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(data) }); },
   deleteHotel(id: string) { return request<void>(`/hotels/${encodeURIComponent(id)}`, { method: "DELETE" }); },
@@ -298,7 +311,13 @@ export const api = {
     const rows = await request<AdminRoom[]>("/rooms?includeInactive=true");
     return scopeByHotel(rows, (room) => room.hotelId);
   },
+  uploadRoomImage(file: File) {
+    const form = new FormData();
+    form.append("image", file);
+    return request<{ url: string; publicId: string }>("/rooms/images", { method: "POST", body: form });
+  },
   createRoom(data: Record<string, unknown>) { return request<AdminRoom>("/rooms", { method: "POST", body: JSON.stringify(data) }); },
+  updateRoom(id: string, data: Record<string, unknown>) { return request<AdminRoom>(`/rooms/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(data) }); },
   deleteRoom(id: string) { return request<void>(`/rooms/${encodeURIComponent(id)}`, { method: "DELETE" }); },
   async getAdminDepartments() {
     const rows = await request<AdminDepartment[]>("/departments");

@@ -24,6 +24,15 @@ export default function RoomSelectionPage() {
   const [loadingAvailability, setLoadingAvailability] = useState(false);
   const [error, setError] = useState("");
   const [childrenCount, setChildrenCount] = useState(0);
+  const [hotelTitle, setHotelTitle] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    api.getHotel(hotelId)
+      .then((hotel) => { if (active) setHotelTitle(`${hotel.name}, ${hotel.city}`); })
+      .catch(() => { if (active) setHotelTitle(""); });
+    return () => { active = false; };
+  }, [hotelId]);
 
   useEffect(() => {
     let active = true;
@@ -86,7 +95,7 @@ export default function RoomSelectionPage() {
       <BookingStepper active={0} />
       <main className="mx-auto grid max-w-[1160px] gap-6 px-5 py-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:px-0">
         <div>
-          <PageHeading title="Make room for a little escape." description="Choose your comfort at The Palm House, Goa." />
+          <PageHeading title="Make room for a little escape." description={`Choose your comfort at ${hotelTitle || "your selected property"}.`} />
           <Surface className="mt-6 p-5">
             <h2 className="text-sm font-semibold">Your dates &amp; guests</h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
