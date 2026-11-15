@@ -137,9 +137,9 @@ export const ROLE_PRESETS: Record<string, { label: string; description: string; 
     label: "General Staff / Associate",
     description: "Restricted workspace access for task updates and room cleaning logs.",
     permissions: {
-      dashboard: { view: true, create: false, edit: false, delete: false },
+      dashboard: { view: false, create: false, edit: false, delete: false },
       hotels: { view: false, create: false, edit: false, delete: false },
-      rooms: { view: true, create: false, edit: false, delete: false },
+      rooms: { view: false, create: false, edit: false, delete: false },
       reservations: { view: false, create: false, edit: false, delete: false },
       customers: { view: false, create: false, edit: false, delete: false },
       departments: { view: false, create: false, edit: false, delete: false },
@@ -207,34 +207,49 @@ export function savePermissionsLocally(identifier: string, role: string, matrix:
  * Resolves effective permissions for the current user session.
  */
 export function getEffectivePermissions(
-  user: { email?: string; id?: string; role?: string } | null,
+  user: { email?: string; id?: string; role?: string; permissions?: Record<string, any> | null } | null,
   employeeRecord?: { role?: string; permissions?: Record<string, any> | null } | null
 ): PermissionMatrix {
-  // If user is top-level ADMIN, grant full access
-  if (user?.role === "ADMIN" || user?.email?.toLowerCase().includes("admin")) {
+  // If no user session, deny all access
+  if (!user) {
+    return NO_PERMISSIONS;
+  }
+
+  // If user is top-level ADMIN, grant full access across the console
+  if (user.role === "ADMIN" || user.email?.toLowerCase() === "mala@gmail.com") {
     return FULL_PERMISSIONS;
   }
 
-  // If passed directly from employeeRecord
-  if (employeeRecord?.permissions && typeof employeeRecord.permissions === "object") {
-    return { ...NO_PERMISSIONS, ...(employeeRecord.permissions as PermissionMatrix) };
+  // 1. Direct permissions object on employeeRecord or user session
+  const directPermissions = employeeRecord?.permissions || user.permissions;
+  if (directPermissions && typeof directPermissions === "object" && Object.keys(directPermissions).length > 0) {
+    return { ...NO_PERMISSIONS, ...(directPermissions as PermissionMatrix) };
   }
 
-  if (employeeRecord?.role && ROLE_PRESETS[employeeRecord.role]) {
-    return ROLE_PRESETS[employeeRecord.role].permissions;
-  }
-
-  // Look up in local storage cache by email or id
-  if (typeof window !== "undefined" && user) {
+  // 2. Look up in local storage cache by email or id (saved by Roles & Permissions modal)
+  if (typeof window !== "undefined") {
     const saved = getSavedPermissionsMap();
-    const match = (user.email && saved[user.email.toLowerCase()]) || (user.id && saved[user.id]);
-    if (match) {
-      return match.matrix;
+    const userEmail = user.email ? user.email.toLowerCase() : "";
+    const userId = user.id || "";
+    const match = (userEmail ? saved[userEmail] : undefined) || (userId ? saved[userId] : undefined);
+    if (match && typeof match === "object") {
+      if (match.matrix && typeof match.matrix === "object") {
+        return { ...NO_PERMISSIONS, ...match.matrix };
+      }
+      if (match.role && ROLE_PRESETS[match.role]) {
+        return ROLE_PRESETS[match.role].permissions;
+      }
     }
   }
 
-  // Default fallback for staff/logged in user
-  return ROLE_PRESETS.HOTEL_MANAGER.permissions;
+  // 3. User's or employee's assigned role preset
+  const role = employeeRecord?.role || user.role;
+  if (role && ROLE_PRESETS[role]) {
+    return ROLE_PRESETS[role].permissions;
+  }
+
+  // 4. Default fallback: NO_PERMISSIONS so unpermitted users cannot see unauthorized pages
+  return NO_PERMISSIONS;
 }
 
 /**

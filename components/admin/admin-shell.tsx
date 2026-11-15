@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { api, type AdminDepartment, type AdminEmployee, type AdminHotel, type AdminRoom, type HousekeepingTask } from "@/lib/api-client";
+import { api, type AdminDepartment, type AdminEmployee, type AdminHotel, type AdminRoom, type HousekeepingTask, type UserSession } from "@/lib/api-client";
 import { FigmaIcon } from "@/components/figma-icon";
 import { adminNavigation, type AdminSection } from "./admin-data";
 import { getEffectivePermissions, type AdminModule } from "@/lib/rbac";
@@ -35,7 +35,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const current = pathname.split("/")[2] || "dashboard";
-  const [adminUser, setAdminUser] = useState<{ name: string; email: string } | null>(null);
+  const [adminUser, setAdminUser] = useState<UserSession | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
 
   const [rbacVersion, setRbacVersion] = useState(0);
@@ -43,7 +43,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     const syncUser = () => {
       const user = api.getUser();
-      if (user) setAdminUser(user);
+      setAdminUser(user);
     };
     const syncRbac = () => {
       setRbacVersion((v) => v + 1);
@@ -60,6 +60,24 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const effectivePermissions = useMemo(() => {
     return getEffectivePermissions(adminUser);
   }, [adminUser, rbacVersion]);
+
+  const isSuperAdmin = adminUser?.role === "ADMIN" || adminUser?.email?.toLowerCase() === "mala@gmail.com";
+
+  const visibleNavItems = useMemo(() => {
+    function canViewSection(secId: AdminSection): boolean {
+      if (isSuperAdmin) return true;
+      if (secId === "profile") return true;
+      if (secId === "settings") return false;
+      if (secId === "roles") return Boolean(effectivePermissions.roles?.view);
+      if (secId === "audit") return false;
+      if (secId === "notifications") {
+        return Object.values(effectivePermissions).some((p) => p && p.view);
+      }
+      const modPerm = effectivePermissions[secId as AdminModule];
+      return Boolean(modPerm && modPerm.view);
+    }
+    return adminNavigation.filter((item) => canViewSection(item.id));
+  }, [effectivePermissions, isSuperAdmin]);
 
   function handleLogout() {
     api.logout();
@@ -182,24 +200,35 @@ export function AdminShell({ children }: { children: ReactNode }) {
           <span className="admin-picker-arrow">⌄</span>
         </div>
         <nav className="admin-nav" aria-label="Admin navigation">
-          {adminNavigation.map((item) => {
-            const modPerm = effectivePermissions[item.id as AdminModule];
-            const canView = modPerm === undefined || modPerm.view;
-            if (!canView) return null;
-            return (
-              <div key={item.id}>
-                {item.group && <div className="admin-nav-group">{item.group}</div>}
-                <Link
-                  href={item.id === "dashboard" ? "/admin" : `/admin/${item.id}`}
-                  className={`admin-nav-link ${current === item.id ? "is-active" : ""}`}
-                  aria-current={current === item.id ? "page" : undefined}
-                >
-                  <span className="admin-nav-icon" aria-hidden="true">{icons[item.id]}</span>
-                  <span>{item.label}</span>
-                </Link>
-              </div>
-            );
-          })}
+          {(() => {
+            let lastGroup = "";
+            return visibleNavItems.map((item) => {
+              const currentGroup = item.group || (
+                ["dashboard", "hotels", "rooms", "reservations", "customers", "departments", "employees", "housekeeping", "roles", "payments", "offers", "reviews"].includes(item.id)
+                  ? "WORKSPACE"
+                  : ["reports"].includes(item.id)
+                    ? "INSIGHTS"
+                    : "SYSTEM"
+              );
+              const showGroupHeader = currentGroup !== lastGroup;
+              if (showGroupHeader) {
+                lastGroup = currentGroup;
+              }
+              return (
+                <div key={item.id}>
+                  {showGroupHeader && <div className="admin-nav-group">{currentGroup}</div>}
+                  <Link
+                    href={item.id === "dashboard" ? "/admin" : `/admin/${item.id}`}
+                    className={`admin-nav-link ${current === item.id ? "is-active" : ""}`}
+                    aria-current={current === item.id ? "page" : undefined}
+                  >
+                    <span className="admin-nav-icon" aria-hidden="true">{icons[item.id]}</span>
+                    <span>{item.label}</span>
+                  </Link>
+                </div>
+              );
+            });
+          })()}
         </nav>
         <div className="admin-sidebar-bottom">
           <div className="admin-sidebar-note">Portfolio operations</div>

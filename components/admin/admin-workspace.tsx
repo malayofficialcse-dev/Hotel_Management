@@ -11,7 +11,7 @@ import { HousekeepingWorkspace } from "./housekeeping-workspace";
 import { EmployeesWorkspace } from "./employees-workspace";
 import { ProfileWorkspace } from "./profile-workspace";
 import { RolesWorkspace } from "./roles-workspace";
-import { getEffectivePermissions, type AdminModule } from "@/lib/rbac";
+import { ADMIN_MODULES, getEffectivePermissions, type AdminModule } from "@/lib/rbac";
 import {
   sectionTabs,
   sectionTitles,
@@ -381,45 +381,31 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
     }
   }
 
-  if (section === "dashboard") {
-    return <Dashboard />;
-  }
-
-  if (section === "reports") return <Reports />;
-
-  if (section === "payments") return <PaymentsWorkspace />;
-
-  if (section === "reservations") return <ReservationsWorkspace />;
-
-  if (section === "housekeeping") return <HousekeepingWorkspace />;
-
-  if (section === "employees") return <EmployeesWorkspace />;
-
-  if (section === "roles") return <RolesWorkspace />;
-
-  if (section === "profile") return <ProfileWorkspace />;
-
-  if (section === "settings") {
-    return (
-      <>
-        <PageHeader section={section} notice={notice} onAction={onAction} actionAvailable={false} />
-        <section className="admin-panel admin-table-panel">
-          <div className="admin-empty">Workspace settings are not connected to persistent storage. No sample settings are shown or saved.</div>
-        </section>
-      </>
-    );
-  }
-
   const user = api.getUser();
   const effectiveMatrix = getEffectivePermissions(user);
+  const isSuperAdmin = user?.role === "ADMIN" || user?.email?.toLowerCase() === "mala@gmail.com";
   const modPerm = effectiveMatrix[section as AdminModule] || {
-    view: true,
-    create: true,
-    edit: true,
-    delete: true,
+    view: false,
+    create: false,
+    edit: false,
+    delete: false,
   };
 
-  if (!modPerm.view) {
+  // Profile is universally accessible to any authenticated staff/admin
+  if (section === "profile") {
+    return <ProfileWorkspace />;
+  }
+
+  // Check section view access
+  const hasViewAccess = isSuperAdmin || (
+    section === "settings" ? isSuperAdmin :
+    section === "audit" ? isSuperAdmin || Boolean(effectiveMatrix.reports?.view) :
+    section === "notifications" ? Object.values(effectiveMatrix).some((p) => p && p.view) :
+    Boolean(modPerm.view)
+  );
+
+  if (!hasViewAccess) {
+    const firstAllowed = ADMIN_MODULES.find((m) => effectiveMatrix[m.id]?.view);
     return (
       <div
         className="admin-panel"
@@ -448,20 +434,59 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
             fontWeight: "bold",
           }}
         >
-          ⛨
+          ✕
         </div>
-        <h2 style={{ fontSize: "18px", color: "#111827", marginBottom: "8px" }}>Access Restricted</h2>
+        <h2 style={{ fontSize: "18px", color: "#111827", marginBottom: "8px", fontWeight: 700 }}>Access Restricted</h2>
         <p style={{ color: "#617169", fontSize: "13px", lineHeight: 1.5, marginBottom: "20px" }}>
-          Your assigned role does not have permission to view the <strong>{content.title}</strong> module. Please contact a system administrator to request access privileges.
+          Your account does not have permission to view the <strong style={{ color: "#111827" }}>{content.title}</strong> module.
+          You only have access to your assigned modules.
         </p>
-        <Link href="/admin" className="admin-primary-button" style={{ display: "inline-block", textDecoration: "none" }}>
-          Return to Dashboard
-        </Link>
+        <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
+          {firstAllowed && (
+            <Link
+              href={firstAllowed.id === "dashboard" ? "/admin" : `/admin/${firstAllowed.id}`}
+              className="admin-primary-button"
+              style={{ textDecoration: "none" }}
+            >
+              Go to {firstAllowed.label} →
+            </Link>
+          )}
+          <Link href="/admin/profile" className="admin-secondary-button" style={{ textDecoration: "none" }}>
+            My Profile
+          </Link>
+        </div>
       </div>
     );
   }
 
-  const actionAvailable = Boolean(createFields[section]) && modPerm.create;
+  if (section === "dashboard") {
+    return <Dashboard />;
+  }
+
+  if (section === "reports") return <Reports />;
+
+  if (section === "payments") return <PaymentsWorkspace />;
+
+  if (section === "reservations") return <ReservationsWorkspace />;
+
+  if (section === "housekeeping") return <HousekeepingWorkspace />;
+
+  if (section === "employees") return <EmployeesWorkspace />;
+
+  if (section === "roles") return <RolesWorkspace />;
+
+  if (section === "settings") {
+    return (
+      <>
+        <PageHeader section={section} notice={notice} onAction={onAction} actionAvailable={false} />
+        <section className="admin-panel admin-table-panel">
+          <div className="admin-empty">Workspace settings are not connected to persistent storage. No sample settings are shown or saved.</div>
+        </section>
+      </>
+    );
+  }
+
+  const actionAvailable = Boolean(createFields[section]) && (isSuperAdmin || modPerm.create);
   const unsupportedMessage: Partial<Record<AdminSection, string>> = {
     customers: "Guest records are derived from persisted reservations.",
     roles: "Custom role and permission records are not implemented in the auth database yet.",
