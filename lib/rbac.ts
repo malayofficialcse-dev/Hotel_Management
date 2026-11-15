@@ -21,6 +21,7 @@ export interface ModulePermission {
 }
 
 export type PermissionMatrix = Record<AdminModule, ModulePermission>;
+export type PermissionAction = keyof ModulePermission;
 
 export const ADMIN_MODULES: { id: AdminModule; label: string; description: string }[] = [
   { id: "dashboard", label: "Dashboard", description: "Workspace statistics, KPI overviews and activity" },
@@ -135,15 +136,15 @@ export const ROLE_PRESETS: Record<string, { label: string; description: string; 
   },
   STAFF: {
     label: "General Staff / Associate",
-    description: "Restricted workspace access for task updates and room cleaning logs.",
+    description: "Department-scoped access to assigned property, rooms, department, team, and housekeeping.",
     permissions: {
       dashboard: { view: false, create: false, edit: false, delete: false },
-      hotels: { view: false, create: false, edit: false, delete: false },
-      rooms: { view: false, create: false, edit: false, delete: false },
+      hotels: { view: true, create: false, edit: false, delete: false },
+      rooms: { view: true, create: false, edit: false, delete: false },
       reservations: { view: false, create: false, edit: false, delete: false },
       customers: { view: false, create: false, edit: false, delete: false },
-      departments: { view: false, create: false, edit: false, delete: false },
-      employees: { view: false, create: false, edit: false, delete: false },
+      departments: { view: true, create: false, edit: false, delete: false },
+      employees: { view: true, create: false, edit: false, delete: false },
       housekeeping: { view: true, create: false, edit: true, delete: false },
       roles: { view: false, create: false, edit: false, delete: false },
       payments: { view: false, create: false, edit: false, delete: false },
@@ -174,6 +175,31 @@ export const ROLE_PRESETS: Record<string, { label: string; description: string; 
 };
 
 const STORAGE_KEY = "stayease_rbac_permissions_v1";
+
+function normalizePermissions(value: Record<string, unknown>): PermissionMatrix {
+  const matrix = { ...NO_PERMISSIONS };
+  for (const { id } of ADMIN_MODULES) {
+    const raw = value[id];
+    if (!raw || typeof raw !== "object") continue;
+    const permission = raw as Partial<ModulePermission>;
+    const view = permission.view === true;
+    matrix[id] = {
+      view,
+      create: view && permission.create === true,
+      edit: view && permission.edit === true,
+      delete: view && permission.delete === true,
+    };
+  }
+  return matrix;
+}
+
+export function canPerform(
+  user: Parameters<typeof getEffectivePermissions>[0],
+  module: AdminModule,
+  action: PermissionAction,
+): boolean {
+  return getEffectivePermissions(user)[module]?.[action] === true;
+}
 
 /**
  * Returns stored custom permissions map keyed by employeeId or email.
@@ -223,7 +249,7 @@ export function getEffectivePermissions(
   // 1. Direct permissions object on employeeRecord or user session
   const directPermissions = employeeRecord?.permissions || user.permissions;
   if (directPermissions && typeof directPermissions === "object" && Object.keys(directPermissions).length > 0) {
-    return { ...NO_PERMISSIONS, ...(directPermissions as PermissionMatrix) };
+    return normalizePermissions(directPermissions);
   }
 
   // 2. Look up in local storage cache by email or id (saved by Roles & Permissions modal)
@@ -234,7 +260,7 @@ export function getEffectivePermissions(
     const match = (userEmail ? saved[userEmail] : undefined) || (userId ? saved[userId] : undefined);
     if (match && typeof match === "object") {
       if (match.matrix && typeof match.matrix === "object") {
-        return { ...NO_PERMISSIONS, ...match.matrix };
+        return normalizePermissions(match.matrix as Record<string, unknown>);
       }
       if (match.role && ROLE_PRESETS[match.role]) {
         return ROLE_PRESETS[match.role].permissions;
@@ -255,7 +281,7 @@ export function getEffectivePermissions(
 /**
  * Helper to count how many modules are accessible for an employee.
  */
-export function countAllowedModules(matrix?: PermissionMatrix | null): number {
-  if (!matrix) return ADMIN_MODULES.length;
-  return Object.values(matrix).filter((m) => m && m.view).length;
+export function countAllowedModules(matrix?: Record<string, ModulePermission | undefined> | null): number {
+  if (!matrix) return 0;
+  return Object.values(matrix).filter((permission) => permission?.view).length;
 }

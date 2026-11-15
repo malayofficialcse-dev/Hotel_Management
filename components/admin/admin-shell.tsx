@@ -47,6 +47,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
     };
     const syncRbac = () => {
       setRbacVersion((v) => v + 1);
+      setHasLoadedSearch(false);
+      setSearchItems([]);
     };
     syncUser();
     window.addEventListener("stayease-user-updated", syncUser);
@@ -110,11 +112,11 @@ export function AdminShell({ children }: { children: ReactNode }) {
     let active = true;
     setSearchLoading(true);
     Promise.allSettled([
-      api.getAdminHotels(),
-      api.getAdminRooms(),
-      api.getAdminDepartments(),
-      api.getAdminEmployees(),
-      api.getAdminHousekeepingTasks(),
+      effectivePermissions.hotels.view ? api.getAdminHotels() : Promise.resolve([]),
+      effectivePermissions.rooms.view ? api.getAdminRooms() : Promise.resolve([]),
+      effectivePermissions.departments.view ? api.getAdminDepartments() : Promise.resolve([]),
+      effectivePermissions.employees.view ? api.getAdminEmployees() : Promise.resolve([]),
+      effectivePermissions.housekeeping.view ? api.getAdminHousekeepingTasks() : Promise.resolve([]),
     ]).then(([hotels, rooms, departments, employees, tasks]) => {
       if (!active) return;
       const items: SearchItem[] = [];
@@ -125,35 +127,35 @@ export function AdminShell({ children }: { children: ReactNode }) {
           detail: `${hotel.city} · Hotel`,
           href: `/admin/hotels/${encodeURIComponent(hotel.slug || hotel._id)}`,
         })));
-      } else errors.push("Hotels");
+      } else if (effectivePermissions.hotels.view) errors.push("Hotels");
       if (rooms.status === "fulfilled") {
         items.push(...rooms.value.map((room: AdminRoom) => ({
           label: room.name,
           detail: `${room.hotelId} · Room`,
           href: "/admin/rooms",
         })));
-      } else errors.push("Rooms");
+      } else if (effectivePermissions.rooms.view) errors.push("Rooms");
       if (departments.status === "fulfilled") {
         items.push(...departments.value.map((department: AdminDepartment) => ({
           label: department.name,
           detail: `${department.hotelId} · Department`,
           href: "/admin/departments",
         })));
-      } else errors.push("Departments");
+      } else if (effectivePermissions.departments.view) errors.push("Departments");
       if (employees.status === "fulfilled") {
         items.push(...employees.value.map((employee: AdminEmployee) => ({
           label: employee.name,
           detail: `${employee.email} · Employee`,
           href: `/admin/employees/${encodeURIComponent(employee.id)}`,
         })));
-      } else errors.push("Employees");
+      } else if (effectivePermissions.employees.view) errors.push("Employees");
       if (tasks.status === "fulfilled") {
         items.push(...tasks.value.map((task: HousekeepingTask) => ({
           label: `Room ${task.roomNumber}`,
           detail: `${task.hotelId} · Housekeeping`,
           href: "/admin/housekeeping",
         })));
-      } else errors.push("Housekeeping");
+      } else if (effectivePermissions.housekeeping.view) errors.push("Housekeeping");
 
       setSearchItems(items);
       setSearchErrors(errors);
@@ -167,12 +169,12 @@ export function AdminShell({ children }: { children: ReactNode }) {
       if (active) setSearchLoading(false);
     });
     return () => { active = false; };
-  }, [searchOpen, hasLoadedSearch]);
+  }, [searchOpen, hasLoadedSearch, effectivePermissions]);
 
   const matchingSections = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    return adminNavigation.filter((item) => !query || item.label.toLowerCase().includes(query));
-  }, [searchQuery]);
+    return visibleNavItems.filter((item) => !query || item.label.toLowerCase().includes(query));
+  }, [searchQuery, visibleNavItems]);
   const matchingRecords = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     return searchItems
@@ -196,7 +198,10 @@ export function AdminShell({ children }: { children: ReactNode }) {
         <div className="admin-side-caption">PORTFOLIO WORKSPACE</div>
         <div className="admin-property-picker">
           <span className="admin-property-avatar">A</span>
-          <span><strong>All properties</strong><small>Portfolio workspace</small></span>
+          <span>
+            <strong>{isSuperAdmin ? "All properties" : "Assigned property"}</strong>
+            <small>{isSuperAdmin ? "Portfolio workspace" : [adminUser?.hotelId, adminUser?.department?.name].filter(Boolean).join(" · ") || "No property or department assigned"}</small>
+          </span>
           <span className="admin-picker-arrow">⌄</span>
         </div>
         <nav className="admin-nav" aria-label="Admin navigation">

@@ -12,7 +12,7 @@ import {
   type UserSession,
 } from "@/lib/api-client";
 import { exportToExcel } from "@/lib/export-excel";
-import { getEffectivePermissions } from "@/lib/rbac";
+import { canPerform, getEffectivePermissions } from "@/lib/rbac";
 import {
   BuildingIcon,
   BedIcon,
@@ -499,6 +499,10 @@ export function HousekeepingWorkspace() {
 
   // Quick Status Transition
   async function handleStatusTransition(task: HousekeepingTask) {
+    if (!canPerform(api.getUser(), "housekeeping", "edit")) {
+      setNotice("You do not have permission to edit housekeeping tasks.");
+      return;
+    }
     const transitions: Record<string, string> = {
       DIRTY: "IN_PROGRESS",
       IN_PROGRESS: "CLEAN",
@@ -517,6 +521,10 @@ export function HousekeepingWorkspace() {
   }
 
   async function handleDeleteTask(task: HousekeepingTask) {
+    if (!canPerform(api.getUser(), "housekeeping", "delete")) {
+      setNotice("You do not have permission to delete housekeeping tasks.");
+      return;
+    }
     if (!window.confirm(`Delete housekeeping task for Room ${task.roomNumber}?`)) return;
     try {
       await api.deleteHousekeepingTask(task._id);
@@ -642,6 +650,10 @@ export function HousekeepingWorkspace() {
 
   async function handleCreateTask(e: React.FormEvent) {
     e.preventDefault();
+    if (!canPerform(api.getUser(), "housekeeping", "create")) {
+      setNotice("You do not have permission to create housekeeping tasks.");
+      return;
+    }
     setCreating(true);
     setNotice("");
     try {

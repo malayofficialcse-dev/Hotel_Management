@@ -11,7 +11,7 @@ import { HousekeepingWorkspace } from "./housekeeping-workspace";
 import { EmployeesWorkspace } from "./employees-workspace";
 import { ProfileWorkspace } from "./profile-workspace";
 import { RolesWorkspace } from "./roles-workspace";
-import { ADMIN_MODULES, getEffectivePermissions, type AdminModule } from "@/lib/rbac";
+import { ADMIN_MODULES, canPerform, getEffectivePermissions, type AdminModule } from "@/lib/rbac";
 import {
   sectionTabs,
   sectionTitles,
@@ -246,6 +246,10 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
   );
 
   function onAction() {
+    if (!canPerform(api.getUser(), section as AdminModule, "create")) {
+      setNotice("You do not have permission to create records in this module.");
+      return;
+    }
     if (live) {
       setCreateOpen(true);
       setNotice("");
@@ -257,6 +261,10 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
   }
 
   async function submitCreate(data: Record<string, unknown>) {
+    if (!canPerform(api.getUser(), section as AdminModule, "create")) {
+      setNotice("You do not have permission to create records in this module.");
+      return;
+    }
     let createdRecord: AdminRecord | undefined;
     try {
       if (section === "hotels") await api.createHotel(data);
@@ -332,6 +340,11 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
   }
 
   async function onRecordAction(row: AdminRecord) {
+    const action = section === "housekeeping" ? "edit" : "delete";
+    if (!canPerform(api.getUser(), section as AdminModule, action)) {
+      setNotice(`You do not have permission to ${action} records in this module.`);
+      return;
+    }
     if (!live) {
       setNotice(`Selected ${row.name}.`);
       return;

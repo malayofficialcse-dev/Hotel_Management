@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { Prisma } from "@prisma/client";
 import { DepartmentClientService } from "./department-client.service.js";
 import { EmployeeRepository } from "../repositories/employee.repository.js";
 import { employeeFields } from "../models/employee.model.js";
@@ -88,6 +89,10 @@ export class EmployeeService {
       position: String(data.position).trim(),
       joiningDate: new Date(String(data.joiningDate)),
       salary,
+      role: typeof data.role === "string" ? data.role : "STAFF",
+      permissions: data.permissions && typeof data.permissions === "object" && !Array.isArray(data.permissions)
+        ? data.permissions as Prisma.InputJsonValue
+        : undefined,
     });
     return { ...employee, department };
   }

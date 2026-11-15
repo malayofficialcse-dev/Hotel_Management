@@ -9,7 +9,7 @@ import {
   type AdminDepartment,
 } from "@/lib/api-client";
 import { exportToExcel } from "@/lib/export-excel";
-import { getEffectivePermissions } from "@/lib/rbac";
+import { canPerform, getEffectivePermissions } from "@/lib/rbac";
 import {
   BuildingIcon,
   BriefcaseIcon,
@@ -395,6 +395,10 @@ export function EmployeesWorkspace() {
 
   // Deactivate/Delete Employee
   async function handleDeactivateEmployee(emp: AdminEmployee) {
+    if (!canPerform(api.getUser(), "employees", "delete")) {
+      setNotice("You do not have permission to deactivate employees.");
+      return;
+    }
     const codeOrId = emp.employeeCode || emp.id;
     if (!window.confirm(`Deactivate team member ${emp.name} (${codeOrId})?`)) return;
     try {
@@ -462,6 +466,10 @@ export function EmployeesWorkspace() {
 
   async function handleCreateEmployee(e: React.FormEvent) {
     e.preventDefault();
+    if (!canPerform(api.getUser(), "employees", "create")) {
+      setNotice("You do not have permission to create employees.");
+      return;
+    }
     setCreating(true);
     setNotice("");
     try {

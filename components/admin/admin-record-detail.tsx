@@ -3,14 +3,16 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api, type AdminEmployee } from "@/lib/api-client";
+import { getEffectivePermissions } from "@/lib/rbac";
 
 export function AdminRecordDetail({ kind, id }: { kind: "employees" | "roles"; id: string }) {
+  const canViewEmployees = getEffectivePermissions(api.getUser()).employees.view;
   const [employee, setEmployee] = useState<AdminEmployee | null>(null);
   const [loading, setLoading] = useState(kind === "employees");
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (kind !== "employees") return;
+    if (kind !== "employees" || !canViewEmployees) return;
     let active = true;
     api.getAdminEmployees()
       .then((employees) => {
@@ -26,7 +28,7 @@ export function AdminRecordDetail({ kind, id }: { kind: "employees" | "roles"; i
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [id, kind]);
+  }, [id, kind, canViewEmployees]);
 
   const title = kind === "roles" ? "Role details unavailable" : employee?.name || "Employee details";
   return (
@@ -42,6 +44,8 @@ export function AdminRecordDetail({ kind, id }: { kind: "employees" | "roles"; i
       <section className="admin-panel admin-record-main">
         {kind === "roles" ? (
           <div className="admin-empty">No role details are stored. No sample permissions or members are shown.</div>
+        ) : !canViewEmployees ? (
+          <div className="admin-empty" role="alert">You do not have permission to view employee records.</div>
         ) : loading ? (
           <div className="admin-empty">Loading employee details…</div>
         ) : error ? (

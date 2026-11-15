@@ -138,6 +138,9 @@ export class AuthService {
         name: user.name,
         role: effectiveRole,
         employeeCode: employeeData?.employeeCode || undefined,
+        hotelId: employeeData?.hotelId || employeeData?.department?.hotelId || undefined,
+        departmentId: employeeData?.departmentId || employeeData?.department?.id || employeeData?.department?._id || undefined,
+        department: employeeData?.department || null,
         permissions: employeeData?.permissions || null,
       },
       tokens,
@@ -203,6 +206,9 @@ export class AuthService {
         ...user,
         role: employeeData?.role || user.role,
         employeeCode: employeeData?.employeeCode,
+        hotelId: employeeData?.hotelId || employeeData?.department?.hotelId,
+        departmentId: employeeData?.departmentId || employeeData?.department?.id || employeeData?.department?._id,
+        department: employeeData?.department || null,
         permissions: employeeData?.permissions || null,
       },
     };
@@ -243,10 +249,30 @@ export class AuthService {
     }
 
     const updated = await this.repo.updateProfile(userId, updateData);
+    let employeeData: any = null;
+    try {
+      const listRes = await fetch("http://localhost:8007/api/v1/employees");
+      if (listRes.ok) {
+        const list = await listRes.json();
+        if (Array.isArray(list)) {
+          employeeData = list.find((employee: any) => employee.email?.toLowerCase() === updated.email.toLowerCase());
+        }
+      }
+    } catch {
+      // Employee scope remains unavailable when the employee service is offline.
+    }
     return {
       success: true,
       message: "Profile updated successfully",
-      user: updated,
+      user: {
+        ...updated,
+        role: employeeData?.role || updated.role,
+        employeeCode: employeeData?.employeeCode,
+        hotelId: employeeData?.hotelId || employeeData?.department?.hotelId,
+        departmentId: employeeData?.departmentId || employeeData?.department?.id || employeeData?.department?._id,
+        department: employeeData?.department || null,
+        permissions: employeeData?.permissions || null,
+      },
     };
   }
 }

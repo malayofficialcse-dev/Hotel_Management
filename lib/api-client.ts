@@ -109,6 +109,7 @@ export interface AdminBooking {
 
 export interface AdminOffer {
   _id: string;
+  hotelId?: string;
   code: string;
   name: string;
   description?: string;
@@ -136,6 +137,9 @@ export interface UserSession {
   email: string;
   name: string;
   role: string;
+  hotelId?: string;
+  departmentId?: string;
+  department?: { id?: string; _id?: string; name?: string; hotelId?: string } | null;
   phone?: string;
   employeeCode?: string;
   permissions?: any;
@@ -151,6 +155,34 @@ function getUser(): UserSession | null {
   } catch {
     return null;
   }
+}
+
+function getAdminDataScope() {
+  const user = getUser();
+  if (!user || user.role === "ADMIN" || user.email?.toLowerCase() === "mala@gmail.com") return null;
+  return {
+    hotelId: user.hotelId || user.department?.hotelId,
+    departmentId: user.departmentId || user.department?.id || user.department?._id,
+  };
+}
+
+function scopeByHotel<T>(rows: T[], getHotelId: (row: T) => string | undefined): T[] {
+  const scope = getAdminDataScope();
+  if (!scope) return rows;
+  if (!scope.hotelId) return [];
+  return rows.filter((row) => getHotelId(row) === scope.hotelId);
+}
+
+function scopeByDepartmentOrHotel<T>(
+  rows: T[],
+  getDepartmentId: (row: T) => string | undefined,
+  getHotelId: (row: T) => string | undefined,
+): T[] {
+  const scope = getAdminDataScope();
+  if (!scope) return rows;
+  if (scope.departmentId) return rows.filter((row) => getDepartmentId(row) === scope.departmentId);
+  if (!scope.hotelId) return [];
+  return rows.filter((row) => getHotelId(row) === scope.hotelId);
 }
 
 function toPublicHotel(hotel: AdminHotel): Hotel {
@@ -255,28 +287,74 @@ export const api = {
   },
   async getHotels(filters?: { city?: string; category?: string; search?: string; minPrice?: number; maxPrice?: number }): Promise<Hotel[]> { const params = new URLSearchParams(); Object.entries(filters || {}).forEach(([key, value]) => { if (value && value !== "All" && value !== "All Stays") params.set(key, String(value)); }); return (await request<AdminHotel[]>(`/hotels?${params}`)).map(toPublicHotel); },
   async getHotel(identifier: string): Promise<Hotel> { return toPublicHotel(await request<AdminHotel>(`/hotels/${encodeURIComponent(identifier)}`)); },
-  getAdminHotels() { return request<AdminHotel[]>("/hotels?includeInactive=true"); },
+  async getAdminHotels() {
+    const rows = await request<AdminHotel[]>("/hotels?includeInactive=true");
+    return scopeByHotel(rows, (hotel) => hotel.slug || hotel._id);
+  },
   createHotel(data: Record<string, unknown>) { return request<AdminHotel>("/hotels", { method: "POST", body: JSON.stringify(data) }); },
   updateHotel(id: string, data: Record<string, unknown>) { return request<AdminHotel>(`/hotels/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(data) }); },
   deleteHotel(id: string) { return request<void>(`/hotels/${encodeURIComponent(id)}`, { method: "DELETE" }); },
-  getAdminRooms() { return request<AdminRoom[]>("/rooms?includeInactive=true"); },
+  async getAdminRooms() {
+    const rows = await request<AdminRoom[]>("/rooms?includeInactive=true");
+    return scopeByHotel(rows, (room) => room.hotelId);
+  },
   createRoom(data: Record<string, unknown>) { return request<AdminRoom>("/rooms", { method: "POST", body: JSON.stringify(data) }); },
   deleteRoom(id: string) { return request<void>(`/rooms/${encodeURIComponent(id)}`, { method: "DELETE" }); },
-  getAdminDepartments() { return request<AdminDepartment[]>("/departments"); },
+  async getAdminDepartments() {
+    const rows = await request<AdminDepartment[]>("/departments");
+    return scopeByDepartmentOrHotel(rows, (department) => department._id, (department) => department.hotelId);
+  },
   createDepartment(data: Record<string, unknown>) { return request<AdminDepartment>("/departments", { method: "POST", body: JSON.stringify(data) }); },
   deleteDepartment(id: string) { return request<void>(`/departments/${encodeURIComponent(id)}`, { method: "DELETE" }); },
-  getAdminEmployees() { return request<AdminEmployee[]>("/employees"); },
+  async getAdminEmployees() {
+    const rows = await request<AdminEmployee[]>("/employees");
+    return scopeByDepartmentOrHotel(rows, (employee) => employee.departmentId, (employee) => employee.hotelId || employee.department?.hotelId);
+  },
   createEmployee(data: Record<string, unknown>) { return request<AdminEmployee>("/employees", { method: "POST", body: JSON.stringify(data) }); },
   updateEmployee(id: string, data: Record<string, unknown>) { return request<AdminEmployee>(`/employees/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(data) }); },
   deleteEmployee(id: string) { return request<void>(`/employees/${encodeURIComponent(id)}`, { method: "DELETE" }); },
-  getAdminHousekeepingTasks() { return request<HousekeepingTask[]>("/housekeeping"); },
+  async getAdminHousekeepingTasks() {
+    const rows = await request<HousekeepingTask[]>("/housekeeping");
+    return scopeByDepartmentOrHotel(rows, (task) => task.departmentId, (task) => task.hotelId);
+  },
   createHousekeepingTask(data: Record<string, unknown>) { return request<HousekeepingTask>("/housekeeping", { method: "POST", body: JSON.stringify(data) }); },
   updateHousekeepingTask(id: string, data: Record<string, unknown>) { return request<HousekeepingTask>(`/housekeeping/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(data) }); },
   deleteHousekeepingTask(id: string) { return request<void>(`/housekeeping/${encodeURIComponent(id)}`, { method: "DELETE" }); },
-  getAdminReservations() { return request<{ bookings: AdminBooking[]; total: number }>("/bookings/admin"); },
-  getAdminOffers() { return request<AdminOffer[]>("/offers?includeInactive=true"); },
-  getAdminPayments() { return request<AdminPayment[]>("/payments/admin"); },
-  getAdminReviews() { return request<AdminReview[]>("/reviews/admin"); },
+  async getAdminReservations() {
+    const result = await request<{ bookings: AdminBooking[]; total: number }>("/bookings/admin");
+    const bookings = scopeByHotel(result.bookings, (booking) => booking.hotel_id);
+    return { ...result, bookings, total: bookings.length };
+  },
+  async getAdminOffers() {
+    const rows = await request<AdminOffer[]>("/offers?includeInactive=true");
+    return scopeByHotel(rows, (offer) => offer.hotelId);
+  },
+  async getAdminPayments() {
+    const rows = await request<AdminPayment[]>("/payments/admin");
+    const scope = getAdminDataScope();
+    if (!scope) return rows;
+
+    const bookings = await api.getAdminReservations();
+    const scopedBookingIds = new Set(
+      bookings.bookings
+        .flatMap((booking) => [booking.id, booking.booking_code])
+        .map((reference) => reference.trim().toLowerCase()),
+    );
+    return rows.filter((payment) => {
+      const paymentHotelId = payment.hotelId || (
+        typeof payment.metadata?.hotelId === "string" ? payment.metadata.hotelId : undefined
+      );
+      return (
+        (Boolean(scope.hotelId) && paymentHotelId === scope.hotelId) ||
+        scopedBookingIds.has((payment.bookingId || "").trim().toLowerCase()) ||
+        scopedBookingIds.has(payment.bookingCode.trim().toLowerCase())
+      );
+    });
+  },
+  async getAdminReviews() {
+    const rows = await request<AdminReview[]>("/reviews/admin");
+    return scopeByHotel(rows, (review) => review.hotelId);
+  },
   createOffer(data: Record<string, unknown>) { return request<AdminOffer>("/offers", { method: "POST", body: JSON.stringify(data) }); },
   deleteOffer(id: string) { return request<void>(`/offers/${encodeURIComponent(id)}`, { method: "DELETE" }); },
   async getRoomsByHotel(hotelId: string): Promise<PublicRoom[]> {
@@ -366,11 +444,32 @@ export const api = {
   createReview(data: Record<string, unknown>) { return request<any>("/reviews", { method: "POST", body: JSON.stringify(data) }); },
   getEmployees(departmentId?: string) { return request<any[]>(`/employees${departmentId ? `?departmentId=${encodeURIComponent(departmentId)}` : ""}`); },
   getDepartments() { return request<any[]>("/departments"); },
-  getAnalyticsOverview() { return request<any>("/analytics/overview"); },
+  async getAnalyticsOverview() {
+    const overview = await request<Record<string, unknown>>("/analytics/overview");
+    if (!getAdminDataScope()) return overview;
+    const hotels = Array.isArray(overview.hotels)
+      ? scopeByHotel(overview.hotels as AdminHotel[], (hotel) => hotel.slug || hotel._id)
+      : overview.hotels;
+    const rooms = Array.isArray(overview.rooms)
+      ? scopeByHotel(overview.rooms as AdminRoom[], (room) => room.hotelId)
+      : overview.rooms;
+    const reservations = Array.isArray(overview.reservations)
+      ? scopeByHotel(overview.reservations as AdminBooking[], (booking) => booking.hotel_id)
+      : overview.reservations;
+    const employees = Array.isArray(overview.employees)
+      ? scopeByDepartmentOrHotel(overview.employees as AdminEmployee[], (employee) => employee.departmentId, (employee) => employee.hotelId || employee.department?.hotelId)
+      : overview.employees;
+    const tasks = Array.isArray(overview.tasks)
+      ? scopeByDepartmentOrHotel(overview.tasks as HousekeepingTask[], (task) => task.departmentId, (task) => task.hotelId)
+      : overview.tasks;
+    return { ...overview, hotels, rooms, reservations, employees, tasks };
+  },
 };
 
 export interface AdminPayment {
   id: string;
+  bookingId?: string;
+  hotelId?: string;
   bookingCode: string;
   amount: number;
   currency: string;

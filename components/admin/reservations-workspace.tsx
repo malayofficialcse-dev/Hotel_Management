@@ -9,7 +9,7 @@ import {
   type AdminRoom,
 } from "@/lib/api-client";
 import { exportToExcel } from "@/lib/export-excel";
-import { getEffectivePermissions } from "@/lib/rbac";
+import { canPerform, getEffectivePermissions } from "@/lib/rbac";
 import {
   BuildingIcon,
   BedIcon,
@@ -372,6 +372,10 @@ export function ReservationsWorkspace() {
   // Handle Create Reservation Submit
   async function handleCreateReservation(e: React.FormEvent) {
     e.preventDefault();
+    if (!canPerform(api.getUser(), "reservations", "create")) {
+      setNotice("You do not have permission to create reservations.");
+      return;
+    }
     setCreating(true);
     setNotice("");
     try {

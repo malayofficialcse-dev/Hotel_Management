@@ -14,6 +14,7 @@ import {
   NO_PERMISSIONS,
   ROLE_PRESETS,
   countAllowedModules,
+  getEffectivePermissions,
   getSavedPermissionsMap,
   savePermissionsLocally,
   type AdminModule,
@@ -43,6 +44,7 @@ export function RolesWorkspace() {
   const [editRole, setEditRole] = useState<string>("STAFF");
   const [editMatrix, setEditMatrix] = useState<PermissionMatrix>(ROLE_PRESETS.STAFF.permissions);
   const [saving, setSaving] = useState(false);
+  const canManageAccess = getEffectivePermissions(api.getUser()).roles.edit;
 
   useEffect(() => {
     void loadData();
@@ -62,8 +64,8 @@ export function RolesWorkspace() {
         const local = localMap[emp.id] || (emp.email && localMap[emp.email.toLowerCase()]);
         return {
           ...emp,
-          role: local?.role || emp.role || "STAFF",
-          permissions: (local?.matrix as any) || emp.permissions || ROLE_PRESETS[emp.role || "STAFF"]?.permissions || ROLE_PRESETS.STAFF.permissions,
+          role: emp.role || local?.role || "STAFF",
+          permissions: emp.permissions || local?.matrix || ROLE_PRESETS[emp.role || local?.role || "STAFF"]?.permissions || ROLE_PRESETS.STAFF.permissions,
         };
       });
 
@@ -165,23 +167,35 @@ export function RolesWorkspace() {
   // Save permissions
   async function handleSavePermissions() {
     if (!selectedEmployee) return;
+    if (!canManageAccess) {
+      setNotice("You do not have permission to change role access.");
+      return;
+    }
     setSaving(true);
     try {
-      // 1. Save to employee-service backend
       await api.updateEmployee(selectedEmployee.id, {
         role: editRole,
         permissions: editMatrix,
-      }).catch((e) => {
-        console.warn("Backend update failed, persisting in RBAC store:", e);
       });
 
-      // 2. Save in RBAC persistent client store
       savePermissionsLocally(selectedEmployee.id, editRole, editMatrix);
       if (selectedEmployee.email) {
         savePermissionsLocally(selectedEmployee.email.toLowerCase(), editRole, editMatrix);
       }
+      const currentUser = api.getUser();
+      if (currentUser && (
+        currentUser.id === selectedEmployee.id ||
+        currentUser.id === selectedEmployee.userId ||
+        currentUser.email.toLowerCase() === selectedEmployee.email.toLowerCase()
+      )) {
+        window.localStorage.setItem("stayease-user", JSON.stringify({
+          ...currentUser,
+          role: editRole,
+          permissions: editMatrix,
+        }));
+        window.dispatchEvent(new Event("stayease-user-updated"));
+      }
 
-      // 3. Update state
       setEmployees((prev) =>
         prev.map((emp) =>
           emp.id === selectedEmployee.id
@@ -221,7 +235,7 @@ export function RolesWorkspace() {
       emp.hotelId || "—",
       emp.department?.name || "—",
       emp.role || "STAFF",
-      `${countAllowedModules(emp.permissions as any)} / ${ADMIN_MODULES.length}`,
+      `${countAllowedModules(emp.permissions)} / ${ADMIN_MODULES.length}`,
       emp.isActive ? "Active" : "Inactive",
     ]);
     exportToExcel({
@@ -489,13 +503,13 @@ export function RolesWorkspace() {
                 </tr>
               ) : (
                 filteredEmployees.map((emp) => {
-                  const allowedCount = countAllowedModules(emp.permissions as any);
+                  const allowedCount = countAllowedModules(emp.permissions);
                   const isFull = allowedCount === ADMIN_MODULES.length;
                   return (
                     <tr
                       key={emp.id}
-                      style={{ cursor: "pointer" }}
-                      onClick={() => openConfigureModal(emp)}
+                      style={{ cursor: canManageAccess ? "pointer" : "default" }}
+                      onClick={() => canManageAccess && openConfigureModal(emp)}
                     >
                       <td onClick={(e) => e.stopPropagation()}>
                         <input type="checkbox" aria-label={`Select ${emp.name}`} />
@@ -595,6 +609,7 @@ export function RolesWorkspace() {
                         </div>
                       </td>
                       <td style={{ textAlign: "right" }} onClick={(e) => e.stopPropagation()}>
+                        {canManageAccess && (
                         <button
                           type="button"
                           className="admin-primary-button"
@@ -603,6 +618,7 @@ export function RolesWorkspace() {
                         >
                           Configure Access
                         </button>
+                        )}
                       </td>
                     </tr>
                   );

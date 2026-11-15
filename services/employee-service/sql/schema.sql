@@ -5,14 +5,18 @@
 
 CREATE TABLE IF NOT EXISTS employees (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    employee_code VARCHAR(64) UNIQUE,
     user_id UUID NOT NULL UNIQUE,
     department_id VARCHAR(64) NOT NULL,
+    hotel_id VARCHAR(64),
     name VARCHAR(128) NOT NULL,
     email VARCHAR(255) NOT NULL,
     phone VARCHAR(32),
     position VARCHAR(64) NOT NULL,
     joining_date DATE NOT NULL,
     salary DOUBLE PRECISION,
+    role VARCHAR(64) DEFAULT 'STAFF',
+    permissions JSONB,
     is_active BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -43,6 +47,7 @@ CREATE TABLE IF NOT EXISTS schedules (
 );
 
 CREATE INDEX IF NOT EXISTS idx_employees_dept ON employees (department_id);
+CREATE INDEX IF NOT EXISTS idx_employees_hotel ON employees (hotel_id);
 CREATE INDEX IF NOT EXISTS idx_employees_user ON employees (user_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_dept ON tasks (department_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_assignee ON tasks (assignee_id);

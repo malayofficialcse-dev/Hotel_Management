@@ -1,4 +1,5 @@
 import { prisma } from "../config/database.js";
+import type { Prisma } from "@prisma/client";
 
 export class EmployeeRepository {
   list(departmentId?: string) {
@@ -41,6 +42,8 @@ export class EmployeeRepository {
     position: string;
     joiningDate: Date;
     salary?: number | null;
+    role?: string;
+    permissions?: Prisma.InputJsonValue;
   }) {
     return prisma.employee.create({ data });
   }
