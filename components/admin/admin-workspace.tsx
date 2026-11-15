@@ -1432,6 +1432,8 @@ function Reports() {
   const [bookings, setBookings] = useState<AdminBooking[] | null>(null);
   const [payments, setPayments] = useState<AdminPayment[] | null>(null);
   const [error, setError] = useState("");
+  const [periodMonths, setPeriodMonths] = useState<6 | 12>(6);
+  const [loading, setLoading] = useState(true);
   useEffect(() => {
     let active = true;
     Promise.allSettled([api.getAdminReservations(), api.getAdminPayments()]).then(([bookingResult, paymentResult]) => {
@@ -1440,15 +1442,107 @@ function Reports() {
       if (paymentResult.status === "fulfilled") setPayments(paymentResult.value);
       const failures = [bookingResult, paymentResult].filter((result) => result.status === "rejected").length;
       if (failures) setError(`${failures} data source${failures === 1 ? "" : "s"} could not be reached.`);
+      setLoading(false);
     });
     return () => { active = false; };
   }, []);
-  const revenue = payments?.filter((payment) => ["SUCCESS", "REFUNDED"].includes(payment.status)).reduce((sum, payment) => sum + payment.amount - (payment.refunds || []).filter((refund) => refund.status === "SUCCESS").reduce((refundTotal, refund) => refundTotal + refund.amount, 0), 0);
+
+  const monthBuckets = useMemo(() => {
+    const now = new Date();
+    return Array.from({ length: periodMonths }, (_, index) => {
+      const date = new Date(now.getFullYear(), now.getMonth() - periodMonths + index + 1, 1);
+      return {
+        key: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`,
+        label: date.toLocaleDateString("en-IN", periodMonths === 12 ? { month: "short", year: "2-digit" } : { month: "short" }),
+      };
+    });
+  }, [periodMonths]);
+  const monthKeys = useMemo(() => new Set(monthBuckets.map((month) => month.key)), [monthBuckets]);
+  const periodBookings = useMemo(
+    () => bookings?.filter((booking) => monthKeys.has(reportMonthKey(booking.created_at || booking.check_in_date))) ?? null,
+    [bookings, monthKeys],
+  );
+  const periodPayments = useMemo(
+    () => payments?.filter((payment) => monthKeys.has(reportMonthKey(payment.createdAt))) ?? null,
+    [payments, monthKeys],
+  );
+  const monthlyData = useMemo(() => {
+    const monthIndex = new Map(monthBuckets.map((month, index) => [month.key, index]));
+    const rows = monthBuckets.map((month) => ({ ...month, bookings: 0, revenue: 0 }));
+    for (const booking of periodBookings || []) {
+      const index = monthIndex.get(reportMonthKey(booking.created_at || booking.check_in_date));
+      if (index !== undefined) rows[index].bookings += 1;
+    }
+    for (const payment of periodPayments || []) {
+      const index = monthIndex.get(reportMonthKey(payment.createdAt));
+      if (index !== undefined) rows[index].revenue += netCollectedPayment(payment);
+    }
+    return rows;
+  }, [monthBuckets, periodBookings, periodPayments]);
+
+  const netRevenue = periodPayments?.reduce((sum, payment) => sum + netCollectedPayment(payment), 0);
+  const averageBookingValue = periodBookings?.length
+    ? periodBookings.reduce((sum, booking) => sum + booking.total_price, 0) / periodBookings.length
+    : null;
+  const reservationStatuses = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const booking of periodBookings || []) {
+      const status = booking.status.replaceAll("_", " ");
+      counts.set(status, (counts.get(status) || 0) + 1);
+    }
+    return Array.from(counts, ([label, value], index) => ({
+      label,
+      value,
+      color: reportStatusColor(label, index),
+    }));
+  }, [periodBookings]);
+  const paymentStatuses = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const payment of periodPayments || []) {
+      const status = payment.status.replaceAll("_", " ");
+      counts.set(status, (counts.get(status) || 0) + 1);
+    }
+    return Array.from(counts, ([label, value], index) => ({
+      label,
+      value,
+      color: reportStatusColor(label, index),
+    }));
+  }, [periodPayments]);
+  const propertyRevenue = useMemo(() => {
+    const bookingByReference = new Map<string, AdminBooking>();
+    for (const booking of periodBookings || []) {
+      bookingByReference.set(booking.id.toLowerCase(), booking);
+      bookingByReference.set(booking.booking_code.toLowerCase(), booking);
+    }
+    const totals = new Map<string, number>();
+    for (const payment of periodPayments || []) {
+      const booking = bookingByReference.get(payment.bookingId?.toLowerCase() || "")
+        || bookingByReference.get(payment.bookingCode.toLowerCase());
+      const propertyName = booking?.hotel_name || payment.metadata?.hotelName;
+      const amount = netCollectedPayment(payment);
+      if (!propertyName || amount <= 0) continue;
+      totals.set(propertyName, (totals.get(propertyName) || 0) + amount);
+    }
+    return Array.from(totals, ([label, value]) => ({ label, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 6);
+  }, [periodBookings, periodPayments]);
+  const roomTypeDemand = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const booking of periodBookings || []) {
+      counts.set(booking.room_type_name, (counts.get(booking.room_type_name) || 0) + 1);
+    }
+    return Array.from(counts, ([label, value]) => ({ label, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 6);
+  }, [periodBookings]);
+  const currentUser = api.getUser();
+  const isPortfolioAdmin = currentUser?.role === "ADMIN" || currentUser?.email?.toLowerCase() === "mala@gmail.com";
 
   function handleExportExcel() {
     const todayStr = new Date().toISOString().split("T")[0];
     const headers = ["Booking Code", "Guest Name", "Hotel", "Room Type", "Status", "Amount (INR)", "Check-in", "Check-out"];
-    const rows: (string | number)[][] = (bookings || []).map((b) => [
+    const rows: (string | number)[][] = (periodBookings || []).map((b) => [
       b.booking_code,
       `${b.guest_first_name} ${b.guest_last_name}`,
       b.hotel_name,
@@ -1468,16 +1562,251 @@ function Reports() {
 
   return <>
     <PageHeader section="reports" notice={error} onAction={() => window.print()} actionAvailable={false} onExportExcel={handleExportExcel} />
-    <section className="admin-panel admin-table-panel">
-      <div className="admin-panel-heading"><div><h2>Reservation and payment summary</h2><p>Calculated from current service database records.</p></div></div>
-      {!bookings || !payments ? <div className="admin-empty">{error || "Loading report data…"}</div> : <div className="admin-dashboard-grid">
-        <div className="admin-stat-card"><span>Reservations</span><strong>{formatNumber(bookings.length)}</strong></div>
-        <div className="admin-stat-card"><span>Net collected revenue</span><strong>{revenue === undefined ? "Unavailable" : `₹${revenue.toLocaleString("en-IN")}`}</strong></div>
-        <div className="admin-stat-card"><span>Payment records</span><strong>{formatNumber(payments.length)}</strong></div>
-        <div className="admin-stat-card"><span>Average booking value</span><strong>{bookings.length ? `₹${Math.round(bookings.reduce((sum, booking) => sum + booking.total_price, 0) / bookings.length).toLocaleString("en-IN")}` : "—"}</strong></div>
-      </div>}
-    </section>
+    <div className="reports-toolbar">
+      <div>
+        <strong>{isPortfolioAdmin ? "Portfolio analytics" : "Property analytics"}</strong>
+        <span>{isPortfolioAdmin ? "All properties · live reservation and payment data" : "Scoped to the properties assigned to your account"}</span>
+      </div>
+      <label className="reports-period">Period
+        <select value={periodMonths} onChange={(event) => setPeriodMonths(event.target.value === "12" ? 12 : 6)}>
+          <option value={6}>Last 6 months</option>
+          <option value={12}>Last 12 months</option>
+        </select>
+      </label>
+    </div>
+
+    <div className="reports-kpi-grid">
+      <ReportMetric label="Reservations" value={periodBookings ? formatNumber(periodBookings.length) : loading ? "Loading…" : "Unavailable"} detail={`${periodMonths}-month period`} />
+      <ReportMetric label="Net collected revenue" value={netRevenue === undefined ? loading ? "Loading…" : "Unavailable" : formatReportCurrency(netRevenue)} detail="Successful payments less refunds" />
+      <ReportMetric label="Payment records" value={periodPayments ? formatNumber(periodPayments.length) : loading ? "Loading…" : "Unavailable"} detail={`${periodMonths}-month period`} />
+      <ReportMetric label="Average booking value" value={averageBookingValue === null ? periodBookings ? "—" : loading ? "Loading…" : "Unavailable" : formatReportCurrency(averageBookingValue)} detail="Reservation value per booking" />
+    </div>
+
+    <div className="reports-chart-grid">
+      <section className="admin-panel reports-panel reports-panel-wide">
+        <div className="admin-panel-heading"><div><h2>Collected revenue trend</h2><p>Monthly net payments after successful refunds</p></div></div>
+        {periodPayments === null
+          ? <div className="admin-empty">{loading ? "Loading payment data…" : "Payment data is unavailable."}</div>
+          : periodPayments.length
+            ? <RevenueAreaChart data={monthlyData} />
+            : <div className="admin-empty">No payments are recorded for this period.</div>}
+      </section>
+      <section className="admin-panel reports-panel">
+        <div className="admin-panel-heading"><div><h2>Reservation status</h2><p>Bookings by current status</p></div></div>
+        {periodBookings === null
+          ? <div className="admin-empty">{loading ? "Loading reservation data…" : "Reservation data is unavailable."}</div>
+          : <ReportDonut segments={reservationStatuses} centerLabel="Bookings" />}
+      </section>
+      <section className="admin-panel reports-panel reports-panel-wide">
+        <div className="admin-panel-heading"><div><h2>Reservation activity</h2><p>Bookings created in each month</p></div></div>
+        {periodBookings === null
+          ? <div className="admin-empty">{loading ? "Loading reservation data…" : "Reservation data is unavailable."}</div>
+          : periodBookings.length
+            ? <MonthlyBookingBars data={monthlyData} />
+            : <div className="admin-empty">No reservations are recorded for this period.</div>}
+      </section>
+      <section className="admin-panel reports-panel">
+        <div className="admin-panel-heading"><div><h2>Payment status</h2><p>Transaction records by status</p></div></div>
+        {periodPayments === null
+          ? <div className="admin-empty">{loading ? "Loading payment data…" : "Payment data is unavailable."}</div>
+          : <ReportDonut segments={paymentStatuses} centerLabel="Payments" />}
+      </section>
+      <section className="admin-panel reports-panel">
+        <div className="admin-panel-heading"><div><h2>Collected by property</h2><p>Net payment totals for your available property data</p></div></div>
+        {periodPayments === null
+          ? <div className="admin-empty">{loading ? "Loading payment data…" : "Payment data is unavailable."}</div>
+          : propertyRevenue.length
+            ? <ReportHorizontalBars items={propertyRevenue} formatValue={formatReportCurrency} />
+            : <div className="admin-empty">No property-level payment totals are available for this period.</div>}
+      </section>
+      <section className="admin-panel reports-panel">
+        <div className="admin-panel-heading"><div><h2>Room type demand</h2><p>Reservations by room type</p></div></div>
+        {periodBookings === null
+          ? <div className="admin-empty">{loading ? "Loading reservation data…" : "Reservation data is unavailable."}</div>
+          : roomTypeDemand.length
+            ? <ReportHorizontalBars items={roomTypeDemand} formatValue={formatNumber} />
+            : <div className="admin-empty">No room type demand is available for this period.</div>}
+      </section>
+    </div>
+    <p className="reports-footnote">All charts use live records from the reservation and payment services. Failed sources are marked unavailable; no sample values are added.</p>
   </>;
+}
+
+function reportMonthKey(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function netCollectedPayment(payment: AdminPayment) {
+  const status = payment.status.toUpperCase();
+  if (status !== "SUCCESS" && status !== "REFUNDED") return 0;
+  const amount = Number.isFinite(payment.amount) ? Math.max(0, payment.amount) : 0;
+  const refundedAmount = (payment.refunds || [])
+    .filter((refund) => refund.status.toUpperCase() === "SUCCESS")
+    .reduce((sum, refund) => sum + refund.amount, 0);
+  const effectiveRefund = status === "REFUNDED" && refundedAmount === 0 ? amount : refundedAmount;
+  return Math.max(0, amount - effectiveRefund);
+}
+
+function formatReportCurrency(value: number) {
+  return `₹${Math.round(value).toLocaleString("en-IN")}`;
+}
+
+function reportStatusColor(label: string, index: number) {
+  const statusColors: Record<string, string> = {
+    CONFIRMED: "#176b58",
+    "PENDING PAYMENT": "#d2a451",
+    "CHECKED IN": "#648da4",
+    "CHECKED OUT": "#86a294",
+    CANCELLED: "#bd7062",
+    REFUNDED: "#927aa5",
+    SUCCESS: "#176b58",
+    FAILED: "#bd7062",
+    PENDING: "#d2a451",
+    EXPIRED: "#a7b3ad",
+  };
+  return statusColors[label.toUpperCase()] || ["#176b58", "#d2a451", "#648da4", "#927aa5", "#bd7062", "#86a294"][index % 6];
+}
+
+function ReportMetric({ label, value, detail }: { label: string; value: string; detail: string }) {
+  return (
+    <div className="admin-stat-card reports-metric">
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <small>{detail}</small>
+    </div>
+  );
+}
+
+type ReportMonthlyDatum = { key: string; label: string; bookings: number; revenue: number };
+type ReportSegment = { label: string; value: number; color: string };
+type ReportBarItem = { label: string; value: number };
+
+function RevenueAreaChart({ data }: { data: ReportMonthlyDatum[] }) {
+  const width = 720;
+  const height = 250;
+  const left = 54;
+  const right = 18;
+  const top = 14;
+  const bottom = 34;
+  const plotHeight = height - top - bottom;
+  const plotWidth = width - left - right;
+  const maximum = Math.max(...data.map((item) => item.revenue), 1);
+  const points = data.map((item, index) => ({
+    ...item,
+    x: left + (data.length < 2 ? plotWidth / 2 : (index / (data.length - 1)) * plotWidth),
+    y: top + plotHeight - (item.revenue / maximum) * plotHeight,
+  }));
+  const linePath = points.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ");
+  const areaPath = `${linePath} L ${points[points.length - 1].x} ${top + plotHeight} L ${points[0].x} ${top + plotHeight} Z`;
+
+  return (
+    <div className="reports-area-chart">
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Monthly net collected revenue">
+        <defs>
+          <linearGradient id="reports-revenue-fill" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="#176b58" stopOpacity=".24" />
+            <stop offset="100%" stopColor="#176b58" stopOpacity=".015" />
+          </linearGradient>
+        </defs>
+        {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+          const y = top + plotHeight - ratio * plotHeight;
+          return (
+            <g key={ratio}>
+              <line x1={left} x2={width - right} y1={y} y2={y} stroke="#e9efec" strokeDasharray="3 4" />
+              <text x={left - 8} y={y + 3} textAnchor="end" className="reports-axis-label">
+                {formatCompactCurrency(maximum * ratio)}
+              </text>
+            </g>
+          );
+        })}
+        <path d={areaPath} fill="url(#reports-revenue-fill)" />
+        <path d={linePath} fill="none" stroke="#176b58" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        {points.map((point) => (
+          <g key={point.key}>
+            <circle cx={point.x} cy={point.y} r="4" fill="#fff" stroke="#176b58" strokeWidth="2" />
+            <title>{point.label}: {formatReportCurrency(point.revenue)}</title>
+            <text x={point.x} y={height - 8} textAnchor="middle" className="reports-axis-label">{point.label}</text>
+          </g>
+        ))}
+      </svg>
+    </div>
+  );
+}
+
+function formatCompactCurrency(value: number) {
+  if (value >= 10000000) return `₹${(value / 10000000).toFixed(1)}Cr`;
+  if (value >= 100000) return `₹${(value / 100000).toFixed(1)}L`;
+  if (value >= 1000) return `₹${(value / 1000).toFixed(0)}k`;
+  return `₹${Math.round(value)}`;
+}
+
+function MonthlyBookingBars({ data }: { data: ReportMonthlyDatum[] }) {
+  const maximum = Math.max(...data.map((item) => item.bookings), 1);
+  return (
+    <div className="reports-monthly-bars" role="img" aria-label="Monthly reservations">
+      {data.map((item) => (
+        <div className="reports-month-column" key={item.key} title={`${item.label}: ${formatNumber(item.bookings)} reservations`}>
+          <span className="reports-month-value">{item.bookings || ""}</span>
+          <div className="reports-month-track">
+            <span style={{ height: `${item.bookings ? Math.max(4, (item.bookings / maximum) * 100) : 0}%` }} />
+          </div>
+          <span className="reports-month-label">{item.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ReportDonut({ segments, centerLabel }: { segments: ReportSegment[]; centerLabel: string }) {
+  const visibleSegments = segments.filter((segment) => segment.value > 0);
+  const total = visibleSegments.reduce((sum, segment) => sum + segment.value, 0);
+  let cumulative = 0;
+  const gradient = total
+    ? visibleSegments.map((segment) => {
+      const start = (cumulative / total) * 100;
+      cumulative += segment.value;
+      return `${segment.color} ${start}% ${(cumulative / total) * 100}%`;
+    }).join(", ")
+    : "#edf1ef 0% 100%";
+
+  return (
+    <div className="reports-donut-layout">
+      <div className="reports-donut" role="img" aria-label={`${centerLabel}: ${formatNumber(total)}`}>
+        <div className="reports-donut-hole">
+          <strong>{formatNumber(total)}</strong>
+          <span>{centerLabel}</span>
+        </div>
+        <span className="reports-donut-pie" style={{ background: `conic-gradient(${gradient})` }} />
+      </div>
+      {visibleSegments.length ? (
+        <ul className="reports-legend">
+          {visibleSegments.map((segment) => (
+            <li key={segment.label}>
+              <span><i style={{ backgroundColor: segment.color }} />{segment.label}</span>
+              <strong>{formatNumber(segment.value)}</strong>
+            </li>
+          ))}
+        </ul>
+      ) : <p className="reports-chart-empty">No records in this period.</p>}
+    </div>
+  );
+}
+
+function ReportHorizontalBars({ items, formatValue }: { items: ReportBarItem[]; formatValue: (value: number) => string }) {
+  const maximum = Math.max(...items.map((item) => item.value), 1);
+  return (
+    <div className="reports-horizontal-bars" role="img" aria-label="Ranked report values">
+      {items.map((item, index) => (
+        <div className="reports-horizontal-row" key={item.label} title={`${item.label}: ${formatValue(item.value)}`}>
+          <div className="reports-horizontal-heading"><span>{item.label}</span><strong>{formatValue(item.value)}</strong></div>
+          <div className="reports-horizontal-track">
+            <span className={index === 0 ? "is-primary" : ""} style={{ width: `${(item.value / maximum) * 100}%` }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function StatusBadge({ status }: { status: string }) {

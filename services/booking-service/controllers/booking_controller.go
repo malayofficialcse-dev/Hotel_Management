@@ -167,6 +167,28 @@ func (c *BookingController) ListAdminBookings(w http.ResponseWriter, r *http.Req
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "data": result})
 }
 
+func (c *BookingController) ListMyBookings(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(uuid.UUID)
+	if !ok {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "message": "Authentication required"})
+		return
+	}
+
+	bookings, err := c.bookingService.GetUserBookings(r.Context(), userID)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "message": "Could not load your bookings"})
+		return
+	}
+
+	result := &models.BookingListResponse{Bookings: bookings, Total: len(bookings)}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "data": result})
+}
+
 func (c *BookingController) GetBookedRoomCount(w http.ResponseWriter, r *http.Request) {
 	roomTypeID := chi.URLParam(r, "roomTypeId")
 	checkIn := r.URL.Query().Get("checkIn")

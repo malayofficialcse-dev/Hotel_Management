@@ -123,6 +123,23 @@ export interface AdminBooking {
   created_at: string;
 }
 
+export interface UserBooking {
+  id: string;
+  booking_code: string;
+  hotel_id: string;
+  hotel_name: string;
+  room_type_id: string;
+  room_type_name: string;
+  check_in_date: string;
+  check_out_date: string;
+  total_nights: number;
+  guests_count: number;
+  room_count: number;
+  total_price: number;
+  status: string;
+  created_at: string;
+}
+
 export interface AdminOffer {
   _id: string;
   hotelId?: string;
@@ -457,6 +474,9 @@ export const api = {
       const res = await request<any>(`/bookings/code/${encodeURIComponent(code)}`);
       return res?.data || res;
     }
+  },
+  getMyBookings() {
+    return request<{ bookings: UserBooking[]; total: number }>("/bookings/mine");
   },
   getPaymentByBookingCode(code: string) {
     return request<any>(`/payments/lookup?code=${encodeURIComponent(code)}`);
