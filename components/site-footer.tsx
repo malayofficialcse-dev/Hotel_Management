@@ -3,7 +3,7 @@ import Link from "next/link";
 export function SiteFooter() {
   return (
     <footer className="mt-10 bg-mist">
-      <div className="mx-auto flex max-w-[1296px] flex-col gap-6 px-5 py-8 text-xs text-muted lg:px-0">
+      <div className="mx-auto flex max-w-[1760px] flex-col gap-6 px-4 py-8 text-xs text-muted sm:px-6 lg:px-10 2xl:px-14">
         <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-start">
           <div>
             <Link href="/" className="text-lg font-semibold text-ink">StayEase</Link>

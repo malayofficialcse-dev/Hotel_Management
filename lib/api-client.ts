@@ -44,6 +44,17 @@ export interface AdminRoom {
   isActive: boolean;
 }
 
+export interface AdminRoomAvailability {
+  roomTypeId: string;
+  checkIn: string;
+  checkOut: string;
+  totalInventory: number;
+  currentlyBooked: number;
+  availableInventory: number;
+  isAvailable: boolean;
+  pricePerNight: number;
+}
+
 export interface AdminDepartment {
   _id: string;
   hotelId: string;
@@ -310,6 +321,13 @@ export const api = {
   async getAdminRooms() {
     const rows = await request<AdminRoom[]>("/rooms?includeInactive=true");
     return scopeByHotel(rows, (room) => room.hotelId);
+  },
+  getRoomsForHotel(hotelId: string) {
+    return request<AdminRoom[]>(`/rooms/hotel/${encodeURIComponent(hotelId)}`);
+  },
+  getRoomAvailability(id: string, checkIn: string, checkOut: string, count: number) {
+    const params = new URLSearchParams({ checkIn, checkOut, count: String(count) });
+    return request<AdminRoomAvailability>(`/rooms/${encodeURIComponent(id)}/availability?${params}`);
   },
   uploadRoomImage(file: File) {
     const form = new FormData();

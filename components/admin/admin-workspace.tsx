@@ -38,6 +38,7 @@ async function loadLiveRecords(section: AdminSection): Promise<AdminRecord[] | n
     const rows = await api.getAdminHotels();
     return rows.map((hotel: AdminHotel) => ({
       id: hotel.slug || hotel._id,
+      image: hotel.mainImage || hotel.galleryImages?.[0],
       name: hotel.name,
       detail: `${hotel.location} · ${hotel.city}`,
       status: hotel.isActive ? "Active" : "Inactive",
@@ -50,6 +51,7 @@ async function loadLiveRecords(section: AdminSection): Promise<AdminRecord[] | n
     return rows.map((room: AdminRoom) => ({
       id: room._id,
       image: room.image,
+      room,
       name: room.name,
       detail: `${room.hotelId} · ${room.bedType || `${room.capacity} guests`}`,
       status: room.isActive ? "Available" : "Inactive",
@@ -230,6 +232,7 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
   const [loading, setLoading] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [editingRoom, setEditingRoom] = useState<AdminRoom | null>(null);
   const content = sectionTitles[section];
   const live = ["hotels", "rooms", "reservations", "customers", "departments", "employees", "housekeeping", "offers", "payments", "reviews"].includes(section);
 
@@ -369,17 +372,34 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
     }
   }
 
-  async function updateRoomImage(row: AdminRecord, file: File) {
+  async function submitRoomEdit(data: Record<string, unknown>, files: Record<string, File[]>) {
     if (!canPerform(api.getUser(), "rooms", "edit")) {
       setNotice("You do not have permission to edit room records.");
       return;
     }
     try {
-      const uploaded = await api.uploadRoomImage(file);
-      await api.updateRoom(row.id, { image: uploaded.url });
-      setNotice(`Image saved for ${row.name}.`);
+      if (!editingRoom) throw new Error("The room being edited is no longer available.");
+      const payload = { ...data };
+      const image = files.imageFile?.[0];
+      if (image) payload.image = (await api.uploadRoomImage(image)).url;
+      await api.updateRoom(editingRoom._id, payload);
     } catch (error) {
-      setNotice(error instanceof Error ? `Could not update room image: ${error.message}` : "Could not update room image.");
+      setNotice(error instanceof Error ? `Could not update room: ${error.message}` : "Could not update room.");
+      return;
+    }
+
+    const updatedName = editingRoom?.name || "Room";
+    setEditingRoom(null);
+    setNotice(`${updatedName} updated.`);
+    setLoading(true);
+    try {
+      setRecords((await loadLiveRecords("rooms")) || []);
+    } catch (error) {
+      setNotice(error instanceof Error
+        ? `Room updated, but the list could not be refreshed: ${error.message}`
+        : "Room updated, but the list could not be refreshed.");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -607,15 +627,15 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
         </div>
         <div className="admin-table-scroll">
           <table className="admin-table">
-            <thead><tr><th><input type="checkbox" aria-label="Select all rows" /></th><th>{section === "rooms" ? "IMAGE" : "ID"}</th><th>{section === "customers" ? "GUEST" : "NAME"}</th><th>DETAILS</th><th>STATUS</th><th>{section === "hotels" ? "RATING" : "VALUE"}</th><th>UPDATED</th><th><span className="sr-only">Actions</span></th></tr></thead>
+            <thead><tr><th><input type="checkbox" aria-label="Select all rows" /></th><th>{section === "rooms" || section === "hotels" ? "IMAGE" : "ID"}</th><th>{section === "customers" ? "GUEST" : "NAME"}</th><th>DETAILS</th><th>STATUS</th><th>{section === "hotels" ? "RATING" : "VALUE"}</th><th>UPDATED</th><th><span className="sr-only">Actions</span></th></tr></thead>
             <tbody>{loading ? <tr><td colSpan={8}>Loading records…</td></tr> : filtered.map((row) => (
               <tr key={row.id}>
                 <td><input type="checkbox" aria-label={`Select ${row.name}`} /></td>
-                <td className={section === "rooms" ? "admin-room-image-cell" : "admin-id"}>
-                  {section === "rooms" ? (
+                <td className={section === "rooms" || section === "hotels" ? "admin-image-cell" : "admin-id"}>
+                  {section === "rooms" || section === "hotels" ? (
                     row.image
-                      ? <img className="admin-room-thumbnail" src={row.image} alt={`${row.name} room`} loading="lazy" />
-                      : <span className="admin-room-thumbnail-empty" role="img" aria-label="No room image available">No image</span>
+                      ? <img className="admin-thumbnail" src={row.image} alt={`${row.name} ${section === "hotels" ? "hotel" : "room"}`} loading="lazy" />
+                      : <span className="admin-thumbnail-empty" role="img" aria-label={`No ${section === "hotels" ? "hotel" : "room"} image available`}>No image</span>
                   ) : row.id}
                 </td>
                 <td>
@@ -631,19 +651,14 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
                 <td className="admin-date-cell">{row.date}</td>
                 <td>
                   {section === "rooms" && (isSuperAdmin || modPerm.edit) ? (
-                    <label className="admin-row-menu">
-                      Image
-                      <input
-                        type="file"
-                        accept="image/jpeg,image/png,image/webp,image/avif"
-                        hidden
-                        onChange={(event) => {
-                          const file = event.target.files?.[0];
-                          event.target.value = "";
-                          if (file) void updateRoomImage(row, file);
-                        }}
-                      />
-                    </label>
+                    <button className="admin-row-menu" type="button" onClick={() => {
+                      if (!canPerform(api.getUser(), "rooms", "edit")) {
+                        setNotice("You do not have permission to edit room records.");
+                      } else if (row.room) setEditingRoom(row.room);
+                      else setNotice(`Could not edit ${row.name}: room details are unavailable.`);
+                    }}>
+                      Edit
+                    </button>
                   ) : null}
                   {(["hotels", "rooms", "departments", "offers"] as string[]).includes(section) && modPerm.delete ? (
                     <button className="admin-row-menu" type="button" aria-label={`Actions for ${row.name}`} onClick={() => void onRecordAction(row)}>
@@ -688,6 +703,19 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
           fields={createFields[section] || []}
           onClose={() => setCreateOpen(false)}
           onSubmit={(data, files) => void submitCreate(data, files)}
+        />
+      )}
+      {editingRoom && (
+        <CreateRecordDialog
+          section="rooms"
+          fields={createFields.rooms || []}
+          initialValues={editingRoom}
+          currentImage={editingRoom.image}
+          title={`Edit ${editingRoom.name}`}
+          submitLabel="Save changes"
+          includeEmptyValues
+          onClose={() => setEditingRoom(null)}
+          onSubmit={(data, files) => void submitRoomEdit(data, files)}
         />
       )}
     </>
@@ -787,15 +815,33 @@ type CreateField = {
 function CreateRecordDialog({
   section,
   fields,
+  initialValues,
+  currentImage,
+  title,
+  submitLabel,
+  includeEmptyValues = false,
   onClose,
   onSubmit,
 }: {
   section: AdminSection;
   fields: CreateField[];
+  initialValues?: Partial<AdminRoom>;
+  currentImage?: string;
+  title?: string;
+  submitLabel?: string;
+  includeEmptyValues?: boolean;
   onClose: () => void;
   onSubmit: (data: Record<string, unknown>, files: Record<string, File[]>) => void;
 }) {
   const [values, setValues] = useState<Record<string, string>>(() => {
+    if (initialValues) {
+      return Object.fromEntries(fields
+        .filter((field) => field.type !== "file")
+        .map((field) => {
+          const value = initialValues[field.name as keyof AdminRoom];
+          return [field.name, Array.isArray(value) ? value.join(", ") : value == null ? "" : String(value)];
+        }));
+    }
     if (section === "housekeeping") {
       return { taskDate: new Date().toISOString().slice(0, 10), taskType: "CLEAN", priority: "NORMAL" };
     }
@@ -819,7 +865,7 @@ function CreateRecordDialog({
     const lookups: [string, string, Promise<{ value: string; label: string }[]>][] = [];
     if (["rooms", "departments"].includes(section)) {
       lookups.push(["hotelId", "hotels", api.getAdminHotels().then((rows) =>
-        rows.filter((hotel) => section !== "rooms" || hotel.isActive).map((hotel) => ({ value: hotel.slug || hotel._id, label: `${hotel.name} · ${hotel.city}` })),
+        rows.filter((hotel) => section !== "rooms" || initialValues || hotel.isActive).map((hotel) => ({ value: hotel.slug || hotel._id, label: `${hotel.name} · ${hotel.city}` })),
       )]);
     }
     if (section === "reservations") {
@@ -1036,7 +1082,7 @@ function CreateRecordDialog({
     <div className="admin-dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <form className="admin-dialog" onSubmit={(event) => {
         event.preventDefault();
-        const data: Record<string, unknown> = Object.fromEntries(Object.entries(values).filter(([, value]) => value !== ""));
+        const data: Record<string, unknown> = Object.fromEntries(Object.entries(values).filter(([, value]) => includeEmptyValues || value !== ""));
         for (const field of ["basePrice", "price", "capacity", "totalInventory", "salary", "guestsCount", "roomCount", "discountValue"]) {
           if (data[field] !== undefined) data[field] = Number(data[field]);
         }
@@ -1064,7 +1110,7 @@ function CreateRecordDialog({
         }
         onSubmit(data, files);
       }}>
-        <div className="admin-dialog-heading"><div><span className="admin-eyebrow">NEW RECORD</span><h2>{sectionTitles[section].action}</h2></div><button type="button" className="admin-row-menu" aria-label="Close dialog" onClick={onClose}>×</button></div>
+        <div className="admin-dialog-heading"><div><span className="admin-eyebrow">{initialValues ? "EDIT RECORD" : "NEW RECORD"}</span><h2>{title || sectionTitles[section].action}</h2></div><button type="button" className="admin-row-menu" aria-label="Close dialog" onClick={onClose}>×</button></div>
         <div className="admin-dialog-fields">
           {fields.map((field) => {
             const isReservationRoom = field.name === "roomTypeId" && section === "reservations";
@@ -1081,6 +1127,9 @@ function CreateRecordDialog({
               <label key={field.name}>{field.label}
                 {field.type === "file" ? (
                   <>
+                    {field.name === "imageFile" && currentImage ? (
+                      <img className="admin-thumbnail" src={currentImage} alt="Current room" />
+                    ) : null}
                     <input
                       type="file"
                       accept="image/jpeg,image/png,image/webp,image/avif"
@@ -1223,7 +1272,7 @@ function CreateRecordDialog({
             )}
           </div>
         )}
-        <div className="admin-dialog-actions"><button type="button" className="admin-secondary-button" onClick={onClose}>Cancel</button><button type="submit" className="admin-primary-button" disabled={loadingLookups || !requiredLookupsReady}>Save record</button></div>
+        <div className="admin-dialog-actions"><button type="button" className="admin-secondary-button" onClick={onClose}>Cancel</button><button type="submit" className="admin-primary-button" disabled={loadingLookups || !requiredLookupsReady}>{submitLabel || "Save record"}</button></div>
       </form>
     </div>
   );

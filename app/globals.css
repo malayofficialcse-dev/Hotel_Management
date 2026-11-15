@@ -53,3 +53,24 @@ textarea:focus-visible {
 ::selection {
   background: #e4f5ec;
 }
+
+@keyframes hero-carousel-reveal {
+  from {
+    opacity: 0.55;
+    transform: scale(1.025);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.hero-carousel-image {
+  animation: hero-carousel-reveal 700ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-carousel-image {
+    animation: none;
+  }
+}

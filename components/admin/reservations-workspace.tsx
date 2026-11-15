@@ -26,6 +26,24 @@ import {
   NextjsLogo,
 } from "@/components/icons";
 
+function formatDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getFilterDateKey(value?: string) {
+  if (!value) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : formatDateKey(date);
+}
+
+function normalizeStatus(status?: string) {
+  return (status || "").trim().replace(/_+/g, " ").replace(/\s+/g, " ").toUpperCase();
+}
+
 export function ReservationsWorkspace() {
   const modPerm = useMemo(() => {
     return getEffectivePermissions(api.getUser()).reservations;
@@ -153,7 +171,8 @@ export function ReservationsWorkspace() {
   const distinctStatuses = useMemo(() => {
     const set = new Set<string>();
     for (const b of bookings) {
-      if (b.status?.trim()) set.add(b.status.trim().toUpperCase());
+      const status = normalizeStatus(b.status);
+      if (status) set.add(status);
     }
     if (!set.has("CONFIRMED")) set.add("CONFIRMED");
     if (!set.has("PENDING PAYMENT")) set.add("PENDING PAYMENT");
@@ -164,7 +183,7 @@ export function ReservationsWorkspace() {
   function applyDatePreset(preset: "all" | "today" | "upcoming" | "7days" | "month") {
     setDatePreset(preset);
     const now = new Date();
-    const todayStr = now.toISOString().split("T")[0];
+    const todayStr = formatDateKey(now);
 
     if (preset === "all") {
       setStartDate("");
@@ -173,15 +192,16 @@ export function ReservationsWorkspace() {
       setStartDate(todayStr);
       setEndDate(todayStr);
     } else if (preset === "upcoming") {
+      setDateField("checkin");
       setStartDate(todayStr);
       setEndDate("");
     } else if (preset === "7days") {
-      const past = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      setStartDate(past.toISOString().split("T")[0]);
+      const past = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+      setStartDate(formatDateKey(past));
       setEndDate(todayStr);
     } else if (preset === "month") {
       const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-      setStartDate(firstDay.toISOString().split("T")[0]);
+      setStartDate(formatDateKey(firstDay));
       setEndDate(todayStr);
     }
   }
@@ -194,13 +214,13 @@ export function ReservationsWorkspace() {
         const q = searchQuery.toLowerCase().trim();
         const guestName = `${b.guest_first_name || ""} ${b.guest_last_name || ""}`.toLowerCase();
         const match =
-          b.booking_code.toLowerCase().includes(q) ||
+          (b.booking_code || "").toLowerCase().includes(q) ||
           guestName.includes(q) ||
           (b.guest_email && b.guest_email.toLowerCase().includes(q)) ||
           (b.guest_phone && b.guest_phone.toLowerCase().includes(q)) ||
           (b.hotel_name && b.hotel_name.toLowerCase().includes(q)) ||
           (b.room_type_name && b.room_type_name.toLowerCase().includes(q)) ||
-          (b.status && b.status.toLowerCase().includes(q));
+          normalizeStatus(b.status).toLowerCase().includes(normalizeStatus(q).toLowerCase());
         if (!match) return false;
       }
 
@@ -220,7 +240,7 @@ export function ReservationsWorkspace() {
 
       // 4. Status Multi-Select
       if (selectedStatuses.length > 0) {
-        const statusNormalized = (b.status || "").trim().toUpperCase();
+        const statusNormalized = normalizeStatus(b.status);
         if (!selectedStatuses.includes(statusNormalized)) {
           return false;
         }
@@ -237,17 +257,8 @@ export function ReservationsWorkspace() {
           targetDateStr = b.created_at;
         }
 
-        if (targetDateStr) {
-          const itemDate = new Date(targetDateStr).getTime();
-          if (startDate) {
-            const startLimit = new Date(`${startDate}T00:00:00`).getTime();
-            if (itemDate < startLimit) return false;
-          }
-          if (endDate) {
-            const endLimit = new Date(`${endDate}T23:59:59.999`).getTime();
-            if (itemDate > endLimit) return false;
-          }
-        }
+        const itemDate = getFilterDateKey(targetDateStr);
+        if (!itemDate || (startDate && itemDate < startDate) || (endDate && itemDate > endDate)) return false;
       }
 
       return true;
@@ -317,6 +328,7 @@ export function ReservationsWorkspace() {
     setSelectedHotels([]);
     setSelectedRoomTypes([]);
     setSelectedStatuses([]);
+    setDateField("booking");
     setStartDate("");
     setEndDate("");
     setDatePreset("all");
@@ -965,6 +977,8 @@ export function ReservationsWorkspace() {
                       <input
                         type="date"
                         value={startDate}
+                        max={endDate || undefined}
+                        aria-invalid={Boolean(startDate && endDate && startDate > endDate)}
                         onChange={(e) => {
                           setStartDate(e.target.value);
                           setDatePreset("custom");
@@ -977,6 +991,8 @@ export function ReservationsWorkspace() {
                       <input
                         type="date"
                         value={endDate}
+                        min={startDate || undefined}
+                        aria-invalid={Boolean(startDate && endDate && startDate > endDate)}
                         onChange={(e) => {
                           setEndDate(e.target.value);
                           setDatePreset("custom");
@@ -985,6 +1001,11 @@ export function ReservationsWorkspace() {
                       />
                     </div>
                   </div>
+                  {startDate && endDate && startDate > endDate && (
+                    <p role="alert" style={{ margin: "6px 0 0", color: "#b91c1c", fontSize: "10px" }}>
+                      The end date must be on or after the start date.
+                    </p>
+                  )}
                   {(startDate || endDate) && (
                     <button
                       type="button"

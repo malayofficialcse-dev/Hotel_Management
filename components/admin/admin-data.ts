@@ -1,3 +1,5 @@
+import type { AdminRoom } from "@/lib/api-client";
+
 export type AdminSection =
   | "dashboard"
   | "hotels"
@@ -20,6 +22,7 @@ export type AdminSection =
 export type AdminRecord = {
   id: string;
   image?: string;
+  room?: AdminRoom;
   name: string;
   detail: string;
   status: string;

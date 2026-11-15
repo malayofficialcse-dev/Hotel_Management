@@ -47,7 +47,7 @@ export function SiteHeader({ active = "explore" }: SiteHeaderProps) {
 
   return (
     <header className="border-b border-line bg-white sticky top-0 z-40">
-      <div className="mx-auto flex h-[88px] max-w-[1296px] items-center justify-between px-5 lg:px-0">
+      <div className="mx-auto flex h-[76px] max-w-[1760px] items-center justify-between px-4 sm:px-6 lg:px-10 2xl:px-14">
         <Link href="/" className="flex items-center gap-[9px]" aria-label="StayEase home">
           <span className="flex h-[34px] w-[34px] items-center justify-center rounded-full bg-mint">
             <FigmaIcon name="bed" className="h-[20px] w-[20px]" />
@@ -62,7 +62,7 @@ export function SiteHeader({ active = "explore" }: SiteHeaderProps) {
               <Link
                 key={item.id}
                 href={item.href}
-                className={`border-b-2 py-[35px] text-[13px] transition-colors ${selected
+                className={`border-b-2 py-[29px] text-[13px] transition-colors ${selected
                   ? "border-forest font-semibold text-forest"
                   : "border-transparent text-muted hover:text-ink"
                   }`}

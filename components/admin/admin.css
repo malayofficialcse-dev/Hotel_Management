@@ -1216,12 +1216,12 @@
   font-size: 8px !important;
 }
 
-.admin-room-image-cell {
+.admin-image-cell {
   width: 68px;
 }
 
-.admin-room-thumbnail,
-.admin-room-thumbnail-empty {
+.admin-thumbnail,
+.admin-thumbnail-empty {
   display: block;
   width: 56px;
   height: 36px;
@@ -1230,7 +1230,7 @@
   object-fit: cover;
 }
 
-.admin-room-thumbnail-empty {
+.admin-thumbnail-empty {
   display: grid;
   place-items: center;
   background: #f5f7f5;
