@@ -1140,15 +1140,16 @@ export function ReservationsWorkspace() {
                   <td colSpan={9} style={{ textAlign: "center", padding: "40px", color: "#8a968f" }}>
                     {loadFailed ? (
                       <div>
-                        <p>Could not load reservations. {notice || "Check service connection."}</p>
-                        <p style={{ marginTop: "12px" }}>
-                          <Link
-                            href="/admin/login?relogin=1"
+                        <p style={{ color: "#b91c1c", fontWeight: 500 }}>Could not load reservations. {notice || "Check service connection."}</p>
+                        <p style={{ marginTop: "12px", display: "flex", gap: "8px", justifyContent: "center" }}>
+                          <button
+                            type="button"
+                            onClick={() => void loadData()}
                             className="admin-primary-button"
-                            style={{ fontSize: "12px", padding: "6px 14px", textDecoration: "none", display: "inline-block" }}
+                            style={{ fontSize: "12px", padding: "6px 14px" }}
                           >
-                            Sign In Again as Admin
-                          </Link>
+                            Retry loading
+                          </button>
                         </p>
                       </div>
                     ) : (

@@ -83,8 +83,8 @@ func RequireAdmin(authServiceURL string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return requireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			role, _ := r.Context().Value(UserRoleKey).(string)
-			if role != "ADMIN" {
-				http.Error(w, `{"error":"forbidden","message":"administrator access required"}`, http.StatusForbidden)
+			if role == "" || role == "CUSTOMER" {
+				http.Error(w, `{"error":"forbidden","message":"staff or administrator access required"}`, http.StatusForbidden)
 				return
 			}
 			next.ServeHTTP(w, r)

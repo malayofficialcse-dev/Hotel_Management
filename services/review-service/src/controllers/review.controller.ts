@@ -19,7 +19,7 @@ export class ReviewController {
 
   @Get("admin")
   getAdminReviews(@Req() request: Request & { user?: { role?: string } }) {
-    if (request.user?.role !== "ADMIN") throw new ForbiddenException("Administrator access required");
+    if (request.user?.role === "CUSTOMER") throw new ForbiddenException("Staff or administrator access required");
     return this.reviewService.getAdminReviews();
   }
 

@@ -20,7 +20,7 @@ async function requireAdmin(req: Request, res: Response, next: NextFunction) {
     if (!response.ok) return res.status(401).json({ message: "Invalid or expired administrator token." });
     const result = await response.json() as { valid?: boolean; user?: { role?: string } };
     if (!result.valid || !result.user) return res.status(401).json({ message: "Invalid or expired administrator token." });
-    if (result.user.role !== "ADMIN") return res.status(403).json({ message: "Administrator access is required." });
+    if (result.user.role === "CUSTOMER") return res.status(403).json({ message: "Staff or administrator access is required." });
     next();
   } catch {
     return res.status(503).json({ message: "Auth service is unavailable." });

@@ -641,7 +641,11 @@ function PageHeader({
         ) : (
           <button type="button" className="admin-secondary-button" onClick={() => window.print()}>↓ <span>Export</span></button>
         )}
-        <button type="button" className="admin-primary-button" onClick={onAction} disabled={!actionAvailable} title={actionAvailable ? undefined : "This section is not connected to a persistent API"}>＋ {content.action}</button>
+        {actionAvailable && (
+          <button type="button" className="admin-primary-button" onClick={onAction}>
+            ＋ {content.action}
+          </button>
+        )}
         {notice && <span className="admin-action-notice" role="status">{notice}</span>}
       </div>
     </div>

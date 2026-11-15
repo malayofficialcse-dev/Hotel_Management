@@ -45,7 +45,7 @@ export class PaymentController {
 
   @Get("admin")
   getAdminPayments(@Req() request: Request & { user?: { role?: string } }) {
-    if (request.user?.role !== "ADMIN") throw new ForbiddenException("Administrator access required");
+    if (request.user?.role === "CUSTOMER") throw new ForbiddenException("Staff or administrator access required");
     return this.paymentService.getAdminPayments();
   }
 }
