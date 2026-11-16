@@ -48,21 +48,38 @@ type Booking struct {
 
 // HoldBookingRequest is the inbound payload for the hold-room endpoint.
 type HoldBookingRequest struct {
-	HotelID           string  `json:"hotel_id"`
-	HotelName         string  `json:"hotel_name"`
-	RoomTypeID        string  `json:"room_type_id"`
-	RoomTypeName      string  `json:"room_type_name"`
-	CheckInDate       string  `json:"check_in_date"`  // "YYYY-MM-DD"
-	CheckOutDate      string  `json:"check_out_date"` // "YYYY-MM-DD"
-	GuestsCount       int     `json:"guests_count"`
-	RoomCount         int     `json:"room_count"`
-	RoomPricePerNight float64 `json:"room_price_per_night"`
-	TaxesAndFees      float64 `json:"taxes_and_fees"`
-	GuestFirstName    string  `json:"guest_first_name"`
-	GuestLastName     string  `json:"guest_last_name"`
-	GuestEmail        string  `json:"guest_email"`
-	GuestPhone        string  `json:"guest_phone"`
-	SpecialRequests   string  `json:"special_requests,omitempty"`
+	HotelID            string  `json:"hotel_id"`
+	HotelIDAlt         string  `json:"hotelId"`
+	HotelName          string  `json:"hotel_name"`
+	HotelNameAlt        string  `json:"hotelName"`
+	RoomTypeID         string  `json:"room_type_id"`
+	RoomID             string  `json:"room_id"`
+	RoomTypeIDAlt      string  `json:"roomTypeId"`
+	RoomTypeName       string  `json:"room_type_name"`
+	RoomTypeNameAlt    string  `json:"roomTypeName"`
+	CheckInDate        string  `json:"check_in_date"`  // "YYYY-MM-DD"
+	CheckIn            string  `json:"check_in"`
+	CheckInDateAlt     string  `json:"checkInDate"`
+	CheckOutDate       string  `json:"check_out_date"` // "YYYY-MM-DD"
+	CheckOut           string  `json:"check_out"`
+	CheckOutDateAlt    string  `json:"checkOutDate"`
+	GuestsCount        int     `json:"guests_count"`
+	GuestsCountAlt     int     `json:"guestsCount"`
+	RoomCount          int     `json:"room_count"`
+	RoomCountAlt       int     `json:"roomCount"`
+	RoomPricePerNight  float64 `json:"room_price_per_night"`
+	TaxesAndFees       float64 `json:"taxes_and_fees"`
+	GuestFirstName     string  `json:"guest_first_name"`
+	GuestFirstNameAlt  string  `json:"guestFirstName"`
+	GuestLastName      string  `json:"guest_last_name"`
+	GuestLastNameAlt   string  `json:"guestLastName"`
+	GuestName          string  `json:"guest_name"`
+	GuestEmail         string  `json:"guest_email"`
+	GuestEmailAlt      string  `json:"guestEmail"`
+	GuestPhone         string  `json:"guest_phone"`
+	GuestPhoneAlt      string  `json:"guestPhone"`
+	SpecialRequests    string  `json:"special_requests,omitempty"`
+	SpecialRequestsAlt string  `json:"specialRequests,omitempty"`
 }
 
 // HoldBookingResponse is returned after a successful hold, including a countdown.

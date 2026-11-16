@@ -112,6 +112,20 @@ service's mock payment flow and do not charge a real card.
 Preview without writing by adding `-- --dry-run` (this does not require the
 access token). Set `SEED_API_URL` to use a different API Gateway URL.
 
+### Auth Service: missing `public.users` table
+
+The Auth Service loads its local `.env` ahead of stale shell variables and runs
+`prisma db push` automatically before `npm run dev`. If you start the compiled
+service directly, apply the schema manually from the service directory:
+
+```powershell
+cd services/auth-service
+npm run prisma:push
+```
+
+This creates or updates the `users` and `refresh_tokens` tables. Confirm that
+`DATABASE_URL` points to the intended local `hotel_auth_db` before running it.
+
 ### PostgreSQL authentication errors
 
 If a service exits with Prisma `P1000` or `password authentication failed`,

@@ -9,33 +9,33 @@ datasource db {
 }
 
 model Payment {
-  id             String   @id @default(uuid())
-  bookingId      String   @unique @map("booking_id")
-  bookingCode    String   @map("booking_code")
-  userId         String?  @map("user_id")
+  id             String   @id @default(uuid()) @db.Uuid
+  bookingId      String   @unique @map("booking_id") @db.Uuid
+  bookingCode    String   @map("booking_code") @db.VarChar(32)
+  userId         String?  @map("user_id") @db.Uuid
   amount         Float
-  currency       String   @default("INR")
-  status         String   @default("PENDING") // PENDING | SUCCESS | FAILED | REFUNDED
-  provider       String   @default("STRIPE")
-  stripeIntentId String?  @unique @map("stripe_intent_id")
-  paymentMethod  String?  @map("payment_method")
+  currency       String   @default("INR") @db.VarChar(8)
+  status         String   @default("PENDING") @db.VarChar(32)
+  provider       String   @default("STRIPE") @db.VarChar(32)
+  stripeIntentId String?  @unique @map("stripe_intent_id") @db.VarChar(128)
+  paymentMethod  String?  @map("payment_method") @db.VarChar(64)
   receiptUrl     String?  @map("receipt_url")
   metadata       Json?
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
   refunds        Refund[]
 
   @@map("payments")
 }
 
 model Refund {
-  id             String   @id @default(uuid())
-  paymentId      String   @map("payment_id")
+  id             String   @id @default(uuid()) @db.Uuid
+  paymentId      String   @map("payment_id") @db.Uuid
   amount         Float
   reason         String?
-  stripeRefundId String?  @map("stripe_refund_id")
-  status         String   @default("PENDING")
-  createdAt      DateTime @default(now()) @map("created_at")
+  stripeRefundId String?  @map("stripe_refund_id") @db.VarChar(128)
+  status         String   @default("PENDING") @db.VarChar(32)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   payment        Payment  @relation(fields: [paymentId], references: [id])
 
   @@map("refunds")

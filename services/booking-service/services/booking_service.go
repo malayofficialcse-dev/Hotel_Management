@@ -73,6 +73,68 @@ func NewBookingService(
 //  3. Store Redis hold (600 s TTL)
 //  4. Release lock
 func (s *BookingService) HoldRoom(ctx context.Context, req *models.HoldBookingRequest, userID *uuid.UUID) (*models.HoldBookingResponse, error) {
+	// Normalize inbound payload fields
+	if req.RoomTypeID == "" {
+		if req.RoomID != "" {
+			req.RoomTypeID = req.RoomID
+		} else if req.RoomTypeIDAlt != "" {
+			req.RoomTypeID = req.RoomTypeIDAlt
+		}
+	}
+	if req.HotelID == "" && req.HotelIDAlt != "" {
+		req.HotelID = req.HotelIDAlt
+	}
+	if req.HotelName == "" && req.HotelNameAlt != "" {
+		req.HotelName = req.HotelNameAlt
+	}
+	if req.RoomTypeName == "" && req.RoomTypeNameAlt != "" {
+		req.RoomTypeName = req.RoomTypeNameAlt
+	}
+	if req.CheckInDate == "" {
+		if req.CheckIn != "" {
+			req.CheckInDate = strings.Split(req.CheckIn, "T")[0]
+		} else if req.CheckInDateAlt != "" {
+			req.CheckInDate = strings.Split(req.CheckInDateAlt, "T")[0]
+		}
+	}
+	if req.CheckOutDate == "" {
+		if req.CheckOut != "" {
+			req.CheckOutDate = strings.Split(req.CheckOut, "T")[0]
+		} else if req.CheckOutDateAlt != "" {
+			req.CheckOutDate = strings.Split(req.CheckOutDateAlt, "T")[0]
+		}
+	}
+	if req.RoomCount < 1 {
+		if req.RoomCountAlt >= 1 {
+			req.RoomCount = req.RoomCountAlt
+		} else {
+			req.RoomCount = 1
+		}
+	}
+	if req.GuestFirstName == "" {
+		if req.GuestFirstNameAlt != "" {
+			req.GuestFirstName = req.GuestFirstNameAlt
+		} else if req.GuestName != "" {
+			parts := strings.SplitN(strings.TrimSpace(req.GuestName), " ", 2)
+			req.GuestFirstName = parts[0]
+			if len(parts) > 1 && req.GuestLastName == "" {
+				req.GuestLastName = parts[1]
+			}
+		}
+	}
+	if req.GuestLastName == "" && req.GuestLastNameAlt != "" {
+		req.GuestLastName = req.GuestLastNameAlt
+	}
+	if req.GuestEmail == "" && req.GuestEmailAlt != "" {
+		req.GuestEmail = req.GuestEmailAlt
+	}
+	if req.GuestPhone == "" && req.GuestPhoneAlt != "" {
+		req.GuestPhone = req.GuestPhoneAlt
+	}
+	if req.SpecialRequests == "" && req.SpecialRequestsAlt != "" {
+		req.SpecialRequests = req.SpecialRequestsAlt
+	}
+
 	checkIn, err := time.Parse("2006-01-02", req.CheckInDate)
 	if err != nil {
 		return nil, fmt.Errorf("invalid check_in_date format, expected YYYY-MM-DD")
@@ -132,13 +194,24 @@ func (s *BookingService) HoldRoom(ctx context.Context, req *models.HoldBookingRe
 	nights := int(checkOut.Sub(checkIn).Hours() / 24)
 	taxesAndFees := math.Round(pricePerNight*float64(nights)*float64(req.RoomCount)*0.12*100) / 100
 
-	seq, err := s.repo.GetNextBookingSequence(ctx, tx, req.HotelID, now.Year())
-	if err != nil || seq < 1 {
-		seq = 1
-	}
 	hotelShort := getHotelShortCode(req.HotelName, req.HotelID)
 	roomNum := extractRoomNumber(req.RoomTypeName, req.RoomTypeID)
-	bookingCode := fmt.Sprintf("%s/%d/%s/%04d", hotelShort, now.Year(), roomNum, seq)
+	prefix := fmt.Sprintf("%s/%d/%s/", hotelShort, now.Year(), roomNum)
+
+	var count int
+	_ = tx.QueryRow(ctx, "SELECT COUNT(*) FROM bookings WHERE booking_code LIKE $1", prefix+"%").Scan(&count)
+	seq := count + 1
+
+	bookingCode := fmt.Sprintf("%s%04d", prefix, seq)
+	for attempt := 0; attempt < 100; attempt++ {
+		candidate := fmt.Sprintf("%s%04d", prefix, seq+attempt)
+		var exists bool
+		_ = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM bookings WHERE booking_code = $1)", candidate).Scan(&exists)
+		if !exists {
+			bookingCode = candidate
+			break
+		}
+	}
 
 	booking := &models.Booking{
 		ID:                uuid.New(),

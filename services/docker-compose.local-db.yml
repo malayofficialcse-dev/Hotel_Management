@@ -40,12 +40,12 @@ services:
       PORT: 8000
       JWT_ACCESS_SECRET: hotel-jwt-secret-key-2026
       CLIENT_URL: http://localhost:3000
-      AUTH_SERVICE_URL: http://auth-service:8001
+      AUTH_SERVICE_URL: http://host.docker.internal:8001
       USER_SERVICE_URL: http://user-service:8002
       HOTEL_SERVICE_URL: http://hotel-service:8003
       ROOM_SERVICE_URL: http://room-service:8004
       BOOKING_SERVICE_URL: http://booking-service:8005
-      PAYMENT_SERVICE_URL: http://payment-service:8006
+      PAYMENT_SERVICE_URL: http://host.docker.internal:8006
       EMPLOYEE_SERVICE_URL: http://employee-service:8007
       DEPARTMENT_SERVICE_URL: http://department-service:8012
       HOUSEKEEPING_SERVICE_URL: http://housekeeping-service:8008
@@ -67,7 +67,7 @@ services:
       - "host.docker.internal:host-gateway"
     environment:
       PORT: 8001
-      DATABASE_URL: postgresql://postgres:Malay%4021@host.docker.internal:5432/hotel_auth_db?schema=public
+      DATABASE_URL: ${DATABASE_URL}
       JWT_ACCESS_SECRET: hotel-jwt-access-secret-2026
       JWT_REFRESH_SECRET: hotel-jwt-refresh-secret-2026
       REDIS_URL: redis://redis:6379
@@ -82,8 +82,8 @@ services:
       - "host.docker.internal:host-gateway"
     environment:
       PORT: 8002
-      DATABASE_URL: postgresql://postgres:Malay%4021@host.docker.internal:5432/hotel_users_db?schema=public
-      AUTH_SERVICE_URL: http://auth-service:8001
+      DATABASE_URL: ${DATABASE_URL}
+      AUTH_SERVICE_URL: http://host.docker.internal:8001
 
   # ── 3. Hotel Catalog Service (Express + Local MongoDB :8003) ──
   hotel-service:
@@ -100,7 +100,7 @@ services:
       GRPC_PORT: 50053
       MONGODB_URI: mongodb://host.docker.internal:27017/hotel_catalog
       REDIS_URL: redis://redis:6379
-      AUTH_SERVICE_URL: http://auth-service:8001
+      AUTH_SERVICE_URL: http://host.docker.internal:8001
 
   # ── 4. Room Service (Express + Local MongoDB :8004) ──────────
   room-service:
@@ -134,12 +134,13 @@ services:
     environment:
       PORT: 8005
       GRPC_PORT: 50051
-      DATABASE_URL: postgres://postgres:Malay%4021@host.docker.internal:5432/hotel_bookings_db?sslmode=disable
+      DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: redis://redis:6379
       RABBITMQ_URL: amqp://hotel_admin:hotel_rabbit_pass@rabbitmq:5672
-      HOTEL_SERVICE_URL: http://room-service:8004
-      AUTH_SERVICE_URL: http://auth-service:8001
-      PAYMENT_SERVICE_URL: http://payment-service:8006
+      HOTEL_SERVICE_URL: http://host.docker.internal:8004
+      ROOM_SERVICE_URL: http://host.docker.internal:8004
+      AUTH_SERVICE_URL: http://host.docker.internal:8001
+      PAYMENT_SERVICE_URL: http://host.docker.internal:8006
     depends_on:
       - redis
       - rabbitmq
@@ -154,10 +155,10 @@ services:
       - "host.docker.internal:host-gateway"
     environment:
       PORT: 8006
-      DATABASE_URL: postgresql://postgres:Malay%4021@host.docker.internal:5432/hotel_payments_db?schema=public
+      DATABASE_URL: ${DATABASE_URL}
       RABBITMQ_URL: amqp://hotel_admin:hotel_rabbit_pass@rabbitmq:5672
       BOOKING_SERVICE_URL: http://booking-service:8005
-      AUTH_SERVICE_URL: http://auth-service:8001
+      AUTH_SERVICE_URL: http://host.docker.internal:8001
       STRIPE_SECRET_KEY: sk_test_mock_stripe_key
     depends_on:
       - rabbitmq
@@ -175,8 +176,8 @@ services:
     environment:
       PORT: 8007
       GRPC_PORT: 50057
-      DATABASE_URL: postgresql://postgres:Malay%4021@host.docker.internal:5432/hotel_operations_db?schema=public
-      AUTH_SERVICE_URL: http://auth-service:8001
+      DATABASE_URL: ${DATABASE_URL}
+      AUTH_SERVICE_URL: http://host.docker.internal:8001
       DEPARTMENT_GRPC_URL: department-service:50059
     depends_on:
       - department-service
@@ -213,7 +214,7 @@ services:
       GRPC_PORT: 50058
       MONGODB_URI: mongodb://host.docker.internal:27017/hotel_housekeeping
       RABBITMQ_URL: amqp://hotel_admin:hotel_rabbit_pass@rabbitmq:5672
-      AUTH_SERVICE_URL: http://auth-service:8001
+      AUTH_SERVICE_URL: http://host.docker.internal:8001
       EMPLOYEE_GRPC_URL: employee-service:50057
     depends_on:
       - employee-service
@@ -229,7 +230,7 @@ services:
     environment:
       PORT: 8009
       MONGODB_URI: mongodb://host.docker.internal:27017/hotel_reviews
-      AUTH_SERVICE_URL: http://auth-service:8001
+      AUTH_SERVICE_URL: http://host.docker.internal:8001
       BOOKING_SERVICE_URL: http://booking-service:8005
 
   # ── 10. Notification Service (Go + Local DB :8010) ───────────
@@ -246,7 +247,7 @@ services:
       PORT: 8010
       GRPC_PORT: 50052
       RABBITMQ_URL: amqp://hotel_admin:hotel_rabbit_pass@rabbitmq:5672
-      DATABASE_URL: postgres://postgres:Malay%4021@host.docker.internal:5432/hotel_notifications_db?sslmode=disable
+      DATABASE_URL: ${DATABASE_URL}
       MONGODB_URI: mongodb://host.docker.internal:27017/hotel_notifications
     depends_on:
       - rabbitmq
@@ -261,10 +262,11 @@ services:
       - "host.docker.internal:host-gateway"
     environment:
       PORT: 8011
-      DATABASE_URL: postgres://postgres:Malay%4021@host.docker.internal:5432/hotel_analytics_db?sslmode=disable
+      DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: redis://redis:6379
       RABBITMQ_URL: amqp://hotel_admin:hotel_rabbit_pass@rabbitmq:5672
     depends_on:
       - redis
       - rabbitmq
+
 

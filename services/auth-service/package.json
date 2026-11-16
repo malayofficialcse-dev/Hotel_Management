@@ -6,6 +6,7 @@
   "scripts": {
     "build": "tsc && prisma generate",
     "start": "node dist/main.js",
+    "predev": "node scripts/sync-schema.js",
     "dev": "tsx watch src/main.ts",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push"

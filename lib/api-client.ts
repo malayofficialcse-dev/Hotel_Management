@@ -180,6 +180,67 @@ export interface UserSession {
 
 function getToken() { return typeof window === "undefined" ? undefined : window.localStorage.getItem("stayease-token") || undefined; }
 
+let sessionValidation: Promise<boolean | null> | null = null;
+let sessionRefresh: Promise<string | null> | null = null;
+
+function refreshAccessToken(): Promise<string | null> {
+  if (!sessionRefresh) {
+    sessionRefresh = (async () => {
+      const refreshToken = window.localStorage.getItem("stayease-refresh-token");
+      if (!refreshToken) return null;
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({ refreshToken }),
+          cache: "no-store",
+        });
+        if (!response.ok) return null;
+
+        const result = await response.json() as {
+          tokens?: { accessToken?: string; refreshToken?: string };
+          data?: { tokens?: { accessToken?: string; refreshToken?: string } };
+        };
+        const tokens = result.tokens || result.data?.tokens;
+        if (!tokens?.accessToken || !tokens.refreshToken) return null;
+
+        window.localStorage.setItem("stayease-token", tokens.accessToken);
+        window.localStorage.setItem("stayease-refresh-token", tokens.refreshToken);
+        return tokens.accessToken;
+      } catch {
+        return null;
+      }
+    })().finally(() => {
+      sessionRefresh = null;
+    });
+  }
+
+  return sessionRefresh;
+}
+
+function validateCurrentSession(token: string): Promise<boolean | null> {
+  if (!sessionValidation) {
+    sessionValidation = fetch(`${API_BASE_URL}/auth/validate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ token }),
+      cache: "no-store",
+    })
+      .then(async (response) => {
+        if (!response.ok) return null;
+        const result = await response.json().catch(() => null) as { valid?: boolean } | null;
+        return typeof result?.valid === "boolean" ? result.valid : null;
+      })
+      .catch(() => null)
+      .finally(() => {
+        sessionValidation = null;
+      });
+  }
+
+  return sessionValidation;
+}
+
 function getUser(): UserSession | null {
   if (typeof window === "undefined") return null;
   try {
@@ -251,14 +312,27 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const isFormData = typeof FormData !== "undefined" && init.body instanceof FormData;
   if (init.body && !isFormData && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   const accessToken = getToken(); if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
-  const response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers, cache: "no-store" });
+  let response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers, cache: "no-store" });
+  const authPathsWithoutRefresh = ["/auth/login", "/auth/refresh", "/auth/validate"];
+  if (response.status === 401 && accessToken && !authPathsWithoutRefresh.includes(path)) {
+    const refreshedToken = await refreshAccessToken();
+    if (refreshedToken) {
+      headers.set("Authorization", `Bearer ${refreshedToken}`);
+      response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers, cache: "no-store" });
+    }
+  }
+
   const body = (await response.json().catch(() => ({}))) as { data?: T; message?: string } & T;
   if (!response.ok) {
-    if (response.status === 401 && typeof window !== "undefined") {
-      window.localStorage.removeItem("stayease-token");
-      window.localStorage.removeItem("stayease-user");
-      if (window.location.pathname.startsWith("/admin") && !window.location.pathname.startsWith("/admin/login")) {
-        window.location.href = "/admin/login?reason=expired";
+    if (response.status === 401 && typeof window !== "undefined" && accessToken && !authPathsWithoutRefresh.includes(path)) {
+      const sessionIsValid = await validateCurrentSession(getToken() || accessToken);
+      if (sessionIsValid === false) {
+        window.localStorage.removeItem("stayease-token");
+        window.localStorage.removeItem("stayease-refresh-token");
+        window.localStorage.removeItem("stayease-user");
+        if (window.location.pathname.startsWith("/admin") && !window.location.pathname.startsWith("/admin/login")) {
+          window.location.href = "/admin/login?reason=expired";
+        }
       }
     }
     throw new Error(body.message || `Request failed (${response.status})`);
@@ -278,6 +352,7 @@ export const api = {
     const token = result.tokens?.accessToken || result.token;
     if (typeof window !== "undefined") {
       if (token) window.localStorage.setItem("stayease-token", token);
+      if (result.tokens?.refreshToken) window.localStorage.setItem("stayease-refresh-token", result.tokens.refreshToken);
       if (result.user) window.localStorage.setItem("stayease-user", JSON.stringify(result.user));
     }
     return { ...result, token };
@@ -291,6 +366,7 @@ export const api = {
     const token = result.tokens?.accessToken || result.token;
     if (typeof window !== "undefined") {
       if (token) window.localStorage.setItem("stayease-token", token);
+      if (result.tokens?.refreshToken) window.localStorage.setItem("stayease-refresh-token", result.tokens.refreshToken);
       if (result.user) window.localStorage.setItem("stayease-user", JSON.stringify(result.user));
     }
     return { ...result, token };
@@ -298,6 +374,7 @@ export const api = {
   logout() {
     if (typeof window !== "undefined") {
       window.localStorage.removeItem("stayease-token");
+      window.localStorage.removeItem("stayease-refresh-token");
       window.localStorage.removeItem("stayease-user");
       window.dispatchEvent(new Event("stayease-user-updated"));
     }

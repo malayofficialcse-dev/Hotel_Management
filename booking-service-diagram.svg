@@ -1,0 +1,362 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1200" width="100%" height="100%" style="background-color: #0b1120; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <defs>
+    <!-- Background Gradients -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b1120"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+
+    <linearGradient id="goCardGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#082f49"/>
+      <stop offset="100%" stop-color="#0369a1"/>
+    </linearGradient>
+
+    <linearGradient id="engineGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+
+    <linearGradient id="redisGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7f1d1d"/>
+      <stop offset="100%" stop-color="#b91c1c"/>
+    </linearGradient>
+
+    <linearGradient id="pgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e3a8a"/>
+      <stop offset="100%" stop-color="#2563eb"/>
+    </linearGradient>
+
+    <linearGradient id="rabbitGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7c2d12"/>
+      <stop offset="100%" stop-color="#ea580c"/>
+    </linearGradient>
+
+    <linearGradient id="flowStepGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#134e4a"/>
+      <stop offset="100%" stop-color="#0d9488"/>
+    </linearGradient>
+
+    <!-- Filters & Shadows -->
+    <filter id="cardShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#000000" flood-opacity="0.45"/>
+    </filter>
+    <filter id="glowGo" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="#38bdf8" flood-opacity="0.35"/>
+    </filter>
+    <filter id="glowRedis" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="#ef4444" flood-opacity="0.3"/>
+    </filter>
+    <filter id="glowPg" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="#3b82f6" flood-opacity="0.3"/>
+    </filter>
+
+    <!-- Markers -->
+    <marker id="arrowGo" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 1 L 8 5 L 0 9 z" fill="#38bdf8"/>
+    </marker>
+    <marker id="arrowRed" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 1 L 8 5 L 0 9 z" fill="#f87171"/>
+    </marker>
+    <marker id="arrowBlue" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 1 L 8 5 L 0 9 z" fill="#60a5fa"/>
+    </marker>
+    <marker id="arrowOrange" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 1 L 8 5 L 0 9 z" fill="#fb923c"/>
+    </marker>
+    <marker id="arrowTeal" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 1 L 8 5 L 0 9 z" fill="#2dd4bf"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="100%" height="100%" fill="url(#bgGrad)"/>
+  <rect width="100%" height="100%" fill="none" stroke="#1e293b" stroke-width="2"/>
+
+  <!-- Grid overlay -->
+  <g opacity="0.05">
+    <path d="M 0,100 L 1600,100 M 0,200 L 1600,200 M 0,300 L 1600,300 M 0,400 L 1600,400 M 0,500 L 1600,500 M 0,600 L 1600,600 M 0,700 L 1600,700 M 0,800 L 1600,800 M 0,900 L 1600,900 M 0,1000 L 1600,1000 M 0,1100 L 1600,1100" stroke="#94a3b8" stroke-width="1"/>
+    <path d="M 100,0 L 100,1200 M 200,0 L 200,1200 M 300,0 L 300,1200 M 400,0 L 400,1200 M 500,0 L 500,1200 M 600,0 L 600,1200 M 700,0 L 700,1200 M 800,0 L 800,1200 M 900,0 L 900,1200 M 1000,0 L 1000,1200 M 1100,0 L 1100,1200 M 1200,0 L 1200,1200 M 1300,0 L 1300,1200 M 1400,0 L 1400,1200 M 1500,0 L 1500,1200" stroke="#94a3b8" stroke-width="1"/>
+  </g>
+
+  <!-- ============================================================== -->
+  <!-- HEADER SECTION                                                 -->
+  <!-- ============================================================== -->
+  <g transform="translate(80, 40)">
+    <rect x="0" y="0" width="1440" height="90" rx="14" fill="#0f172a" stroke="#334155" stroke-width="1.5" filter="url(#cardShadow)"/>
+    <text x="35" y="42" fill="#38bdf8" font-size="24" font-weight="800" letter-spacing="0.5">StayEase Booking Service Architecture</text>
+    <text x="35" y="68" fill="#94a3b8" font-size="13" font-weight="500">Polyglot Go Microservice · Concurrency Gate · Distributed Locking · 10-Min Inventory Hold · Event Bus</text>
+
+    <!-- Header Badges -->
+    <rect x="940" y="26" width="105" height="34" rx="17" fill="#0c4a6e" stroke="#0284c7" stroke-width="1.5"/>
+    <text x="992" y="48" fill="#e0f2fe" font-size="12" font-weight="700" text-anchor="middle">Go 1.22 + Chi</text>
+
+    <rect x="1060" y="26" width="115" height="34" rx="17" fill="#450a0a" stroke="#dc2626" stroke-width="1.5"/>
+    <text x="1117" y="48" fill="#fee2e2" font-size="12" font-weight="700" text-anchor="middle">Redis Redlock</text>
+
+    <rect x="1190" y="26" width="125" height="34" rx="17" fill="#172554" stroke="#2563eb" stroke-width="1.5"/>
+    <text x="1252" y="48" fill="#dbeafe" font-size="12" font-weight="700" text-anchor="middle">PostgreSQL pgx</text>
+
+    <rect x="1330" y="26" width="85" height="34" rx="17" fill="#1e293b" stroke="#64748b" stroke-width="1.5"/>
+    <text x="1372" y="48" fill="#f8fafc" font-size="12" font-weight="700" text-anchor="middle">gRPC</text>
+  </g>
+
+  <!-- ============================================================== -->
+  <!-- 1. INBOUND CLIENT LAYER                                        -->
+  <!-- ============================================================== -->
+  <g transform="translate(80, 160)">
+    <rect x="0" y="0" width="300" height="230" rx="12" fill="#0f172a" stroke="#334155" stroke-width="1.5" filter="url(#cardShadow)"/>
+    <rect x="18" y="16" width="264" height="26" rx="6" fill="#1e293b"/>
+    <text x="150" y="34" fill="#f8fafc" font-size="12" font-weight="700" text-anchor="middle">CLIENT &amp; GATEWAY LAYER</text>
+
+    <!-- Web App -->
+    <rect x="20" y="58" width="260" height="64" rx="8" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+    <text x="35" y="84" fill="#38bdf8" font-size="13" font-weight="700">Next.js Web Frontend</text>
+    <text x="35" y="104" fill="#94a3b8" font-size="11">localhost:3000 · /booking/guest /booking/payment</text>
+
+    <!-- API Gateway -->
+    <rect x="20" y="140" width="260" height="70" rx="8" fill="#1e293b" stroke="#e11d48" stroke-width="1.5"/>
+    <text x="35" y="166" fill="#fb7185" font-size="13" font-weight="700">API Gateway (NestJS)</text>
+    <text x="35" y="186" fill="#94a3b8" font-size="11">localhost:8000 · Reverse Proxy &amp; Auth</text>
+    <text x="35" y="200" fill="#cbd5e1" font-size="10">/api/v1/bookings/hold &amp; /confirm</text>
+  </g>
+
+  <!-- ============================================================== -->
+  <!-- 2. CORE BOOKING SERVICE (CENTER)                              -->
+  <!-- ============================================================== -->
+  <g transform="translate(430, 160)">
+    <!-- Container Box -->
+    <rect x="0" y="0" width="740" height="520" rx="16" fill="url(#engineGrad)" stroke="#38bdf8" stroke-width="2" filter="url(#glowGo)"/>
+    
+    <!-- Title Bar -->
+    <rect x="20" y="18" width="700" height="42" rx="8" fill="url(#goCardGrad)"/>
+    <text x="40" y="45" fill="#ffffff" font-size="16" font-weight="800" letter-spacing="0.5">hotel-booking-service-go</text>
+    <text x="560" y="45" fill="#bae6fd" font-size="12" font-weight="700">HTTP :8005 · gRPC :50051</text>
+
+    <!-- Inner Module 1: HTTP Controllers & Chi Router -->
+    <rect x="25" y="78" width="335" height="125" rx="8" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+    <text x="40" y="102" fill="#38bdf8" font-size="13" font-weight="700">Chi HTTP Router &amp; Handlers</text>
+    <text x="40" y="122" fill="#cbd5e1" font-size="11">POST /api/v1/bookings/hold</text>
+    <text x="40" y="140" fill="#cbd5e1" font-size="11">POST /api/v1/bookings/{id}/confirm</text>
+    <text x="40" y="158" fill="#cbd5e1" font-size="11">GET /api/v1/bookings/code/{code}</text>
+    <text x="40" y="176" fill="#94a3b8" font-size="10">GET /internal/rooms/{id}/booked-count</text>
+
+    <!-- Inner Module 2: gRPC Server -->
+    <rect x="380" y="78" width="335" height="125" rx="8" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+    <text x="395" y="102" fill="#a78bfa" font-size="13" font-weight="700">Internal gRPC Server (:50051)</text>
+    <text x="395" y="122" fill="#cbd5e1" font-size="11">CheckAvailability(roomTypeId, dates)</text>
+    <text x="395" y="140" fill="#cbd5e1" font-size="11">GetOverlappingCount(roomTypeId)</text>
+    <text x="395" y="158" fill="#cbd5e1" font-size="11">GetBookingByCode(bookingCode)</text>
+    <text x="395" y="176" fill="#94a3b8" font-size="10">Synchronous inter-service RPC interface</text>
+
+    <!-- Inner Module 3: Distributed Concurrency Gate -->
+    <rect x="25" y="220" width="690" height="150" rx="10" fill="#0f172a" stroke="#0ea5e9" stroke-width="1.5"/>
+    <rect x="40" y="235" width="220" height="24" rx="4" fill="#0369a1"/>
+    <text x="150" y="251" fill="#ffffff" font-size="11" font-weight="800" text-anchor="middle">CONCURRENCY &amp; LOCK ENGINE</text>
+    
+    <g transform="translate(40, 270)">
+      <!-- Sub-step 1 -->
+      <rect x="0" y="0" width="200" height="85" rx="6" fill="#1e293b" stroke="#ef4444" stroke-width="1"/>
+      <text x="12" y="22" fill="#f87171" font-size="11" font-weight="700">1. Distributed Lock</text>
+      <text x="12" y="40" fill="#e2e8f0" font-size="10">Redis SETNX with 5s TTL</text>
+      <text x="12" y="56" fill="#94a3b8" font-size="9">lock:room:{id}:{ci}:{co}</text>
+      <text x="12" y="72" fill="#fca5a5" font-size="9">Prevents race conditions</text>
+
+      <!-- Sub-step 2 -->
+      <rect x="220" y="0" width="215" height="85" rx="6" fill="#1e293b" stroke="#3b82f6" stroke-width="1"/>
+      <text x="12" y="22" fill="#60a5fa" font-size="11" font-weight="700" transform="translate(220,0)">2. Serializable TX</text>
+      <text x="12" y="40" fill="#e2e8f0" font-size="10" transform="translate(220,0)">Postgres ACID Isolation</text>
+      <text x="12" y="56" fill="#94a3b8" font-size="9" transform="translate(220,0)">GetOverlappingCount(tx)</text>
+      <text x="12" y="72" fill="#93c5fd" font-size="9" transform="translate(220,0)">Strict overlapping check</text>
+
+      <!-- Sub-step 3 -->
+      <rect x="455" y="0" width="205" height="85" rx="6" fill="#1e293b" stroke="#10b981" stroke-width="1"/>
+      <text x="12" y="22" fill="#34d399" font-size="11" font-weight="700" transform="translate(455,0)">3. Availability Gate</text>
+      <text x="12" y="40" fill="#e2e8f0" font-size="10" transform="translate(455,0)">avail = totalInv - overlap</text>
+      <text x="12" y="56" fill="#94a3b8" font-size="9" transform="translate(455,0)">Authoritative Room inventory</text>
+      <text x="12" y="72" fill="#6ee7b7" font-size="9" transform="translate(455,0)">Gated before DB insert</text>
+    </g>
+
+    <!-- Inner Module 4: Hold Manager & RabbitMQ Publisher -->
+    <rect x="25" y="388" width="335" height="112" rx="8" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+    <text x="40" y="412" fill="#f59e0b" font-size="12" font-weight="700">10-Minute Hold Manager</text>
+    <text x="40" y="432" fill="#cbd5e1" font-size="11">Status: PENDING_PAYMENT</text>
+    <text x="40" y="450" fill="#cbd5e1" font-size="11">Redis TTL: 600s (`hold:booking:{id}`)</text>
+    <text x="40" y="468" fill="#94a3b8" font-size="10">Auto-expires unpaid locks</text>
+
+    <rect x="380" y="388" width="335" height="112" rx="8" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+    <text x="395" y="412" fill="#fb923c" font-size="12" font-weight="700">Event Publisher (AMQP 0-9-1)</text>
+    <text x="395" y="432" fill="#cbd5e1" font-size="11">Exchange: hotel_events (topic)</text>
+    <text x="395" y="450" fill="#cbd5e1" font-size="11">`booking.held` · `booking.confirmed`</text>
+    <text x="395" y="468" fill="#94a3b8" font-size="10">`booking.cancelled` · `booking.expired`</text>
+  </g>
+
+  <!-- ============================================================== -->
+  <!-- 3. DOWNSTREAM SERVICES LAYER (RIGHT)                           -->
+  <!-- ============================================================== -->
+  <g transform="translate(1220, 160)">
+    <!-- Room Service -->
+    <rect x="0" y="0" width="300" height="110" rx="10" fill="#0f172a" stroke="#10b981" stroke-width="1.5" filter="url(#cardShadow)"/>
+    <text x="20" y="30" fill="#34d399" font-size="13" font-weight="700">Room Service (Express + Mongo)</text>
+    <text x="20" y="52" fill="#94a3b8" font-size="11">localhost:8004 · HTTP REST</text>
+    <rect x="18" y="64" width="264" height="32" rx="5" fill="#1e293b"/>
+    <text x="28" y="84" fill="#6ee7b7" font-size="10" font-family="monospace">GET /internal/rooms/{id}/inventory</text>
+
+    <!-- Payment Service -->
+    <rect x="0" y="130" width="300" height="110" rx="10" fill="#0f172a" stroke="#f43f5e" stroke-width="1.5" filter="url(#cardShadow)"/>
+    <text x="20" y="160" fill="#fb7185" font-size="13" font-weight="700">Payment Service (NestJS + Prisma)</text>
+    <text x="20" y="182" fill="#94a3b8" font-size="11">localhost:8006 · Stripe &amp; Billing</text>
+    <rect x="18" y="194" width="264" height="32" rx="5" fill="#1e293b"/>
+    <text x="28" y="214" fill="#fda4af" font-size="10" font-family="monospace">POST /payments/confirm -> ConfirmBooking</text>
+
+    <!-- Consumers of RabbitMQ events -->
+    <rect x="0" y="260" width="300" height="150" rx="10" fill="#0f172a" stroke="#ea580c" stroke-width="1.5" filter="url(#cardShadow)"/>
+    <text x="20" y="290" fill="#fb923c" font-size="13" font-weight="700">Event Consumers</text>
+    <text x="20" y="312" fill="#cbd5e1" font-size="11">📡 Notification Service (:8010)</text>
+    <text x="35" y="330" fill="#94a3b8" font-size="10">Dispatches SMS/Email confirmation</text>
+    <text x="20" y="352" fill="#cbd5e1" font-size="11">🧹 Housekeeping Service (:8008)</text>
+    <text x="35" y="370" fill="#94a3b8" font-size="10">Auto-schedules room turnover task</text>
+    <text x="20" y="392" fill="#cbd5e1" font-size="11">📈 Analytics Service (:8011)</text>
+  </g>
+
+  <!-- ============================================================== -->
+  <!-- 4. DATA STORES (BELOW SERVICE)                                 -->
+  <!-- ============================================================== -->
+  <!-- Redis Store -->
+  <g transform="translate(430, 715)">
+    <rect x="0" y="0" width="345" height="135" rx="12" fill="url(#redisGrad)" stroke="#ef4444" stroke-width="1.5" filter="url(#glowRedis)"/>
+    <text x="24" y="34" fill="#ffffff" font-size="16" font-weight="800">Redis 7 (hotel-redis :6379)</text>
+    <text x="24" y="56" fill="#fecaca" font-size="11">Distributed In-Memory Lock &amp; TTL Store</text>
+
+    <rect x="18" y="68" width="309" height="52" rx="6" fill="#450a0a" stroke="#991b1b" stroke-width="1"/>
+    <text x="30" y="88" fill="#fca5a5" font-size="11" font-family="monospace">KEY: lock:room:{id}:{ci}:{co}</text>
+    <text x="30" y="106" fill="#fca5a5" font-size="11" font-family="monospace">KEY: hold:booking:{id} (TTL 600s)</text>
+  </g>
+
+  <!-- PostgreSQL Store -->
+  <g transform="translate(825, 715)">
+    <rect x="0" y="0" width="345" height="135" rx="12" fill="url(#pgGrad)" stroke="#3b82f6" stroke-width="1.5" filter="url(#glowPg)"/>
+    <text x="24" y="34" fill="#ffffff" font-size="16" font-weight="800">PostgreSQL (hotel-postgres :55432)</text>
+    <text x="24" y="56" fill="#bfdbfe" font-size="11">Authoritative hotel_bookings_db Database</text>
+
+    <rect x="18" y="68" width="309" height="52" rx="6" fill="#172554" stroke="#1d4ed8" stroke-width="1"/>
+    <text x="30" y="88" fill="#93c5fd" font-size="11" font-family="monospace">TABLE: public.bookings</text>
+    <text x="30" y="106" fill="#93c5fd" font-size="11">UUID, booking_code, dates, status, totals</text>
+  </g>
+
+  <!-- RabbitMQ Message Broker -->
+  <g transform="translate(1220, 440)">
+    <rect x="0" y="0" width="300" height="100" rx="12" fill="url(#rabbitGrad)" stroke="#f97316" stroke-width="1.5" filter="url(#cardShadow)"/>
+    <text x="20" y="32" fill="#ffffff" font-size="15" font-weight="800">RabbitMQ 3.13 (:5672)</text>
+    <text x="20" y="52" fill="#ffedd5" font-size="11">Exchange: hotel_events (type: topic)</text>
+    <rect x="18" y="62" width="264" height="26" rx="4" fill="#431407"/>
+    <text x="28" y="79" fill="#fed7aa" font-size="10" font-family="monospace">Routing key: booking.*</text>
+  </g>
+
+  <!-- ============================================================== -->
+  <!-- 5. CONCURRENCY FLOW PIPELINE (BOTTOM STEP-BY-STEP)             -->
+  <!-- ============================================================== -->
+  <g transform="translate(80, 885)">
+    <rect x="0" y="0" width="1440" height="260" rx="14" fill="#0f172a" stroke="#334155" stroke-width="1.5" filter="url(#cardShadow)"/>
+    
+    <rect x="25" y="16" width="400" height="28" rx="6" fill="#134e4a"/>
+    <text x="225" y="35" fill="#5eead4" font-size="12" font-weight="800" text-anchor="middle">DOUBLE-BOOKING PREVENTION FLOW (HOLD ROOM ENDPOINT)</text>
+
+    <g transform="translate(25, 60)">
+      <!-- Step 1 -->
+      <rect x="0" y="0" width="215" height="175" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="1"/>
+      <circle cx="28" cy="28" r="14" fill="#0284c7"/>
+      <text x="28" y="33" fill="#ffffff" font-size="12" font-weight="800" text-anchor="middle">1</text>
+      <text x="50" y="33" fill="#38bdf8" font-size="12" font-weight="700">Acquire Redis Lock</text>
+      <text x="14" y="62" fill="#e2e8f0" font-size="11" font-weight="600">SETNX 5s TTL</text>
+      <text x="14" y="80" fill="#94a3b8" font-size="10">Key: lock:room:{roomTypeId}</text>
+      <text x="14" y="96" fill="#94a3b8" font-size="10">:{checkIn}:{checkOut}</text>
+      <text x="14" y="122" fill="#fca5a5" font-size="10">If lock fails -> 409 Conflict</text>
+      <text x="14" y="140" fill="#fca5a5" font-size="10">"Room is being booked, retry"</text>
+
+      <!-- Step 2 -->
+      <rect x="235" y="0" width="215" height="175" rx="8" fill="#1e293b" stroke="#60a5fa" stroke-width="1"/>
+      <circle cx="263" cy="28" r="14" fill="#2563eb"/>
+      <text x="263" y="33" fill="#ffffff" font-size="12" font-weight="800" text-anchor="middle">2</text>
+      <text x="285" y="33" fill="#60a5fa" font-size="12" font-weight="700">Start Postgres TX</text>
+      <text x="249" y="62" fill="#e2e8f0" font-size="11" font-weight="600">Serializable Transaction</text>
+      <text x="249" y="80" fill="#94a3b8" font-size="10">Executes SQL query:</text>
+      <text x="249" y="96" fill="#93c5fd" font-size="9" font-family="monospace">SELECT COUNT(*) FROM</text>
+      <text x="249" y="110" fill="#93c5fd" font-size="9" font-family="monospace">bookings WHERE overlap</text>
+      <text x="249" y="132" fill="#cbd5e1" font-size="10">Counts active &amp; held</text>
+      <text x="249" y="148" fill="#cbd5e1" font-size="10">non-expired bookings</text>
+
+      <!-- Step 3 -->
+      <rect x="470" y="0" width="215" height="175" rx="8" fill="#1e293b" stroke="#34d399" stroke-width="1"/>
+      <circle cx="498" cy="28" r="14" fill="#059669"/>
+      <text x="498" y="33" fill="#ffffff" font-size="12" font-weight="800" text-anchor="middle">3</text>
+      <text x="520" y="33" fill="#34d399" font-size="12" font-weight="700">Inventory Verification</text>
+      <text x="484" y="62" fill="#e2e8f0" font-size="11" font-weight="600">Call Room Service</text>
+      <text x="484" y="80" fill="#94a3b8" font-size="10">HTTP GET /inventory</text>
+      <text x="484" y="96" fill="#94a3b8" font-size="10">Fetches total inventory &amp;</text>
+      <text x="484" y="112" fill="#94a3b8" font-size="10">authoritative nightly price.</text>
+      <text x="484" y="132" fill="#6ee7b7" font-size="10">avail = totalInv - overlap</text>
+      <text x="484" y="148" fill="#fca5a5" font-size="10">If avail &lt; count -> Reject</text>
+
+      <!-- Step 4 -->
+      <rect x="705" y="0" width="215" height="175" rx="8" fill="#1e293b" stroke="#a78bfa" stroke-width="1"/>
+      <circle cx="733" cy="28" r="14" fill="#7c3aed"/>
+      <text x="733" y="33" fill="#ffffff" font-size="12" font-weight="800" text-anchor="middle">4</text>
+      <text x="755" y="33" fill="#a78bfa" font-size="12" font-weight="700">Sequential Code &amp; Insert</text>
+      <text x="719" y="62" fill="#e2e8f0" font-size="11" font-weight="600">Insert Pending Booking</text>
+      <text x="719" y="80" fill="#c4b5fd" font-size="10">Code: HTL/2026/ROOM/0001</text>
+      <text x="719" y="96" fill="#94a3b8" font-size="10">Collision-proof uniqueness</text>
+      <text x="719" y="112" fill="#94a3b8" font-size="10">Status: PENDING_PAYMENT</text>
+      <text x="719" y="132" fill="#c4b5fd" font-size="10">Expires: now() + 10 mins</text>
+      <text x="719" y="148" fill="#a7f3d0" font-size="10">Commit Postgres TX</text>
+
+      <!-- Step 5 -->
+      <rect x="940" y="0" width="215" height="175" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1"/>
+      <circle cx="968" cy="28" r="14" fill="#d97706"/>
+      <text x="968" y="33" fill="#ffffff" font-size="12" font-weight="800" text-anchor="middle">5</text>
+      <text x="990" y="33" fill="#f59e0b" font-size="12" font-weight="700">Set 10-Min Redis Hold</text>
+      <text x="954" y="62" fill="#e2e8f0" font-size="11" font-weight="600">Redis TTL 600 Seconds</text>
+      <text x="954" y="80" fill="#94a3b8" font-size="10">hold:booking:{bookingId}</text>
+      <text x="954" y="96" fill="#94a3b8" font-size="10">Guarantees inventory for</text>
+      <text x="954" y="112" fill="#94a3b8" font-size="10">guest checkout experience.</text>
+      <text x="954" y="132" fill="#fde68a" font-size="10">Countdown timer on UI</text>
+      <text x="954" y="148" fill="#fde68a" font-size="10">Releases distributed lock</text>
+
+      <!-- Step 6 -->
+      <rect x="1175" y="0" width="215" height="175" rx="8" fill="#1e293b" stroke="#fb923c" stroke-width="1"/>
+      <circle cx="1203" cy="28" r="14" fill="#ea580c"/>
+      <text x="1203" y="33" fill="#ffffff" font-size="12" font-weight="800" text-anchor="middle">6</text>
+      <text x="1225" y="33" fill="#fb923c" font-size="12" font-weight="700">Publish Event &amp; Return</text>
+      <text x="1189" y="62" fill="#e2e8f0" font-size="11" font-weight="600">hotel_events Exchange</text>
+      <text x="1189" y="80" fill="#fed7aa" font-size="10">Event: booking.held</text>
+      <text x="1189" y="96" fill="#94a3b8" font-size="10">Notifies downstream workers</text>
+      <text x="1189" y="122" fill="#38bdf8" font-size="11" font-weight="700">HTTP 201 Created</text>
+      <text x="1189" y="140" fill="#bae6fd" font-size="10">bookingId + holdSeconds: 600</text>
+    </g>
+  </g>
+
+  <!-- ============================================================== -->
+  <!-- CONNECTING PATHS & ARROWS                                      -->
+  <!-- ============================================================== -->
+  <!-- Client to Booking Service -->
+  <path d="M 380,275 L 430,275" fill="none" stroke="#38bdf8" stroke-width="2.5" marker-end="url(#arrowGo)"/>
+  <text x="405" y="265" fill="#38bdf8" font-size="10" font-weight="700" text-anchor="middle">HTTP</text>
+
+  <!-- Booking Service to Room Service -->
+  <path d="M 1170,215 L 1220,215" fill="none" stroke="#10b981" stroke-width="2" marker-end="url(#arrowTeal)"/>
+  <text x="1195" y="205" fill="#34d399" font-size="10" font-weight="700" text-anchor="middle">REST</text>
+
+  <!-- Booking Service to Redis -->
+  <path d="M 580,680 L 580,715" fill="none" stroke="#ef4444" stroke-width="2.5" marker-end="url(#arrowRed)"/>
+  <text x="605" y="700" fill="#f87171" font-size="10" font-weight="700">Lock / Hold</text>
+
+  <!-- Booking Service to Postgres -->
+  <path d="M 980,680 L 980,715" fill="none" stroke="#3b82f6" stroke-width="2.5" marker-end="url(#arrowBlue)"/>
+  <text x="1005" y="700" fill="#60a5fa" font-size="10" font-weight="700">pgx / ACID</text>
+
+  <!-- Booking Service to RabbitMQ -->
+  <path d="M 1170,490 L 1220,490" fill="none" stroke="#ea580c" stroke-width="2" marker-end="url(#arrowOrange)"/>
+  <text x="1195" y="480" fill="#fb923c" font-size="10" font-weight="700" text-anchor="middle">Events</text>
+
+  <!-- RabbitMQ to Consumers -->
+  <path d="M 1370,440 L 1370,410" fill="none" stroke="#fb923c" stroke-width="2" marker-end="url(#arrowOrange)"/>
+</svg>

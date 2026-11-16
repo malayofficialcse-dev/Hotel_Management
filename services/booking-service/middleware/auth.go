@@ -3,7 +3,9 @@ package middleware
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -27,6 +29,68 @@ type validateTokenResponse struct {
 	} `json:"user"`
 }
 
+func authServiceCandidates(authServiceURL string) []string {
+	base := strings.TrimRight(authServiceURL, "/")
+	candidates := []string{base}
+	parsed, err := url.Parse(base)
+	if err != nil {
+		return candidates
+	}
+	if strings.EqualFold(parsed.Hostname(), "localhost") || parsed.Hostname() == "127.0.0.1" {
+		fallback := *parsed
+		fallback.Host = strings.Replace(parsed.Host, parsed.Hostname(), "host.docker.internal", 1)
+		candidates = append(candidates, strings.TrimRight(fallback.String(), "/"))
+	}
+	return candidates
+}
+
+func validateToken(ctx context.Context, client *http.Client, authServiceURL, token string) (*validateTokenResponse, int) {
+	body, err := json.Marshal(map[string]string{"token": token})
+	if err != nil {
+		return nil, http.StatusInternalServerError
+	}
+	status := http.StatusServiceUnavailable
+	for _, baseURL := range authServiceCandidates(authServiceURL) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+"/internal/auth/validate", strings.NewReader(string(body)))
+		if err != nil {
+			log.Printf("booking auth validation: invalid auth service URL %q: %v", baseURL, err)
+			continue
+		}
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := client.Do(req)
+		if err != nil {
+			log.Printf("booking auth validation: cannot reach %s: %v", baseURL, err)
+			continue
+		}
+		if resp.StatusCode != http.StatusOK {
+			if resp.StatusCode == http.StatusUnauthorized {
+				status = http.StatusUnauthorized
+			} else if status != http.StatusUnauthorized {
+				status = http.StatusServiceUnavailable
+			}
+			log.Printf("booking auth validation: %s returned HTTP %d", baseURL, resp.StatusCode)
+			resp.Body.Close()
+			continue
+		}
+
+		var result validateTokenResponse
+		decodeErr := json.NewDecoder(resp.Body).Decode(&result)
+		resp.Body.Close()
+		if decodeErr != nil {
+			status = http.StatusUnauthorized
+			log.Printf("booking auth validation: invalid response from %s: %v", baseURL, decodeErr)
+			continue
+		}
+		if result.Valid && result.User != nil {
+			return &result, http.StatusOK
+		}
+		status = http.StatusUnauthorized
+		log.Printf("booking auth validation: %s rejected the access token", baseURL)
+	}
+
+	return nil, status
+}
+
 // RequireAuth creates a middleware that validates JWT token against Auth Service.
 func RequireAuth(authServiceURL string) func(next http.Handler) http.Handler {
 	client := &http.Client{Timeout: 4 * time.Second}
@@ -41,24 +105,13 @@ func RequireAuth(authServiceURL string) func(next http.Handler) http.Handler {
 
 			token := strings.TrimPrefix(authHeader, "Bearer ")
 
-			// Validate with Auth Service
-			req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, authServiceURL+"/internal/auth/validate", strings.NewReader(`{"token":"`+token+`"}`))
-			if err != nil {
-				http.Error(w, `{"error":"internal_error"}`, http.StatusInternalServerError)
-				return
-			}
-			req.Header.Set("Content-Type", "application/json")
-
-			resp, err := client.Do(req)
-			if err != nil || resp.StatusCode != http.StatusOK {
+			valRes, status := validateToken(r.Context(), client, authServiceURL, token)
+			if valRes == nil {
+				if status == http.StatusServiceUnavailable {
+					http.Error(w, `{"error":"auth_service_unavailable","message":"booking service cannot reach the authentication service"}`, http.StatusServiceUnavailable)
+					return
+				}
 				http.Error(w, `{"error":"unauthorized","message":"invalid or expired token"}`, http.StatusUnauthorized)
-				return
-			}
-			defer resp.Body.Close()
-
-			var valRes validateTokenResponse
-			if err := json.NewDecoder(resp.Body).Decode(&valRes); err != nil || valRes.User == nil {
-				http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
 				return
 			}
 
@@ -105,21 +158,13 @@ func OptionalAuth(authServiceURL string) func(next http.Handler) http.Handler {
 			}
 
 			token := strings.TrimPrefix(authHeader, "Bearer ")
-			req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, authServiceURL+"/internal/auth/validate", strings.NewReader(`{"token":"`+token+`"}`))
-			if err == nil {
-				req.Header.Set("Content-Type", "application/json")
-				if resp, err := client.Do(req); err == nil {
-					defer resp.Body.Close()
-					var valRes validateTokenResponse
-					if json.NewDecoder(resp.Body).Decode(&valRes) == nil && valRes.User != nil {
-						if parsedID, err := uuid.Parse(valRes.User.ID); err == nil {
-							ctx := context.WithValue(r.Context(), UserIDKey, parsedID)
-							ctx = context.WithValue(ctx, UserEmailKey, valRes.User.Email)
-							ctx = context.WithValue(ctx, UserRoleKey, valRes.User.Role)
-							next.ServeHTTP(w, r.WithContext(ctx))
-							return
-						}
-					}
+			if valRes, _ := validateToken(r.Context(), client, authServiceURL, token); valRes != nil {
+				if parsedID, err := uuid.Parse(valRes.User.ID); err == nil {
+					ctx := context.WithValue(r.Context(), UserIDKey, parsedID)
+					ctx = context.WithValue(ctx, UserEmailKey, valRes.User.Email)
+					ctx = context.WithValue(ctx, UserRoleKey, valRes.User.Role)
+					next.ServeHTTP(w, r.WithContext(ctx))
+					return
 				}
 			}
 
@@ -127,4 +172,3 @@ func OptionalAuth(authServiceURL string) func(next http.Handler) http.Handler {
 		})
 	}
 }
-
