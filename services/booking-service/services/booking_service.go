@@ -31,9 +31,25 @@ var (
 	ErrNotAuthorized   = errors.New("not authorised to perform this action")
 )
 
+type AvailabilityCalendarDay struct {
+	Date               string `json:"date"`
+	BookedInventory    int    `json:"bookedInventory"`
+	AvailableInventory int    `json:"availableInventory"`
+	IsAvailable        bool   `json:"isAvailable"`
+}
+
+type AvailabilityCalendar struct {
+	RoomTypeID     string                    `json:"roomTypeId"`
+	StartDate      string                    `json:"startDate"`
+	EndDate        string                    `json:"endDate"`
+	TotalInventory int                       `json:"totalInventory"`
+	Days           []AvailabilityCalendarDay `json:"days"`
+}
+
 // inventoryResponse is the payload returned by the Room Service inventory endpoint.
 type inventoryResponse struct {
 	Inventory     int     `json:"inventory"`
+	Capacity      int     `json:"capacity"`
 	PricePerNight float64 `json:"pricePerNight"`
 }
 
@@ -63,15 +79,8 @@ func NewBookingService(
 	}
 }
 
-// HoldRoom implements the double-booking prevention algorithm:
-//  1. Acquire Redis lock (5 s TTL)
-//  2. Inside a serialisable transaction:
-//     a. Count overlapping active bookings
-//     b. Fetch total inventory from Hotel Service
-//     c. If (inventory - overlap) < roomCount → reject
-//     d. INSERT booking with PENDING_PAYMENT, expires_at = now+10min
-//  3. Store Redis hold (600 s TTL)
-//  4. Release lock
+// HoldRoom serializes inventory decisions for a room type in PostgreSQL,
+// checks each occupied night, then inserts a ten-minute pending-payment hold.
 func (s *BookingService) HoldRoom(ctx context.Context, req *models.HoldBookingRequest, userID *uuid.UUID) (*models.HoldBookingResponse, error) {
 	// Normalize inbound payload fields
 	if req.RoomTypeID == "" {
@@ -111,6 +120,15 @@ func (s *BookingService) HoldRoom(ctx context.Context, req *models.HoldBookingRe
 			req.RoomCount = 1
 		}
 	}
+	if req.GuestsCount < 1 && req.GuestsCountAlt > 0 {
+		req.GuestsCount = req.GuestsCountAlt
+	}
+	if strings.TrimSpace(req.RoomTypeID) == "" || strings.TrimSpace(req.HotelID) == "" {
+		return nil, fmt.Errorf("hotel_id and room_type_id are required")
+	}
+	if req.RoomCount > 20 || req.GuestsCount > 100 {
+		return nil, fmt.Errorf("room_count or guests_count exceeds the supported limit")
+	}
 	if req.GuestFirstName == "" {
 		if req.GuestFirstNameAlt != "" {
 			req.GuestFirstName = req.GuestFirstNameAlt
@@ -146,30 +164,26 @@ func (s *BookingService) HoldRoom(ctx context.Context, req *models.HoldBookingRe
 	if !checkOut.After(checkIn) {
 		return nil, fmt.Errorf("check_out_date must be after check_in_date")
 	}
+	if checkOut.Sub(checkIn) > 365*24*time.Hour {
+		return nil, fmt.Errorf("a booking cannot exceed 365 nights")
+	}
 	if req.RoomCount < 1 {
 		return nil, fmt.Errorf("room_count must be at least 1")
 	}
 
-	// Step 1 — acquire distributed lock.
-	acquired, err := s.lock.AcquireLock(ctx, req.RoomTypeID, req.CheckInDate, req.CheckOutDate)
-	if err != nil {
-		return nil, fmt.Errorf("lock error: %w", err)
-	}
-	if !acquired {
-		return nil, ErrLockUnavailable
-	}
-	defer func() {
-		if releaseErr := s.lock.ReleaseLock(context.Background(), req.RoomTypeID, req.CheckInDate, req.CheckOutDate); releaseErr != nil {
-			s.logger.Error("failed to release lock", "error", releaseErr)
-		}
-	}()
-
-	// Step 2 — serialisable transaction.
+	// The PostgreSQL advisory lock covers the entire room type, so requests for
+	// partially overlapping date ranges cannot both pass the inventory check.
 	tx, err := s.repo.BeginTx(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("begin transaction: %w", err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
+	if err := s.repo.LockRoomType(ctx, tx, req.RoomTypeID); err != nil {
+		return nil, fmt.Errorf("lock room inventory: %w", err)
+	}
+	if err := s.repo.ExpireStaleBookingsForRoomType(ctx, tx, req.RoomTypeID); err != nil {
+		return nil, fmt.Errorf("expire stale room holds: %w", err)
+	}
 
 	// 2a — overlapping bookings.
 	overlapping, err := s.repo.GetOverlappingCount(ctx, tx, req.RoomTypeID, checkIn, checkOut)
@@ -178,7 +192,7 @@ func (s *BookingService) HoldRoom(ctx context.Context, req *models.HoldBookingRe
 	}
 
 	// 2b — inventory from Hotel Service.
-	inventory, pricePerNight, err := s.fetchInventory(ctx, req.RoomTypeID)
+	inventory, pricePerNight, capacity, err := s.fetchInventory(ctx, req.RoomTypeID)
 	if err != nil {
 		return nil, fmt.Errorf("inventory check: %w", err)
 	}
@@ -187,6 +201,9 @@ func (s *BookingService) HoldRoom(ctx context.Context, req *models.HoldBookingRe
 	available := inventory - overlapping
 	if available < req.RoomCount {
 		return nil, ErrNoRoomsLeft
+	}
+	if req.GuestsCount < 1 || (capacity > 0 && req.GuestsCount > capacity*req.RoomCount) {
+		return nil, fmt.Errorf("guest count exceeds this room's capacity")
 	}
 
 	// 2d — build & insert booking.
@@ -197,6 +214,9 @@ func (s *BookingService) HoldRoom(ctx context.Context, req *models.HoldBookingRe
 	hotelShort := getHotelShortCode(req.HotelName, req.HotelID)
 	roomNum := extractRoomNumber(req.RoomTypeName, req.RoomTypeID)
 	prefix := fmt.Sprintf("%s/%d/%s/", hotelShort, now.Year(), roomNum)
+	if err := s.repo.LockBookingCodePrefix(ctx, tx, prefix); err != nil {
+		return nil, fmt.Errorf("lock booking code sequence: %w", err)
+	}
 
 	var count int
 	_ = tx.QueryRow(ctx, "SELECT COUNT(*) FROM bookings WHERE booking_code LIKE $1", prefix+"%").Scan(&count)
@@ -248,10 +268,12 @@ func (s *BookingService) HoldRoom(ctx context.Context, req *models.HoldBookingRe
 		return nil, fmt.Errorf("commit transaction: %w", err)
 	}
 
-	// Step 3 — Redis hold.
-	if err := s.lock.SetHold(ctx, booking.ID.String(), booking.BookingCode); err != nil {
-		s.logger.Error("failed to set booking hold in Redis", "bookingID", booking.ID, "error", err)
-		// Non-fatal: the DB record is authoritative; the hold is a convenience TTL.
+	// Redis stores a convenience TTL; the PostgreSQL expiry timestamp remains authoritative.
+	if s.lock != nil {
+		if err := s.lock.SetHold(ctx, booking.ID.String(), booking.BookingCode); err != nil {
+			s.logger.Error("failed to set booking hold in Redis", "bookingID", booking.ID, "error", err)
+			// Non-fatal: the DB record is authoritative; the hold is a convenience TTL.
+		}
 	}
 
 	// Step 4 — Publish booking.held event to RabbitMQ
@@ -284,6 +306,57 @@ func (s *BookingService) HoldRoom(ctx context.Context, req *models.HoldBookingRe
 	}, nil
 }
 
+// GetAvailabilityCalendar returns daily room inventory for inclusive calendar
+// dates. Reservations use checkout-exclusive hotel night semantics.
+func (s *BookingService) GetAvailabilityCalendar(ctx context.Context, roomTypeID, startDate, endDate string) (*AvailabilityCalendar, error) {
+	start, err := time.Parse("2006-01-02", startDate)
+	if err != nil {
+		return nil, fmt.Errorf("invalid startDate format, expected YYYY-MM-DD")
+	}
+	end, err := time.Parse("2006-01-02", endDate)
+	if err != nil {
+		return nil, fmt.Errorf("invalid endDate format, expected YYYY-MM-DD")
+	}
+	if end.Before(start) {
+		return nil, fmt.Errorf("endDate must be on or after startDate")
+	}
+	if end.Sub(start) > 62*24*time.Hour {
+		return nil, fmt.Errorf("availability calendar range cannot exceed 63 days")
+	}
+	if strings.TrimSpace(roomTypeID) == "" {
+		return nil, fmt.Errorf("roomTypeId is required")
+	}
+
+	inventory, _, _, err := s.fetchInventory(ctx, roomTypeID)
+	if err != nil {
+		return nil, fmt.Errorf("inventory check: %w", err)
+	}
+	bookedDays, err := s.repo.GetAvailabilityCalendar(ctx, roomTypeID, start, end)
+	if err != nil {
+		return nil, fmt.Errorf("load availability calendar: %w", err)
+	}
+	days := make([]AvailabilityCalendarDay, 0, len(bookedDays))
+	for _, day := range bookedDays {
+		available := inventory - day.BookedInventory
+		if available < 0 {
+			available = 0
+		}
+		days = append(days, AvailabilityCalendarDay{
+			Date:               day.Date.Format("2006-01-02"),
+			BookedInventory:    day.BookedInventory,
+			AvailableInventory: available,
+			IsAvailable:        available > 0,
+		})
+	}
+	return &AvailabilityCalendar{
+		RoomTypeID:     roomTypeID,
+		StartDate:      startDate,
+		EndDate:        endDate,
+		TotalInventory: inventory,
+		Days:           days,
+	}, nil
+}
+
 // ConfirmBooking transitions a booking from PENDING_PAYMENT to CONFIRMED.
 // Intended to be called by the Payment Service after successful payment.
 func (s *BookingService) ConfirmBooking(ctx context.Context, bookingID uuid.UUID) (*models.Booking, error) {
@@ -299,12 +372,23 @@ func (s *BookingService) ConfirmBooking(ctx context.Context, bookingID uuid.UUID
 		return booking, nil // idempotent
 	}
 
-	if booking.Status != models.StatusPendingPayment && booking.Status != models.StatusExpired {
+	if booking.Status != models.StatusPendingPayment {
 		return nil, fmt.Errorf("cannot confirm booking in status %q", booking.Status)
 	}
 
-	if err := s.repo.UpdateStatus(ctx, bookingID, models.StatusConfirmed); err != nil {
+	confirmed, err := s.repo.ConfirmPendingBooking(ctx, bookingID)
+	if err != nil {
 		return nil, err
+	}
+	if !confirmed {
+		latest, getErr := s.repo.GetBookingByID(ctx, bookingID)
+		if getErr != nil {
+			return nil, getErr
+		}
+		if latest.Status == models.StatusConfirmed {
+			return latest, nil
+		}
+		return nil, fmt.Errorf("booking hold has expired and can no longer be confirmed")
 	}
 
 	// Remove the Redis hold since payment is complete.
@@ -462,6 +546,9 @@ func (s *BookingService) GetOverlappingCount(ctx context.Context, roomTypeID, ch
 	if err != nil {
 		return 0, fmt.Errorf("invalid check_out: %w", err)
 	}
+	if !coTime.After(ciTime) || coTime.Sub(ciTime) > 365*24*time.Hour {
+		return 0, fmt.Errorf("availability range must be between 1 and 365 nights")
+	}
 	return s.repo.GetOverlappingCount(ctx, nil, roomTypeID, ciTime, coTime)
 }
 
@@ -470,30 +557,30 @@ func (s *BookingService) GetOverlappingCount(ctx context.Context, roomTypeID, ch
 // --------------------------------------------------------------------------
 
 // fetchInventory gets room inventory and its authoritative nightly price.
-func (s *BookingService) fetchInventory(ctx context.Context, roomTypeID string) (int, float64, error) {
+func (s *BookingService) fetchInventory(ctx context.Context, roomTypeID string) (int, float64, int, error) {
 	url := fmt.Sprintf("%s/internal/rooms/%s/inventory", s.hotelServiceURL, roomTypeID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return 0, 0, fmt.Errorf("build inventory request: %w", err)
+		return 0, 0, 0, fmt.Errorf("build inventory request: %w", err)
 	}
 
 	client := &http.Client{Timeout: 5 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		return 0, 0, fmt.Errorf("call hotel service: %w", err)
+		return 0, 0, 0, fmt.Errorf("call hotel service: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return 0, 0, fmt.Errorf("hotel service returned %d: %s", resp.StatusCode, body)
+		return 0, 0, 0, fmt.Errorf("hotel service returned %d: %s", resp.StatusCode, body)
 	}
 
 	var inv inventoryResponse
 	if err := json.NewDecoder(resp.Body).Decode(&inv); err != nil {
-		return 0, 0, fmt.Errorf("decode inventory response: %w", err)
+		return 0, 0, 0, fmt.Errorf("decode inventory response: %w", err)
 	}
-	return inv.Inventory, inv.PricePerNight, nil
+	return inv.Inventory, inv.PricePerNight, inv.Capacity, nil
 }
 
 // getHotelShortCode extracts a 2-4 letter uppercase short code from hotel name or hotel ID.

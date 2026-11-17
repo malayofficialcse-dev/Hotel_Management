@@ -39,6 +39,9 @@ func holdKey(bookingID string) string {
 // Returns (true, nil) when the lock is acquired, (false, nil) when it is
 // already held by another caller, and (false, err) on Redis errors.
 func (s *LockService) AcquireLock(ctx context.Context, roomTypeID, checkIn, checkOut string) (bool, error) {
+	if s == nil || s.rdb == nil {
+		return true, nil
+	}
 	key := lockKey(roomTypeID, checkIn, checkOut)
 	ok, err := s.rdb.SetNX(ctx, key, "1", lockTTL).Result()
 	if err != nil {
@@ -49,6 +52,9 @@ func (s *LockService) AcquireLock(ctx context.Context, roomTypeID, checkIn, chec
 
 // ReleaseLock deletes the distributed lock key.
 func (s *LockService) ReleaseLock(ctx context.Context, roomTypeID, checkIn, checkOut string) error {
+	if s == nil || s.rdb == nil {
+		return nil
+	}
 	key := lockKey(roomTypeID, checkIn, checkOut)
 	if err := s.rdb.Del(ctx, key).Err(); err != nil {
 		return fmt.Errorf("release lock %q: %w", key, err)
@@ -58,6 +64,9 @@ func (s *LockService) ReleaseLock(ctx context.Context, roomTypeID, checkIn, chec
 
 // SetHold stores a booking code under the hold key with a 600-second TTL.
 func (s *LockService) SetHold(ctx context.Context, bookingID, bookingCode string) error {
+	if s == nil || s.rdb == nil {
+		return nil
+	}
 	key := holdKey(bookingID)
 	if err := s.rdb.Set(ctx, key, bookingCode, holdTTL).Err(); err != nil {
 		return fmt.Errorf("set hold %q: %w", key, err)
@@ -67,6 +76,9 @@ func (s *LockService) SetHold(ctx context.Context, bookingID, bookingCode string
 
 // RemoveHold deletes the hold entry for a booking.
 func (s *LockService) RemoveHold(ctx context.Context, bookingID string) error {
+	if s == nil || s.rdb == nil {
+		return nil
+	}
 	key := holdKey(bookingID)
 	if err := s.rdb.Del(ctx, key).Err(); err != nil {
 		return fmt.Errorf("remove hold %q: %w", key, err)
@@ -77,6 +89,9 @@ func (s *LockService) RemoveHold(ctx context.Context, bookingID string) error {
 // HoldTTLRemaining returns the remaining TTL (in seconds) of a booking hold.
 // Returns 0 if the key does not exist.
 func (s *LockService) HoldTTLRemaining(ctx context.Context, bookingID string) (int, error) {
+	if s == nil || s.rdb == nil {
+		return 0, nil
+	}
 	key := holdKey(bookingID)
 	d, err := s.rdb.TTL(ctx, key).Result()
 	if err != nil {

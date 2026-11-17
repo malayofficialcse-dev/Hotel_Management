@@ -24,6 +24,7 @@ func SetupRoutes(c *controllers.BookingController, authServiceURL string) *chi.M
 	r.Get("/health", c.HealthCheck)
 
 	r.Route("/api/v1/bookings", func(api chi.Router) {
+		api.Get("/availability", c.GetAvailabilityCalendar)
 		// Hold allows guest checkout or logged in user (optional token)
 		api.With(bookingMiddleware.OptionalAuth(authServiceURL)).Post("/hold", c.HoldRoom)
 		api.With(bookingMiddleware.RequireAuth(authServiceURL)).Get("/mine", c.ListMyBookings)
@@ -35,6 +36,8 @@ func SetupRoutes(c *controllers.BookingController, authServiceURL string) *chi.M
 		api.Get("/code/{code}", c.GetBookingByCode)
 		api.Get("/code/*", c.GetBookingByCode)
 	})
+
+	r.Get("/internal/rooms/{roomTypeId}/availability", c.GetAvailabilityCalendar)
 
 	// Internal endpoint for Hotel/Room service availability checks
 	r.Get("/internal/rooms/{roomTypeId}/booked-count", c.GetBookedRoomCount)

@@ -11,6 +11,7 @@ import {
 import { exportToExcel } from "@/lib/export-excel";
 import { getEffectivePermissions } from "@/lib/rbac";
 import { AdminPagination } from "@/components/admin/admin-pagination";
+import { RoomAvailabilityCalendar } from "@/components/room-availability-calendar";
 import {
   BuildingIcon,
   BedIcon,
@@ -1588,6 +1589,34 @@ export function ReservationsWorkspace() {
                 />
               </label>
             </div>
+
+            {createForm.roomTypeId && (
+              <div className="mt-4 space-y-3">
+                {(() => {
+                  const room = dialogFilteredRooms.find((candidate) => candidate._id === createForm.roomTypeId);
+                  if (!room) return null;
+                  return (
+                    <div className="grid gap-3 rounded border border-line bg-white p-3 text-[10px] sm:grid-cols-[96px_1fr]">
+                      {room.image && <img src={room.image} alt={room.name} className="h-20 w-full rounded object-cover" />}
+                      <div>
+                        <strong className="block text-xs">{room.name}</strong>
+                        <span className="mt-1 block text-muted">{room.bedType || "Room"} · up to {room.capacity} guests · {room.roomSize || "Size not specified"}</span>
+                        <span className="mt-1 block text-muted">{room.description || "No additional room description."}</span>
+                        <span className="mt-1 block text-forest">{room.amenities?.join(" · ") || "No amenities listed."}</span>
+                      </div>
+                    </div>
+                  );
+                })()}
+                <RoomAvailabilityCalendar
+                  compact
+                  roomTypeId={createForm.roomTypeId}
+                  roomCount={Number(createForm.roomCount) || 1}
+                  checkIn={createForm.checkInDate}
+                  checkOut={createForm.checkOutDate}
+                  onDatesChange={(checkInDate, checkOutDate) => setCreateForm((prev) => ({ ...prev, checkInDate, checkOutDate }))}
+                />
+              </div>
+            )}
 
             <div className="admin-dialog-actions">
               <button

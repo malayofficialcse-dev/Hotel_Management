@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"log/slog"
 	"net/http"
 	"os"
+	"time"
 
 	"booking-service/config"
 	"booking-service/controllers"
@@ -35,6 +37,15 @@ func main() {
 	bookingRepo := repository.NewBookingRepository(db)
 	lockService := services.NewLockService(rdb)
 	bookingService := services.NewBookingService(bookingRepo, lockService, publisher, cfg.HotelServiceURL, logger)
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			bookingService.ExpireStaleBookings(ctx)
+			cancel()
+		}
+	}()
 	bookingController := controllers.NewBookingController(bookingService)
 
 	router := routes.SetupRoutes(bookingController, cfg.AuthServiceURL)
@@ -45,4 +56,3 @@ func main() {
 		log.Fatalf("Server exited: %v", err)
 	}
 }
-

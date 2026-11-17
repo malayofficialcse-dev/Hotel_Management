@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, Inject } from "@nestjs/common";
+import { Injectable, BadRequestException, ConflictException, Inject, ServiceUnavailableException } from "@nestjs/common";
 import { PaymentRepository } from "../repository/payment.repository.js";
 import { CreatePaymentIntentDto, ConfirmPaymentDto, RefundDto } from "../models/payment.dto.js";
 import { PaymentStatus } from "../models/payment.entity.js";
@@ -45,6 +45,30 @@ export class PaymentService {
     }
     if (!payment) {
       throw new BadRequestException("Payment record not found");
+    }
+
+    if (payment.status === PaymentStatus.SUCCESS) {
+      const metadata = (payment.metadata || {}) as Record<string, unknown>;
+      return {
+        success: true,
+        message: "Payment was already confirmed",
+        payment,
+        billNumber: typeof metadata.billNumber === "string" ? metadata.billNumber : undefined,
+        receiptUrl: payment.receiptUrl,
+      };
+    }
+
+    // Inventory is authoritative in Booking Service. Confirm its live hold
+    // before recording payment success so expired holds cannot be charged.
+    try {
+      const confirmation = await axios.post(`${env.BOOKING_SERVICE_URL}/api/v1/bookings/${payment.bookingId}/confirm`, null, { timeout: 5000 });
+      if (!confirmation.data?.success) throw new Error("Booking service did not confirm the reservation");
+    } catch (error) {
+      if (axios.isAxiosError(error) && (error.response?.status === 400 || error.response?.status === 409)) {
+        const message = typeof error.response.data?.message === "string" ? error.response.data.message : "The room hold expired. Please book the room again.";
+        throw new ConflictException(message);
+      }
+      throw new ServiceUnavailableException("Could not confirm the room hold. Payment was not finalized.");
     }
 
     const year = new Date().getFullYear();
@@ -98,13 +122,6 @@ export class PaymentService {
       receiptUrl,
       metadata,
     });
-
-    // Call Go Booking Service to mark booking as CONFIRMED
-    try {
-      await axios.post(`${env.BOOKING_SERVICE_URL}/api/v1/bookings/${payment.bookingId}/confirm`);
-    } catch (e: any) {
-      console.warn("⚠️ [Payment Service] Failed to notify Booking Service:", e.message);
-    }
 
     // Publish payment.succeeded event to RabbitMQ
     try {

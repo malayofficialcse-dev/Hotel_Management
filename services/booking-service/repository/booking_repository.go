@@ -123,6 +123,17 @@ func (r *BookingRepository) UpdateStatus(ctx context.Context, id uuid.UUID, stat
 	return nil
 }
 
+// ConfirmPendingBooking atomically confirms a live hold. A payment that arrives
+// after the ten-minute hold expired cannot reclaim inventory already released.
+func (r *BookingRepository) ConfirmPendingBooking(ctx context.Context, id uuid.UUID) (bool, error) {
+	tag, err := r.db.Exec(ctx, `UPDATE bookings SET status = 'CONFIRMED', updated_at = NOW()
+		WHERE id = $1 AND status = 'PENDING_PAYMENT' AND expires_at > NOW()`, id)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() == 1, nil
+}
+
 // UpdateStatusTx is UpdateStatus but operates inside a caller-managed transaction.
 func (r *BookingRepository) UpdateStatusTx(ctx context.Context, tx pgx.Tx, id uuid.UUID, status models.BookingStatus) error {
 	const q = `UPDATE bookings SET status = $1, updated_at = $2 WHERE id = $3`
@@ -145,12 +156,19 @@ func (r *BookingRepository) GetOverlappingCount(
 	checkIn, checkOut time.Time,
 ) (int, error) {
 	const q = `
-		SELECT COALESCE(SUM(room_count), 0)
-		FROM   bookings
-		WHERE  room_type_id = $1
-		  AND  status IN ('PENDING_PAYMENT','CONFIRMED','CHECKED_IN')
-		  AND  check_in_date  < $3
-		  AND  check_out_date > $2`
+		SELECT COALESCE(MAX(booked), 0)
+		FROM (
+		  SELECT day::date,
+		         COALESCE(SUM(b.room_count), 0)::int AS booked
+		  FROM generate_series($2::date, $3::date - 1, interval '1 day') AS dates(day)
+		  LEFT JOIN bookings b
+		    ON b.room_type_id = $1
+		   AND b.check_in_date <= day::date
+		   AND b.check_out_date > day::date
+		   AND (b.status IN ('CONFIRMED','CHECKED_IN') OR
+		        (b.status = 'PENDING_PAYMENT' AND b.expires_at > NOW()))
+		  GROUP BY day::date
+		) nightly_inventory`
 
 	var count int
 	var err error
@@ -160,6 +178,62 @@ func (r *BookingRepository) GetOverlappingCount(
 		err = r.db.QueryRow(ctx, q, roomTypeID, checkIn, checkOut).Scan(&count)
 	}
 	return count, err
+}
+
+// LockRoomType serializes inventory decisions for a room type across every
+// date range. The lock is released automatically when the transaction ends.
+func (r *BookingRepository) LockRoomType(ctx context.Context, tx pgx.Tx, roomTypeID string) error {
+	_, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, roomTypeID)
+	return err
+}
+
+func (r *BookingRepository) LockBookingCodePrefix(ctx context.Context, tx pgx.Tx, prefix string) error {
+	_, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, "booking-code:"+prefix)
+	return err
+}
+
+func (r *BookingRepository) ExpireStaleBookingsForRoomType(ctx context.Context, tx pgx.Tx, roomTypeID string) error {
+	_, err := tx.Exec(ctx, `UPDATE bookings SET status = 'EXPIRED', updated_at = NOW()
+		WHERE room_type_id = $1 AND status = 'PENDING_PAYMENT' AND expires_at <= NOW()`, roomTypeID)
+	return err
+}
+
+// AvailabilityDay contains the number of room units reserved on a calendar date.
+type AvailabilityDay struct {
+	Date            time.Time
+	BookedInventory int
+}
+
+// GetAvailabilityCalendar returns one row per date, with checkout dates treated
+// as available because the stay interval is [check-in, check-out).
+func (r *BookingRepository) GetAvailabilityCalendar(ctx context.Context, roomTypeID string, start, end time.Time) ([]AvailabilityDay, error) {
+	const q = `
+		SELECT day::date,
+		       COALESCE(SUM(b.room_count), 0)::int AS booked_inventory
+		FROM generate_series($2::date, $3::date, interval '1 day') AS dates(day)
+		LEFT JOIN bookings b
+		  ON b.room_type_id = $1
+		 AND b.check_in_date <= day::date
+		 AND b.check_out_date > day::date
+		 AND (b.status IN ('CONFIRMED','CHECKED_IN') OR
+		      (b.status = 'PENDING_PAYMENT' AND b.expires_at > NOW()))
+		GROUP BY day::date
+		ORDER BY day::date`
+	rows, err := r.db.Query(ctx, q, roomTypeID, start, end)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	days := make([]AvailabilityDay, 0)
+	for rows.Next() {
+		var day AvailabilityDay
+		if err := rows.Scan(&day.Date, &day.BookedInventory); err != nil {
+			return nil, err
+		}
+		days = append(days, day)
+	}
+	return days, rows.Err()
 }
 
 // ExpireStaleBookings transitions PENDING_PAYMENT bookings whose expires_at has
@@ -181,7 +255,7 @@ func (r *BookingRepository) ExpireStaleBookings(ctx context.Context) (int64, err
 
 // BeginTx starts a serializable transaction using the pool.
 func (r *BookingRepository) BeginTx(ctx context.Context) (pgx.Tx, error) {
-	return r.db.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.Serializable})
+	return r.db.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
 }
 
 // --------------------------------------------------------------------------

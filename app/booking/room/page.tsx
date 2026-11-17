@@ -11,6 +11,7 @@ import { Button, PageHeading, Surface } from "@/components/ui";
 import { useBooking } from "@/components/booking-provider";
 import { api, type PublicRoom } from "@/lib/api-client";
 import { formatPrice } from "@/lib/data";
+import { RoomAvailabilityCalendar } from "@/components/room-availability-calendar";
 
 export default function RoomSelectionPage() {
   const router = useRouter();
@@ -68,32 +69,38 @@ export default function RoomSelectionPage() {
     }
 
     setError("");
-    setLoadingAvailability(true);
-    Promise.all(rooms.map(async (room) => [
-      room.id,
-      await api.checkRoomAvailability(room.id, checkInDate, checkOutDate, roomCount),
-    ] as const))
-      .then((results) => {
+    const checkAvailability = async (initial: boolean) => {
+      if (initial) setLoadingAvailability(true);
+      try {
+        const results = await Promise.all(rooms.map(async (room) => [
+          room.id,
+          await api.checkRoomAvailability(room.id, checkInDate, checkOutDate, roomCount),
+        ] as const));
         if (active) setAvailability(Object.fromEntries(results));
-      })
-      .catch((cause: unknown) => {
+      } catch (cause) {
         if (active) setError(cause instanceof Error ? cause.message : "Could not check room availability.");
-      })
-      .finally(() => {
-        if (active) setLoadingAvailability(false);
-      });
-    return () => { active = false; };
+      } finally {
+        if (active && initial) setLoadingAvailability(false);
+      }
+    };
+    void checkAvailability(true);
+    const timer = window.setInterval(() => void checkAvailability(false), 10_000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
   }, [rooms, checkInDate, checkOutDate, roomCount]);
 
   const canContinue = Boolean(
     selectedRoom && availability[selectedRoom.id]?.isAvailable && !loadingAvailability,
   );
+  const activeRoom = rooms.find((room) => room.id === roomId) || selectedRoom;
 
   return (
     <>
       <SiteHeader />
       <BookingStepper active={0} />
-      <main className="mx-auto grid max-w-[1160px] gap-6 px-5 py-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:px-0">
+        <main className="mx-auto grid w-full max-w-none gap-6 px-4 py-8 sm:px-6 xl:px-8 2xl:px-10 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div>
           <PageHeading title="Make room for a little escape." description={`Choose your comfort at ${hotelTitle || "your selected property"}.`} />
           <Surface className="mt-6 p-5">
@@ -142,6 +149,29 @@ export default function RoomSelectionPage() {
             {loadingRooms && <p className="rounded-[4px] bg-mist p-4 text-xs text-muted">Loading available rooms…</p>}
             {!loadingRooms && !rooms.length && !error && <p className="rounded-[4px] bg-mist p-4 text-xs text-muted">No rooms are currently listed for this hotel.</p>}
           </div>
+          {activeRoom && (
+            <div className="mt-5 grid min-w-0 items-start gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(340px,0.9fr)]">
+              <RoomAvailabilityCalendar
+                roomTypeId={activeRoom.id}
+                roomCount={roomCount}
+                checkIn={checkInDate}
+                checkOut={checkOutDate}
+                onDatesChange={(checkIn, checkOut) => setBookingDetails({ checkInDate: checkIn, checkOutDate: checkOut })}
+              />
+              <Surface className="grid min-w-0 gap-4 p-4 sm:grid-cols-[150px_1fr] xl:grid-cols-1 2xl:grid-cols-[150px_1fr]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={activeRoom.image || "/assets/figma/a0108.png"} alt={activeRoom.name} className="h-28 w-full rounded-[4px] object-cover sm:h-full" />
+                <div>
+                  <p className="text-[9px] font-semibold uppercase tracking-wider text-forest">Selected room</p>
+                  <h3 className="mt-1 text-sm font-semibold">{activeRoom.name}</h3>
+                  <p className="mt-1 text-[10px] text-muted">{activeRoom.beds}</p>
+                  <p className="mt-2 text-[10px] leading-5 text-muted">{activeRoom.detail}</p>
+                  <p className="mt-1 text-[10px] font-medium text-forest">{activeRoom.inclusions || "Room features vary by property."}</p>
+                  <p className="mt-2 text-[10px] text-muted">Up to {activeRoom.capacity} guests per room · {activeRoom.totalInventory} rooms in this room type</p>
+                </div>
+              </Surface>
+            </div>
+          )}
           <div className="mt-4 flex items-center justify-between rounded-[4px] bg-mist p-3 text-[10px]">
             <span>{selectedRoom?.name || "Select a room"} · {roomCount} {roomCount === 1 ? "room" : "rooms"}</span>
             <span>Quantity&nbsp; <button type="button" onClick={() => setBookingDetails({ roomCount: Math.max(1, roomCount - 1) })}>−</button>&nbsp; {roomCount} &nbsp;<button type="button" onClick={() => setBookingDetails({ roomCount: Math.min(5, roomCount + 1) })}>+</button></span>

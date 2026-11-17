@@ -22,6 +22,7 @@ export interface Availability {
   checkIn: string;
   checkOut: string;
   totalInventory: number;
+  capacity: number;
   currentlyBooked: number;
   availableInventory: number;
   isAvailable: boolean;
@@ -69,6 +70,9 @@ export class RoomService {
       if (!checkIn || !checkOut || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
         throw new Error("checkIn and checkOut must be valid dates and checkOut must be after checkIn");
       }
+      if (end.getTime() - start.getTime() > 365 * 24 * 60 * 60 * 1000) {
+        throw new Error("The selected stay cannot exceed 365 nights.");
+      }
       currentlyBooked = await getBookedRoomCount(id, checkIn, checkOut);
     }
 
@@ -79,6 +83,7 @@ export class RoomService {
       checkIn,
       checkOut,
       totalInventory,
+      capacity: room.capacity,
       currentlyBooked,
       availableInventory,
       isAvailable: availableInventory >= count,

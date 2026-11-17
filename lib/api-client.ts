@@ -55,6 +55,19 @@ export interface AdminRoomAvailability {
   pricePerNight: number;
 }
 
+export interface RoomAvailabilityCalendar {
+  roomTypeId: string;
+  startDate: string;
+  endDate: string;
+  totalInventory: number;
+  days: Array<{
+    date: string;
+    bookedInventory: number;
+    availableInventory: number;
+    isAvailable: boolean;
+  }>;
+}
+
 export interface AdminDepartment {
   _id: string;
   hotelId: string;
@@ -422,6 +435,10 @@ export const api = {
   getRoomAvailability(id: string, checkIn: string, checkOut: string, count: number) {
     const params = new URLSearchParams({ checkIn, checkOut, count: String(count) });
     return request<AdminRoomAvailability>(`/rooms/${encodeURIComponent(id)}/availability?${params}`);
+  },
+  getRoomAvailabilityCalendar(roomTypeId: string, startDate: string, endDate: string) {
+    const params = new URLSearchParams({ roomTypeId, startDate, endDate });
+    return request<RoomAvailabilityCalendar>(`/bookings/availability?${params}`);
   },
   uploadRoomImage(file: File) {
     const form = new FormData();

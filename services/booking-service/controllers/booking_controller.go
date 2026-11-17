@@ -2,8 +2,10 @@ package controllers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"booking-service/middleware"
 	"booking-service/models"
@@ -50,7 +52,13 @@ func (c *BookingController) HoldRoom(w http.ResponseWriter, r *http.Request) {
 	resp, err := c.bookingService.HoldRoom(r.Context(), &req, userID)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusConflict)
+		status := http.StatusBadRequest
+		if errors.Is(err, services.ErrNoRoomsLeft) || errors.Is(err, services.ErrLockUnavailable) {
+			status = http.StatusConflict
+		} else if strings.Contains(err.Error(), "inventory check") {
+			status = http.StatusServiceUnavailable
+		}
+		w.WriteHeader(status)
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "message": err.Error()})
 		return
 	}
@@ -219,4 +227,23 @@ func (c *BookingController) GetBookedRoomCount(w http.ResponseWriter, r *http.Re
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "count": count})
+}
+
+func (c *BookingController) GetAvailabilityCalendar(w http.ResponseWriter, r *http.Request) {
+	roomTypeID := r.URL.Query().Get("roomTypeId")
+	if roomTypeID == "" {
+		roomTypeID = chi.URLParam(r, "roomTypeId")
+	}
+	calendar, err := c.bookingService.GetAvailabilityCalendar(r.Context(), roomTypeID, r.URL.Query().Get("startDate"), r.URL.Query().Get("endDate"))
+	w.Header().Set("Content-Type", "application/json")
+	if err != nil {
+		status := http.StatusBadRequest
+		if strings.Contains(err.Error(), "inventory check") || strings.Contains(err.Error(), "load availability calendar") {
+			status = http.StatusServiceUnavailable
+		}
+		w.WriteHeader(status)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "message": err.Error()})
+		return
+	}
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "data": calendar})
 }
