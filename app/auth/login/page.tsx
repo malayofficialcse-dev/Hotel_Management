@@ -7,6 +7,7 @@ import { api } from "@/lib/api-client";
 import { FigmaIcon } from "@/components/figma-icon";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { AuthSplitLayout } from "@/app/auth/auth-split-layout";
 
 function LoginForm() {
   const router = useRouter();
@@ -50,7 +51,7 @@ function LoginForm() {
         </div>
       )}
 
-      <div className="overflow-hidden rounded-2xl border border-stone-200/80 bg-white shadow-xl shadow-stone-200/50">
+      <div className="overflow-hidden rounded-[3px] border border-stone-200/80 bg-white shadow-xl shadow-stone-200/50">
         <div className="bg-gradient-to-br from-[#1b3d36] to-[#2c5348] p-8 text-white text-center relative">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-white/10 backdrop-blur-sm border border-white/20 mb-3">
             <FigmaIcon name="bed" className="h-6 w-6 text-emerald-300" />
@@ -144,9 +145,9 @@ export default function LoginPage() {
   return (
     <>
       <SiteHeader />
-      <main className="min-h-[calc(100vh-200px)] bg-[#f7f5f2] py-14 px-4 flex items-center justify-center">
+      <main className="flex min-h-[calc(100svh-180px)] w-full items-center justify-center bg-[#f6f5f2] px-0 py-0">
         <Suspense fallback={<div className="text-center text-sm text-stone-500">Loading sign in…</div>}>
-          <LoginForm />
+          <AuthSplitLayout><LoginForm /></AuthSplitLayout>
         </Suspense>
       </main>
       <SiteFooter />

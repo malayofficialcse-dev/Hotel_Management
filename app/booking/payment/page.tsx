@@ -32,7 +32,7 @@ const popularBanks = [
 ];
 
 export default function PaymentPage() {
-  const { paymentMethod: ctxMethod, setPaymentMethod: setCtxMethod, booking: ctxBooking, setBooking } = useBooking();
+  const { paymentMethod: ctxMethod, setPaymentMethod: setCtxMethod, booking: ctxBooking, setBooking, guestDetails } = useBooking();
   const router = useRouter();
 
   const [paymentMethod, setPaymentMethod] = useState<string>("Credit / Debit card");
@@ -65,9 +65,9 @@ export default function PaymentPage() {
   const [bookingId, setBookingId] = useState<string>("");
   const [hotelName, setHotelName] = useState<string>("StayEase Luxury Hotel");
   const [roomTypeName, setRoomTypeName] = useState<string>("Deluxe Room");
-  const [guestName, setGuestName] = useState<string>("Aarav Mehta");
-  const [guestEmail, setGuestEmail] = useState<string>("aarav.mehta@gmail.com");
-  const [guestPhone, setGuestPhone] = useState<string>("+91 9876543210");
+  const [guestName, setGuestName] = useState<string>("");
+  const [guestEmail, setGuestEmail] = useState<string>("");
+  const [guestPhone, setGuestPhone] = useState<string>("");
   const [checkInDate, setCheckInDate] = useState<string>("2026-12-18");
   const [checkOutDate, setCheckOutDate] = useState<string>("2026-12-21");
   const [nights, setNights] = useState<number>(3);
@@ -80,7 +80,7 @@ export default function PaymentPage() {
   const [upiId, setUpiId] = useState("");
   const [showQr, setShowQr] = useState(false);
   const [selectedBank, setSelectedBank] = useState("HDFC Bank");
-  const [cardName, setCardName] = useState("Aarav Mehta");
+  const [cardName, setCardName] = useState("");
   const [cardNumber, setCardNumber] = useState("");
   const [expiry, setExpiry] = useState("");
   const [cvv, setCvv] = useState("");
@@ -126,6 +126,15 @@ export default function PaymentPage() {
       }
     }
   }, [ctxBooking]);
+
+  useEffect(() => {
+    const fullName = `${guestDetails.firstName} ${guestDetails.lastName}`.trim();
+    if (!fullName && !guestDetails.email && !guestDetails.phone) return;
+    setGuestName(fullName || "Guest");
+    setGuestEmail(guestDetails.email);
+    setGuestPhone(guestDetails.phone);
+    setCardName(fullName);
+  }, [guestDetails]);
 
   async function submitPayment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

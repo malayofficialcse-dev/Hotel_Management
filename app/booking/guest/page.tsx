@@ -15,7 +15,7 @@ export default function GuestDetailsPage() {
   const router = useRouter();
   const {
     hotelId, roomId, checkInDate, checkOutDate, guestsCount, roomCount,
-    selectedRoom, setSelectedRoom, setBooking,
+    selectedRoom, setSelectedRoom, setBooking, guestDetails, setGuestDetails, hydrated,
   } = useBooking();
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -30,6 +30,21 @@ export default function GuestDetailsPage() {
     const loggedInUser = api.getUser();
     if (loggedInUser) setUser(loggedInUser);
   }, [router]);
+
+  useEffect(() => {
+    if (!hydrated || !user) return;
+    const [firstName = "", ...lastNames] = user.name.trim().split(/\s+/);
+    const updates: Partial<typeof guestDetails> = {};
+    if (!guestDetails.firstName) updates.firstName = firstName;
+    if (!guestDetails.lastName) updates.lastName = lastNames.join(" ");
+    if (!guestDetails.email) updates.email = user.email;
+    if (!guestDetails.phone && user.phone) updates.phone = user.phone;
+    if (Object.keys(updates).length) setGuestDetails(updates);
+  }, [hydrated, user, guestDetails, setGuestDetails]);
+
+  function updateGuestField(field: keyof typeof guestDetails, value: string) {
+    setGuestDetails({ [field]: value });
+  }
 
   useEffect(() => {
     if (!roomId || selectedRoom?.id === roomId) return;
@@ -63,7 +78,6 @@ export default function GuestDetailsPage() {
       return;
     }
     setSubmitting(true);
-    const data = new FormData(event.currentTarget);
     try {
       const hotel = await api.getHotel(hotelId);
       const result = await api.holdRoom({
@@ -75,11 +89,11 @@ export default function GuestDetailsPage() {
         checkOutDate,
         guestsCount,
         roomCount,
-        guestFirstName: String(data.get("firstName")),
-        guestLastName: String(data.get("lastName")),
-        guestEmail: String(data.get("email")),
-        guestPhone: String(data.get("phone")),
-        specialRequests: String(data.get("specialRequests") || ""),
+        guestFirstName: guestDetails.firstName,
+        guestLastName: guestDetails.lastName,
+        guestEmail: guestDetails.email,
+        guestPhone: guestDetails.phone,
+        specialRequests: guestDetails.specialRequests,
       });
       if (!result.success) {
         setError(result.message || "We couldn't reserve that room. Please try again.");
@@ -108,10 +122,10 @@ export default function GuestDetailsPage() {
           <Surface className="mt-4 p-5">
             <h2 className="text-sm font-semibold">Lead guest details</h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <TextField name="firstName" label="First name *" key={`fn-${user?.name}`} defaultValue={user?.name ? user.name.split(" ")[0] : "Aarav"} required />
-              <TextField name="lastName" label="Last name *" key={`ln-${user?.name}`} defaultValue={user?.name ? user.name.split(" ").slice(1).join(" ") || "Guest" : "Mehta"} required />
-              <TextField name="email" label="Email address *" type="email" key={`em-${user?.email}`} defaultValue={user?.email || "aarav.mehta@gmail.com"} required />
-              <TextField name="phone" label="Mobile number *" type="tel" key={`ph-${user?.phone}`} defaultValue={user?.phone || "+91 98765 43210"} required />
+              <TextField name="firstName" label="First name *" value={guestDetails.firstName} onChange={(event) => updateGuestField("firstName", event.target.value)} required />
+              <TextField name="lastName" label="Last name *" value={guestDetails.lastName} onChange={(event) => updateGuestField("lastName", event.target.value)} required />
+              <TextField name="email" label="Email address *" type="email" value={guestDetails.email} onChange={(event) => updateGuestField("email", event.target.value)} required />
+              <TextField name="phone" label="Mobile number *" type="tel" value={guestDetails.phone} onChange={(event) => updateGuestField("phone", event.target.value)} required />
             </div>
             <p className="mt-3 text-[10px] text-muted">Your confirmation and stay updates will be sent here.</p>
             <div className="mt-4 flex flex-wrap gap-5 text-[11px]">
@@ -122,23 +136,23 @@ export default function GuestDetailsPage() {
           <Surface className="mt-4 p-5">
             <h2 className="text-sm font-semibold">Address</h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <TextField label="Street address *" defaultValue="24, Palm Avenue, Indiranagar" required className="sm:col-span-2" />
-              <TextField label="City *" defaultValue="Bengaluru" required />
-              <TextField label="Postal code *" defaultValue="560038" required />
-              <TextField label="State *" defaultValue="Karnataka" required />
-              <TextField label="Country *" defaultValue="India" required />
+              <TextField label="Street address *" name="street" value={guestDetails.street} onChange={(event) => updateGuestField("street", event.target.value)} required className="sm:col-span-2" />
+              <TextField label="City *" name="city" value={guestDetails.city} onChange={(event) => updateGuestField("city", event.target.value)} required />
+              <TextField label="Postal code *" name="postalCode" value={guestDetails.postalCode} onChange={(event) => updateGuestField("postalCode", event.target.value)} required />
+              <TextField label="State *" name="state" value={guestDetails.state} onChange={(event) => updateGuestField("state", event.target.value)} required />
+              <TextField label="Country *" name="country" value={guestDetails.country} onChange={(event) => updateGuestField("country", event.target.value)} required />
             </div>
           </Surface>
           <Surface className="mt-4 p-5">
             <h2 className="text-sm font-semibold">Make yourself at home</h2>
             <label className="mt-4 block text-[11px] font-medium">
               Special requests (optional)
-              <textarea name="specialRequests" defaultValue="A quiet room on a higher floor would be lovely, please." rows={3} className="mt-2 w-full resize-y rounded-[4px] border border-line p-3 text-xs font-normal" />
+              <textarea name="specialRequests" value={guestDetails.specialRequests} onChange={(event) => updateGuestField("specialRequests", event.target.value)} rows={3} className="mt-2 w-full resize-y rounded-[4px] border border-line p-3 text-xs font-normal" />
             </label>
             <p className="mt-2 text-[10px] text-muted">We’ll share your requests with the hotel. They’re subject to availability.</p>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <label className="text-[10px] font-medium">Estimated arrival<select className="mt-2 h-10 w-full rounded-[4px] border border-line px-3 text-xs font-normal"><option>2:00 PM – 3:00 PM</option><option>3:00 PM – 4:00 PM</option></select></label>
-              <label className="text-[10px] font-medium">Room preference<select className="mt-2 h-10 w-full rounded-[4px] border border-line px-3 text-xs font-normal"><option>Non-smoking</option><option>Smoking</option></select></label>
+              <label className="text-[10px] font-medium">Estimated arrival<select value={guestDetails.arrivalTime} onChange={(event) => updateGuestField("arrivalTime", event.target.value)} className="mt-2 h-10 w-full rounded-[4px] border border-line px-3 text-xs font-normal"><option>2:00 PM – 3:00 PM</option><option>3:00 PM – 4:00 PM</option></select></label>
+              <label className="text-[10px] font-medium">Room preference<select value={guestDetails.roomPreference} onChange={(event) => updateGuestField("roomPreference", event.target.value)} className="mt-2 h-10 w-full rounded-[4px] border border-line px-3 text-xs font-normal"><option>Non-smoking</option><option>Smoking</option></select></label>
             </div>
           </Surface>
           <label className="mt-4 flex items-center gap-2 text-[10px]"><input type="checkbox" defaultChecked className="accent-[#486958]" /> Save these details for my next getaway</label>

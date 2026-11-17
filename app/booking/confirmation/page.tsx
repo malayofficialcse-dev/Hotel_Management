@@ -10,6 +10,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { Button, Surface } from "@/components/ui";
 import { api, type UserSession } from "@/lib/api-client";
+import { useBooking } from "@/components/booking-provider";
 
 const calendarEvent = `BEGIN:VCALENDAR
 VERSION:2.0
@@ -23,6 +24,8 @@ END:VEVENT
 END:VCALENDAR`;
 
 export default function BookingConfirmationPage() {
+  const { guestDetails } = useBooking();
+  const guestName = `${guestDetails.firstName} ${guestDetails.lastName}`.trim() || "Guest";
   const [bookingCode, setBookingCode] = useState("SE-261218-0482");
   const [userChecked, setUserChecked] = useState(false);
   const [user, setUser] = useState<UserSession | null>(null);
@@ -103,7 +106,7 @@ export default function BookingConfirmationPage() {
       <main className="mx-auto max-w-[1160px] px-5 py-7 lg:px-0">
         <section className="rounded-[4px] bg-mint px-5 py-8 text-center sm:py-10">
           <span className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-white"><FigmaIcon name="check" className="h-5 w-5" /></span>
-          <h1 className="mt-4 text-[24px] font-semibold tracking-[-0.5px]">You’re going to Goa, Aarav!</h1>
+          <h1 className="mt-4 text-[24px] font-semibold tracking-[-0.5px]">You’re going to Goa, {guestDetails.firstName || "Guest"}!</h1>
           <p className="mt-2 text-xs text-muted">Your stay is confirmed. Let the countdown to slow mornings begin.</p>
           <span className="mt-3 inline-block rounded-[4px] bg-white px-3 py-1 text-[9px] font-semibold">CONFIRMED · BOOKING ID {bookingCode}</span>
         </section>
@@ -133,7 +136,7 @@ export default function BookingConfirmationPage() {
               </div>
               <div className="mt-4 flex items-center justify-between gap-4 border-t border-line pt-4">
                 <div className="text-[10px]">
-                  <p className="font-semibold">Aarav Mehta · 2 adults</p>
+                  <p className="font-semibold">{guestName} · 2 adults</p>
                   <p className="mt-1 text-muted">1 Deluxe Room · King bed · 3 nights</p>
                   <p className="mt-1 text-muted">Breakfast included · Free Wi-Fi</p>
                   <p className="mt-2 text-muted">Show this QR at the front desk for a smooth check-in.</p>
@@ -143,7 +146,7 @@ export default function BookingConfirmationPage() {
             </Surface>
             <Surface className="bg-sky p-5">
               <h2 className="text-sm font-semibold">All the details, delivered</h2>
-              <p className="mt-3 flex items-center gap-2 text-[10px]"><FigmaIcon name="mail" className="h-4 w-4" /> Your confirmation and payment receipt have been sent to aarav.mehta@gmail.com.</p>
+              <p className="mt-3 flex items-center gap-2 text-[10px]"><FigmaIcon name="mail" className="h-4 w-4" /> Your confirmation and payment receipt have been sent to {guestDetails.email || "your email address"}.</p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <a href={`/booking/bill?code=${encodeURIComponent(bookingCode)}`} className="inline-flex min-h-9 items-center gap-2 rounded-[4px] bg-white px-3 text-[10px] font-semibold text-charcoal shadow-sm hover:bg-mist">View & Print Tax Invoice <FigmaIcon name="download" className="h-3.5 w-3.5" /></a>
                 <a href={`data:text/calendar;charset=utf-8,${encodeURIComponent(calendarEvent)}`} download="stayease-stay.ics" className="inline-flex min-h-9 items-center gap-2 rounded-[4px] bg-white px-3 text-[10px] font-semibold">Add to calendar <FigmaIcon name="calendar-plus" className="h-3.5 w-3.5" /></a>

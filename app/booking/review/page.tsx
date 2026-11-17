@@ -8,9 +8,13 @@ import { FigmaIcon } from "@/components/figma-icon";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { Button, PageHeading, Surface } from "@/components/ui";
+import { useBooking } from "@/components/booking-provider";
 
 export default function BookingReviewPage() {
   const router = useRouter();
+  const { guestDetails } = useBooking();
+  const guestName = `${guestDetails.firstName} ${guestDetails.lastName}`.trim();
+  const guestAddress = [guestDetails.street, guestDetails.city, guestDetails.state, guestDetails.postalCode, guestDetails.country].filter(Boolean).join(", ");
   const [agreed, setAgreed] = useState(true);
   function continueToPayment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -45,10 +49,10 @@ export default function BookingReviewPage() {
               <Button href="/booking/guest" variant="outline" className="min-h-8 border-0 px-2">Edit details</Button>
             </div>
             <div className="mt-4 grid gap-4 text-[11px] sm:grid-cols-2">
-              <div><p className="font-semibold">Aarav Mehta</p><p className="mt-2 text-muted">aarav.mehta@gmail.com</p><p className="mt-2 text-muted">+91 98765 43210</p></div>
-              <div className="text-muted">24, Palm Avenue, Indiranagar, Bengaluru, Karnataka 560038, India<br /><br />Arrival: 2:00 PM – 3:00 PM</div>
+              <div><p className="font-semibold">{guestName || "Guest"}</p><p className="mt-2 text-muted">{guestDetails.email}</p><p className="mt-2 text-muted">{guestDetails.phone}</p></div>
+              <div className="text-muted">{guestAddress || "Address not provided"}<br /><br />Arrival: {guestDetails.arrivalTime}</div>
             </div>
-            <p className="mt-4 border-t border-line pt-4 text-[10px] text-muted">Special request: A quiet room on a higher floor would be lovely, please.</p>
+            {guestDetails.specialRequests && <p className="mt-4 border-t border-line pt-4 text-[10px] text-muted">Special request: {guestDetails.specialRequests}</p>}
           </Surface>
           <Surface className="mt-4 flex items-center justify-between gap-3 bg-mint p-5">
             <div>

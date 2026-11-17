@@ -4,6 +4,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { PublicRoom } from "@/lib/api-client";
 
 type BookingState = {
+  guestDetails: GuestDetails;
+  hydrated: boolean;
   roomId: string;
   hotelId: string;
   checkInDate: string;
@@ -19,6 +21,28 @@ type BookingState = {
   setBooking: (booking: BookingState["booking"]) => void;
   toggleSavedHotel: (hotelId: string) => void;
   setPaymentMethod: (method: string) => void;
+  setGuestDetails: (details: Partial<GuestDetails>) => void;
+};
+
+export type GuestDetails = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  street: string;
+  city: string;
+  postalCode: string;
+  state: string;
+  country: string;
+  specialRequests: string;
+  arrivalTime: string;
+  roomPreference: string;
+};
+
+const EMPTY_GUEST_DETAILS: GuestDetails = {
+  firstName: "", lastName: "", email: "", phone: "", street: "", city: "",
+  postalCode: "", state: "", country: "", specialRequests: "", arrivalTime: "2:00 PM – 3:00 PM",
+  roomPreference: "Non-smoking",
 };
 
 const BookingContext = createContext<BookingState | null>(null);
@@ -42,6 +66,7 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
     "river-root",
   ]);
   const [paymentMethod, setPaymentMethod] = useState("Credit / Debit card");
+  const [guestDetails, setGuestDetailsState] = useState<GuestDetails>(EMPTY_GUEST_DETAILS);
   const [hydrated, setHydrated] = useState(false);
 
   const setSelectedRoom = useCallback((room: PublicRoom) => {
@@ -57,11 +82,13 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
           roomId: string;
           savedHotelIds: string[];
           paymentMethod: string;
+          guestDetails: Partial<GuestDetails>;
           hotelId: string; checkInDate: string; checkOutDate: string; guestsCount: number; roomCount: number;
         }>;
         if (state.roomId) setRoomId(state.roomId);
         if (Array.isArray(state.savedHotelIds)) setSavedHotelIds(state.savedHotelIds);
         if (state.paymentMethod) setPaymentMethod(state.paymentMethod);
+        if (state.guestDetails) setGuestDetailsState({ ...EMPTY_GUEST_DETAILS, ...state.guestDetails });
         if (state.hotelId) setHotelId(state.hotelId);
         if (state.checkInDate) setCheckInDate(state.checkInDate);
         if (state.checkOutDate) setCheckOutDate(state.checkOutDate);
@@ -80,21 +107,23 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
     try {
       window.localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ roomId, hotelId, checkInDate, checkOutDate, guestsCount, roomCount, savedHotelIds, paymentMethod }),
+        JSON.stringify({ roomId, hotelId, checkInDate, checkOutDate, guestsCount, roomCount, savedHotelIds, paymentMethod, guestDetails }),
       );
     } catch (error) {
       console.error("Could not persist the StayEase session.", error);
     }
-  }, [hydrated, roomId, hotelId, checkInDate, checkOutDate, guestsCount, roomCount, savedHotelIds, paymentMethod]);
+  }, [hydrated, roomId, hotelId, checkInDate, checkOutDate, guestsCount, roomCount, savedHotelIds, paymentMethod, guestDetails]);
 
   const value = useMemo(
     () => ({
       roomId,
       hotelId, checkInDate, checkOutDate, guestsCount, roomCount, selectedRoom, booking,
+      guestDetails, hydrated,
       savedHotelIds,
       paymentMethod,
       setSelectedRoom,
       setPaymentMethod,
+      setGuestDetails: (details: Partial<GuestDetails>) => setGuestDetailsState((current) => ({ ...current, ...details })),
       setBookingDetails: (details: Partial<Pick<BookingState, "hotelId" | "checkInDate" | "checkOutDate" | "guestsCount" | "roomCount">>) => {
         if (details.hotelId !== undefined) setHotelId(details.hotelId);
         if (details.checkInDate !== undefined) setCheckInDate(details.checkInDate);
@@ -111,7 +140,7 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
         );
       },
     }),
-    [roomId, hotelId, checkInDate, checkOutDate, guestsCount, roomCount, selectedRoom, booking, savedHotelIds, paymentMethod],
+    [roomId, hotelId, checkInDate, checkOutDate, guestsCount, roomCount, selectedRoom, booking, savedHotelIds, paymentMethod, guestDetails, hydrated],
   );
 
   return <BookingContext.Provider value={value}>{children}</BookingContext.Provider>;
