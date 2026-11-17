@@ -39,11 +39,13 @@ export default function PaymentPage() {
   const [loadingBooking, setLoadingBooking] = useState(false);
   const [error, setError] = useState("");
   const [processing, setProcessing] = useState(false);
+  const [userChecked, setUserChecked] = useState(false);
   const [user, setUser] = useState<UserSession | null>(null);
 
   useEffect(() => {
     const syncUser = () => {
       setUser(api.getUser());
+      setUserChecked(true);
     };
     syncUser();
     window.addEventListener("stayease-user-updated", syncUser);
@@ -188,6 +190,60 @@ export default function PaymentPage() {
   }
 
   const subtotal = Math.round(totalPrice / 1.12);
+
+  if (!userChecked) {
+    return (
+      <>
+        <SiteHeader />
+        <main className="mx-auto max-w-[800px] px-5 py-16 text-center">
+          <div className="rounded-lg border border-line bg-white p-12 text-sm text-muted">
+            Checking session…
+          </div>
+        </main>
+        <SiteFooter />
+      </>
+    );
+  }
+
+  if (!user) {
+    const returnUrl = typeof window !== "undefined" ? window.location.pathname + window.location.search : "/bookings";
+    return (
+      <>
+        <SiteHeader />
+        <main className="mx-auto max-w-[560px] px-5 py-16 text-center">
+          <div className="rounded-xl border border-line bg-white p-8 shadow-sm">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#f0f4f1] text-forest">
+              <FigmaIcon name="lock" className="h-6 w-6" />
+            </div>
+            <h1 className="mt-4 text-lg font-bold text-charcoal">Sign in to complete payment</h1>
+            <p className="mt-2 text-xs text-muted leading-relaxed">
+              You are currently signed out. To secure your payment and access booking details, please sign in to your StayEase account.
+            </p>
+            <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
+              <Link
+                href={`/auth/login?returnUrl=${encodeURIComponent(returnUrl)}`}
+                className="w-full sm:w-auto rounded bg-forest px-5 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-[#344d40] transition-colors"
+              >
+                Sign in to continue
+              </Link>
+              <Link
+                href="/auth/register"
+                className="w-full sm:w-auto rounded border border-line bg-white px-4 py-2.5 text-xs font-semibold text-charcoal hover:bg-mist transition-colors"
+              >
+                Create account
+              </Link>
+            </div>
+            <div className="mt-4">
+              <Link href="/" className="text-xs text-muted hover:text-forest underline">
+                Return to Explore
+              </Link>
+            </div>
+          </div>
+        </main>
+        <SiteFooter />
+      </>
+    );
+  }
 
   return (
     <>

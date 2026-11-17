@@ -36,11 +36,13 @@ export default function BillPage() {
   const [bill, setBill] = useState<BillData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [userChecked, setUserChecked] = useState(false);
   const [user, setUser] = useState<UserSession | null>(null);
 
   useEffect(() => {
     const syncUser = () => {
       setUser(api.getUser());
+      setUserChecked(true);
     };
     syncUser();
     window.addEventListener("stayease-user-updated", syncUser);
@@ -56,6 +58,13 @@ export default function BillPage() {
   );
   const canViewPayments = Boolean(
     user && (isSuperAdmin || effectivePerms?.payments?.view)
+  );
+
+  const isAuthorized = Boolean(
+    isSuperAdmin ||
+    canViewReservations ||
+    canViewPayments ||
+    (user && bill && user.email && bill.guestEmail && user.email.toLowerCase() === bill.guestEmail.toLowerCase())
   );
 
   useEffect(() => {
@@ -143,6 +152,106 @@ export default function BillPage() {
 
     void loadData();
   }, []);
+
+  if (!userChecked) {
+    return (
+      <>
+        <div className="print:hidden">
+          <SiteHeader />
+        </div>
+        <main className="mx-auto max-w-[880px] px-4 py-16 text-center">
+          <div className="rounded-lg border border-line bg-white p-12 text-sm text-muted">
+            Checking session…
+          </div>
+        </main>
+        <div className="print:hidden">
+          <SiteFooter />
+        </div>
+      </>
+    );
+  }
+
+  if (!user) {
+    const returnUrl = typeof window !== "undefined" ? window.location.pathname + window.location.search : "/booking/bill";
+    return (
+      <>
+        <div className="print:hidden">
+          <SiteHeader />
+        </div>
+        <main className="mx-auto max-w-[560px] px-4 py-16 text-center">
+          <div className="rounded-xl border border-line bg-white p-8 shadow-sm">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#f0f4f1] text-forest">
+              <FigmaIcon name="lock" className="h-6 w-6" />
+            </div>
+            <h1 className="mt-4 text-lg font-bold text-charcoal">Sign in to view invoice</h1>
+            <p className="mt-2 text-xs text-muted leading-relaxed">
+              You are currently signed out. For guest privacy and security, booking details and tax invoices can only be accessed while signed in to an authorized account.
+            </p>
+            <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
+              <Link
+                href={`/auth/login?returnUrl=${encodeURIComponent(returnUrl)}`}
+                className="w-full sm:w-auto rounded bg-forest px-5 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-[#344d40] transition-colors"
+              >
+                Sign in to view bill
+              </Link>
+              <Link
+                href="/auth/register"
+                className="w-full sm:w-auto rounded border border-line bg-white px-4 py-2.5 text-xs font-semibold text-charcoal hover:bg-mist transition-colors"
+              >
+                Create account
+              </Link>
+            </div>
+            <div className="mt-4">
+              <Link href="/" className="text-xs text-muted hover:text-forest underline">
+                Return to Explore
+              </Link>
+            </div>
+          </div>
+        </main>
+        <div className="print:hidden">
+          <SiteFooter />
+        </div>
+      </>
+    );
+  }
+
+  if (bill && !isAuthorized) {
+    return (
+      <>
+        <div className="print:hidden">
+          <SiteHeader />
+        </div>
+        <main className="mx-auto max-w-[560px] px-4 py-16 text-center">
+          <div className="rounded-xl border border-red-200 bg-red-50/50 p-8 shadow-sm">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-red-700">
+              <FigmaIcon name="shield" className="h-6 w-6" />
+            </div>
+            <h1 className="mt-4 text-lg font-bold text-charcoal">Access Restricted</h1>
+            <p className="mt-2 text-xs text-muted leading-relaxed">
+              This tax invoice belongs to another reservation. You can only view invoices linked to your account.
+            </p>
+            <div className="mt-6 flex justify-center gap-3">
+              <Link
+                href="/bookings"
+                className="rounded bg-forest px-5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-[#344d40]"
+              >
+                My Bookings
+              </Link>
+              <Link
+                href="/"
+                className="rounded border border-line bg-white px-4 py-2 text-xs font-semibold text-charcoal hover:bg-mist"
+              >
+                Return to Explore
+              </Link>
+            </div>
+          </div>
+        </main>
+        <div className="print:hidden">
+          <SiteFooter />
+        </div>
+      </>
+    );
+  }
 
   return (
     <>

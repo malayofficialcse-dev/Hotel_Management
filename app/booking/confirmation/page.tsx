@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { QRCodeSVG } from "qrcode.react";
 import { BookingStepper } from "@/components/booking-stepper";
 import { BookingSummary } from "@/components/booking-summary";
@@ -8,6 +9,7 @@ import { FigmaIcon } from "@/components/figma-icon";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { Button, Surface } from "@/components/ui";
+import { api, type UserSession } from "@/lib/api-client";
 
 const calendarEvent = `BEGIN:VCALENDAR
 VERSION:2.0
@@ -22,7 +24,78 @@ END:VCALENDAR`;
 
 export default function BookingConfirmationPage() {
   const [bookingCode, setBookingCode] = useState("SE-261218-0482");
-  useEffect(() => { const code = new URLSearchParams(window.location.search).get("code"); if (code) setBookingCode(code); }, []);
+  const [userChecked, setUserChecked] = useState(false);
+  const [user, setUser] = useState<UserSession | null>(null);
+
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get("code");
+    if (code) setBookingCode(code);
+  }, []);
+
+  useEffect(() => {
+    const syncUser = () => {
+      setUser(api.getUser());
+      setUserChecked(true);
+    };
+    syncUser();
+    window.addEventListener("stayease-user-updated", syncUser);
+    return () => window.removeEventListener("stayease-user-updated", syncUser);
+  }, []);
+
+  if (!userChecked) {
+    return (
+      <>
+        <SiteHeader />
+        <main className="mx-auto max-w-[800px] px-5 py-16 text-center">
+          <div className="rounded-lg border border-line bg-white p-12 text-sm text-muted">
+            Checking session…
+          </div>
+        </main>
+        <SiteFooter />
+      </>
+    );
+  }
+
+  if (!user) {
+    const returnUrl = typeof window !== "undefined" ? window.location.pathname + window.location.search : "/bookings";
+    return (
+      <>
+        <SiteHeader />
+        <main className="mx-auto max-w-[560px] px-5 py-16 text-center">
+          <div className="rounded-xl border border-line bg-white p-8 shadow-sm">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#f0f4f1] text-forest">
+              <FigmaIcon name="lock" className="h-6 w-6" />
+            </div>
+            <h1 className="mt-4 text-lg font-bold text-charcoal">Sign in to view booking confirmation</h1>
+            <p className="mt-2 text-xs text-muted leading-relaxed">
+              You are currently signed out. For guest privacy and security, booking confirmation details can only be viewed while signed in to an authorized account.
+            </p>
+            <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
+              <Link
+                href={`/auth/login?returnUrl=${encodeURIComponent(returnUrl)}`}
+                className="w-full sm:w-auto rounded bg-forest px-5 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-[#344d40] transition-colors"
+              >
+                Sign in to view booking
+              </Link>
+              <Link
+                href="/auth/register"
+                className="w-full sm:w-auto rounded border border-line bg-white px-4 py-2.5 text-xs font-semibold text-charcoal hover:bg-mist transition-colors"
+              >
+                Create account
+              </Link>
+            </div>
+            <div className="mt-4">
+              <Link href="/" className="text-xs text-muted hover:text-forest underline">
+                Return to Explore
+              </Link>
+            </div>
+          </div>
+        </main>
+        <SiteFooter />
+      </>
+    );
+  }
+
   return (
     <>
       <SiteHeader />
