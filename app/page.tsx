@@ -8,6 +8,8 @@ import { SiteHeader } from "@/components/site-header";
 import { Button } from "@/components/ui";
 import { hotels, type Hotel } from "@/lib/data";
 import { api, type PublicRoom } from "@/lib/api-client";
+import { TotalPageSkeleton, HotelGridSkeleton } from "@/components/skeletons/home-page-skeleton";
+import { AdminPagination } from "@/components/admin/admin-pagination";
 
 const benefits = [
   { icon: "shield" as const, title: "Handpicked, not endless", subtitle: "Stays worth travelling for" },
@@ -105,8 +107,19 @@ export default function HomePage() {
   const [activeHeroSlide, setActiveHeroSlide] = useState(0);
   const [carouselPaused, setCarouselPaused] = useState(false);
   const [carouselNotice, setCarouselNotice] = useState("");
+  const [isPageLoading, setIsPageLoading] = useState(true);
+  const [forceSkeleton, setForceSkeleton] = useState(false);
   const searchRequestId = useRef(0);
   const activeSlide = heroSlides[activeHeroSlide] || heroSlides[0];
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("skeleton") === "true") {
+        setForceSkeleton(true);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -161,6 +174,13 @@ export default function HomePage() {
       })
       .catch(() => {
         if (active) setCatalogError("Showing our saved catalogue while the live catalogue reconnects.");
+      })
+      .finally(() => {
+        if (active) {
+          setTimeout(() => {
+            if (active) setIsPageLoading(false);
+          }, 350);
+        }
       });
     return () => { active = false; };
   }, []);
@@ -222,14 +242,14 @@ export default function HomePage() {
     return result;
   }, [catalog, searched, sort, minimumPrice, maximumPrice, priceBounds, rating, selectedAmenities, selectedCategories, availabilityByHotel]);
 
-  const pageSize = 6;
+  const [pageSize, setPageSize] = useState(6);
   const totalPages = Math.max(1, Math.ceil(visibleHotels.length / pageSize));
   const currentPage = Math.min(page, totalPages);
   const pageHotels = visibleHotels.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   useEffect(() => {
     setPage(1);
-  }, [searched, sort, minimumPrice, maximumPrice, rating, selectedAmenities, selectedCategories, availabilityByHotel]);
+  }, [searched, sort, minimumPrice, maximumPrice, rating, selectedAmenities, selectedCategories, availabilityByHotel, pageSize]);
 
   async function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -309,6 +329,16 @@ export default function HomePage() {
     setAvailabilityError("");
     setSearchError("");
     setPage(1);
+  }
+
+  if (isPageLoading || forceSkeleton) {
+    return (
+      <>
+        <SiteHeader active="explore" />
+        <TotalPageSkeleton />
+        <SiteFooter />
+      </>
+    );
   }
 
   return (
@@ -650,8 +680,12 @@ export default function HomePage() {
                 </span>
               </div>
               {availabilityLoading ? (
-                <div className="rounded-xl border border-[#e5e7e1] bg-white p-12 text-center text-sm text-[#78847c]">
-                  Checking available rooms for your selected dates and party size…
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 rounded-xl border border-[#cbe0d3] bg-[#edf3ee] px-4 py-3 text-xs font-medium text-[#2d5a43] shadow-sm">
+                    <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-[#2d5a43] border-t-transparent" />
+                    Checking live room availability for your dates and party size…
+                  </div>
+                  <HotelGridSkeleton count={pageSize} />
                 </div>
               ) : visibleHotels.length ? (
                 <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
@@ -665,11 +699,17 @@ export default function HomePage() {
                   <button type="button" onClick={resetAll} className="mt-5 rounded-lg bg-[#244b3e] px-4 py-2.5 text-[11px] font-semibold text-white hover:bg-[#193c32]">Clear all filters</button>
                 </div>
               )}
-              {totalPages > 1 && !availabilityLoading && (
-                <div className="mt-5 flex items-center justify-center gap-4 text-[11px]">
-                  <button type="button" aria-label="Previous page" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)} className="rounded-lg border border-[#e1e5df] bg-white px-3 py-2 text-[#385a49] disabled:text-[#bbc2bc]">←</button>
-                  <span className="text-[#68756d]">Page {currentPage} of {totalPages}</span>
-                  <button type="button" aria-label="Next page" disabled={currentPage === totalPages} onClick={() => setPage(currentPage + 1)} className="rounded-lg border border-[#e1e5df] bg-white px-3 py-2 text-[#385a49] disabled:text-[#bbc2bc]">→</button>
+              {visibleHotels.length > 0 && !availabilityLoading && (
+                <div className="mt-6 overflow-hidden rounded-xl border border-[#e5e7e1] bg-white shadow-sm">
+                  <AdminPagination
+                    currentPage={currentPage}
+                    totalItems={visibleHotels.length}
+                    pageSize={pageSize}
+                    onPageChange={(p) => setPage(p)}
+                    onPageSizeChange={(s) => setPageSize(s)}
+                    pageSizeOptions={[6, 12, 24, 48]}
+                    itemLabel="stays"
+                  />
                 </div>
               )}
             </div>

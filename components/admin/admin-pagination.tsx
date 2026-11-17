@@ -259,4 +259,3 @@ export function AdminPagination({
     </div>
   );
 }
-

@@ -69,8 +69,33 @@ textarea:focus-visible {
   animation: hero-carousel-reveal 700ms ease-out both;
 }
 
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(90deg, #e7ece8 25%, #f4f7f4 37%, #e7ece8 63%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+.skeleton-shimmer-dark {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.07) 25%, rgba(255, 255, 255, 0.18) 37%, rgba(255, 255, 255, 0.07) 63%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hero-carousel-image {
+    animation: none;
+  }
+  .skeleton-shimmer,
+  .skeleton-shimmer-dark {
     animation: none;
   }
 }

@@ -13,6 +13,7 @@ import { useBooking } from "@/components/booking-provider";
 import { api, type PublicRoom } from "@/lib/api-client";
 import type { Hotel } from "@/lib/data";
 import { formatPrice } from "@/lib/data";
+import { HotelDetailSkeleton } from "@/components/skeletons/hotel-detail-skeleton";
 
 const fallbackImage = "/assets/figma/a0108.png";
 
@@ -61,7 +62,7 @@ export default function HotelDetailsPage() {
     <>
       <SiteHeader />
       <main className="mx-auto max-w-[1296px] px-5 py-7 lg:px-0">
-        {loading && <p className="rounded-[4px] bg-mist p-5 text-sm text-muted">Loading property details…</p>}
+        {loading && <HotelDetailSkeleton />}
         {!loading && error && <p role="alert" className="rounded-[4px] bg-blush p-5 text-sm text-red-800">{error}</p>}
         {!loading && !error && hotel && (
           <>

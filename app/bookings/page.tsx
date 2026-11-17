@@ -8,6 +8,7 @@ import { Button, PageHeading, Surface } from "@/components/ui";
 import { api, type UserBooking } from "@/lib/api-client";
 import { formatPrice, type Hotel } from "@/lib/data";
 import { AdminPagination } from "@/components/admin/admin-pagination";
+import { BookingsSkeleton } from "@/components/skeletons/bookings-skeleton";
 
 type BookingGroup = "upcoming" | "completed" | "cancelled";
 
@@ -156,9 +157,7 @@ export default function BookingsPage() {
         </div>
 
         {loading ? (
-          <Surface role="status" className="mt-6 p-8 text-center text-xs text-muted">
-            Loading your bookings…
-          </Surface>
+          <BookingsSkeleton />
         ) : error ? (
           <Surface role="alert" className="mt-6 p-8 text-center">
             <p className="text-sm font-semibold">Your bookings couldn’t be loaded.</p>
