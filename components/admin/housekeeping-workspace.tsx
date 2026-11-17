@@ -13,6 +13,7 @@ import {
 } from "@/lib/api-client";
 import { exportToExcel } from "@/lib/export-excel";
 import { canPerform, getEffectivePermissions } from "@/lib/rbac";
+import { AdminPagination } from "./admin-pagination";
 import {
   BuildingIcon,
   BedIcon,
@@ -453,6 +454,31 @@ export function HousekeepingWorkspace() {
     };
   }, [staffScopedTasks]);
 
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [
+    activeTab,
+    searchQuery,
+    selectedHotels,
+    selectedDepartments,
+    selectedRooms,
+    selectedStatuses,
+    selectedPriorities,
+    selectedTaskTypes,
+    dateField,
+    startDate,
+    endDate,
+  ]);
+
+  const paginatedTasks = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredTasks.slice(start, start + pageSize);
+  }, [filteredTasks, currentPage, pageSize]);
+
   // Bulk Select
   const allSelected = filteredTasks.length > 0 && filteredTasks.every((t) => selectedIds.has(t._id));
 
@@ -819,7 +845,7 @@ export function HousekeepingWorkspace() {
           <div>
             <h2>{isSupervisor ? "All Housekeeping Tasks" : "My Assigned Tasks"}</h2>
             <p>
-              Showing {filteredTasks.length} of {staffScopedTasks.length} {isSupervisor ? "database records" : "tasks assigned to you"}
+              Showing {filteredTasks.length === 0 ? "0" : `${(currentPage - 1) * pageSize + 1}–${Math.min(filteredTasks.length, currentPage * pageSize)}`} of {filteredTasks.length} {isSupervisor ? "database records" : "tasks assigned to you"}{filteredTasks.length !== staffScopedTasks.length ? ` (filtered from ${staffScopedTasks.length} total)` : ""}
             </p>
           </div>
           {activeFiltersCount > 0 && (
@@ -1570,7 +1596,7 @@ export function HousekeepingWorkspace() {
                   </td>
                 </tr>
               ) : (
-                filteredTasks.map((t) => {
+                paginatedTasks.map((t) => {
                   const hotelName = hotelMap.get(t.hotelId) || t.hotelId;
                   const deptName = resolveTaskDepartment(t);
                   const emp = employeeMap.get(t.assignedTo || "");
@@ -1813,6 +1839,19 @@ export function HousekeepingWorkspace() {
             </tbody>
           </table>
         </div>
+
+        <AdminPagination
+          currentPage={currentPage}
+          totalItems={filteredTasks.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(newSize) => {
+            setPageSize(newSize);
+            setCurrentPage(1);
+          }}
+          itemLabel="tasks"
+          selectedCount={selectedIds.size}
+        />
       </section>
 
       {/* Create Housekeeping Task Dialog */}

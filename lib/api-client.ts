@@ -451,10 +451,22 @@ export const api = {
   createHousekeepingTask(data: Record<string, unknown>) { return request<HousekeepingTask>("/housekeeping", { method: "POST", body: JSON.stringify(data) }); },
   updateHousekeepingTask(id: string, data: Record<string, unknown>) { return request<HousekeepingTask>(`/housekeeping/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(data) }); },
   deleteHousekeepingTask(id: string) { return request<void>(`/housekeeping/${encodeURIComponent(id)}`, { method: "DELETE" }); },
-  async getAdminReservations() {
-    const result = await request<{ bookings: AdminBooking[]; total: number }>("/bookings/admin");
+  async getAdminReservations(params?: { page?: number; limit?: number }) {
+    const qs = params && (params.page || params.limit)
+      ? `?${new URLSearchParams({
+          ...(params.page ? { page: String(params.page) } : {}),
+          ...(params.limit ? { limit: String(params.limit) } : {}),
+        }).toString()}`
+      : "";
+    const result = await request<{
+      bookings: AdminBooking[];
+      total: number;
+      page?: number;
+      limit?: number;
+      total_pages?: number;
+    }>(`/bookings/admin${qs}`);
     const bookings = scopeByHotel(result.bookings, (booking) => booking.hotel_id);
-    return { ...result, bookings, total: bookings.length };
+    return { ...result, bookings, total: result.total || bookings.length };
   },
   async getAdminOffers() {
     const rows = await request<AdminOffer[]>("/offers?includeInactive=true");

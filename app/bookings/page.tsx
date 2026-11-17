@@ -7,6 +7,7 @@ import { SiteHeader } from "@/components/site-header";
 import { Button, PageHeading, Surface } from "@/components/ui";
 import { api, type UserBooking } from "@/lib/api-client";
 import { formatPrice, type Hotel } from "@/lib/data";
+import { AdminPagination } from "@/components/admin/admin-pagination";
 
 type BookingGroup = "upcoming" | "completed" | "cancelled";
 
@@ -129,6 +130,18 @@ export default function BookingsPage() {
   const nextBooking = groupedBookings.upcoming[0];
   const nextHotel = nextBooking ? findHotel(nextBooking, hotelsByKey) : undefined;
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [tab]);
+
+  const paginatedVisibleBookings = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return visibleBookings.slice(start, start + pageSize);
+  }, [visibleBookings, currentPage, pageSize]);
+
   return (
     <>
       <SiteHeader active="bookings" />
@@ -193,16 +206,32 @@ export default function BookingsPage() {
             )}
 
             {visibleBookings.length ? (
-              <div className="mt-5 space-y-4">
-                {visibleBookings.map((booking) => (
-                  <BookingCard
-                    key={booking.id}
-                    booking={booking}
-                    hotel={findHotel(booking, hotelsByKey)}
-                    group={tab}
+              <>
+                <div className="mt-5 space-y-4">
+                  {paginatedVisibleBookings.map((booking) => (
+                    <BookingCard
+                      key={booking.id}
+                      booking={booking}
+                      hotel={findHotel(booking, hotelsByKey)}
+                      group={tab}
+                    />
+                  ))}
+                </div>
+                <div className="mt-4 overflow-hidden rounded border border-line bg-white shadow-sm">
+                  <AdminPagination
+                    currentPage={currentPage}
+                    totalItems={visibleBookings.length}
+                    pageSize={pageSize}
+                    onPageChange={setCurrentPage}
+                    onPageSizeChange={(newSize) => {
+                      setPageSize(newSize);
+                      setCurrentPage(1);
+                    }}
+                    pageSizeOptions={[5, 10, 20]}
+                    itemLabel="bookings"
                   />
-                ))}
-              </div>
+                </div>
+              </>
             ) : (
               <Surface className="mt-5 p-8 text-center">
                 <h2 className="text-sm font-semibold">

@@ -10,6 +10,7 @@ import {
 } from "@/lib/api-client";
 import { exportToExcel } from "@/lib/export-excel";
 import { canPerform, getEffectivePermissions } from "@/lib/rbac";
+import { AdminPagination } from "./admin-pagination";
 import {
   BuildingIcon,
   BriefcaseIcon,
@@ -351,6 +352,29 @@ export function EmployeesWorkspace() {
     };
   }, [employees, departmentMap]);
 
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [
+    activeTab,
+    searchQuery,
+    selectedHotels,
+    selectedDepartments,
+    selectedPositions,
+    selectedStatuses,
+    selectedSalaryRanges,
+    startDate,
+    endDate,
+  ]);
+
+  const paginatedEmployees = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredEmployees.slice(start, start + pageSize);
+  }, [filteredEmployees, currentPage, pageSize]);
+
   // Bulk Selection
   const allSelected = filteredEmployees.length > 0 && filteredEmployees.every((e) => selectedIds.has(e.id));
 
@@ -625,7 +649,7 @@ export function EmployeesWorkspace() {
           <div>
             <h2>All Team Members</h2>
             <p>
-              Showing {filteredEmployees.length} of {employees.length} database records
+              Showing {filteredEmployees.length === 0 ? "0" : `${(currentPage - 1) * pageSize + 1}–${Math.min(filteredEmployees.length, currentPage * pageSize)}`} of {filteredEmployees.length} database records{filteredEmployees.length !== employees.length ? ` (filtered from ${employees.length} total)` : ""}
             </p>
           </div>
           {activeFiltersCount > 0 && (
@@ -1234,7 +1258,7 @@ export function EmployeesWorkspace() {
                   </td>
                 </tr>
               ) : (
-                filteredEmployees.map((emp) => {
+                paginatedEmployees.map((emp) => {
                   const hotelName = resolveEmployeeHotel(emp);
                   const deptName = resolveEmployeeDepartment(emp);
                   const code = emp.employeeCode || emp.id;
@@ -1391,6 +1415,19 @@ export function EmployeesWorkspace() {
             </tbody>
           </table>
         </div>
+
+        <AdminPagination
+          currentPage={currentPage}
+          totalItems={filteredEmployees.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(newSize) => {
+            setPageSize(newSize);
+            setCurrentPage(1);
+          }}
+          itemLabel="employees"
+          selectedCount={selectedIds.size}
+        />
       </section>
 
       {/* Add Employee Modal */}

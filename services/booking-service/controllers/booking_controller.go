@@ -3,6 +3,7 @@ package controllers
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"booking-service/middleware"
 	"booking-service/models"
@@ -156,7 +157,21 @@ func (c *BookingController) GetBookingByCode(w http.ResponseWriter, r *http.Requ
 }
 
 func (c *BookingController) ListAdminBookings(w http.ResponseWriter, r *http.Request) {
-	result, err := c.bookingService.GetAdminBookings(r.Context())
+	pageStr := r.URL.Query().Get("page")
+	limitStr := r.URL.Query().Get("limit")
+	var page, limit int
+	if pageStr != "" {
+		if p, err := strconv.Atoi(pageStr); err == nil {
+			page = p
+		}
+	}
+	if limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil {
+			limit = l
+		}
+	}
+
+	result, err := c.bookingService.GetAdminBookings(r.Context(), page, limit)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { api, type AdminBooking, type AdminDepartment, type AdminEmployee, type AdminHotel, type AdminOffer, type AdminPayment, type AdminReview, type AdminRoom, type HousekeepingTask } from "@/lib/api-client";
 import { exportToExcel } from "@/lib/export-excel";
 import { DownloadIcon } from "@/components/icons";
+import { AdminPagination } from "./admin-pagination";
 import { PaymentsWorkspace } from "./payments-workspace";
 import { ReservationsWorkspace } from "./reservations-workspace";
 import { HousekeepingWorkspace } from "./housekeeping-workspace";
@@ -264,6 +265,18 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
     () => records.filter((row) => `${row.id} ${row.name} ${row.detail} ${row.status}`.toLowerCase().includes(query.toLowerCase())),
     [records, query],
   );
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [section, query, tab]);
+
+  const paginatedRows = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, currentPage, pageSize]);
 
   function onAction() {
     if (!canPerform(api.getUser(), section as AdminModule, "create")) {
@@ -615,7 +628,12 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
       {unsupportedMessage[section] && <div className="admin-inline-notice" role="status">{unsupportedMessage[section]}</div>}
       <section className="admin-panel admin-table-panel">
         <div className="admin-panel-heading">
-          <div><h2>{`All ${content.title.toLowerCase()}`}</h2><p>{formatNumber(filtered.length)} database record{filtered.length === 1 ? "" : "s"}</p></div>
+          <div>
+            <h2>{`All ${content.title.toLowerCase()}`}</h2>
+            <p>
+              Showing {filtered.length === 0 ? "0" : `${(currentPage - 1) * pageSize + 1}–${Math.min(filtered.length, currentPage * pageSize)}`} of {formatNumber(filtered.length)} database record{filtered.length === 1 ? "" : "s"}{filtered.length !== records.length ? ` (filtered from ${records.length} total)` : ""}
+            </p>
+          </div>
         </div>
         {sectionTabs[section] && (
           <div className="admin-tabs" role="tablist" aria-label={`${content.title} views`}>
@@ -628,7 +646,7 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
         <div className="admin-table-scroll">
           <table className="admin-table">
             <thead><tr><th><input type="checkbox" aria-label="Select all rows" /></th><th>{section === "rooms" || section === "hotels" ? "IMAGE" : "ID"}</th><th>{section === "customers" ? "GUEST" : "NAME"}</th><th>DETAILS</th><th>STATUS</th><th>{section === "hotels" ? "RATING" : "VALUE"}</th><th>UPDATED</th><th><span className="sr-only">Actions</span></th></tr></thead>
-            <tbody>{loading ? <tr><td colSpan={8}>Loading records…</td></tr> : filtered.map((row) => (
+            <tbody>{loading ? <tr><td colSpan={8}>Loading records…</td></tr> : paginatedRows.map((row) => (
               <tr key={row.id}>
                 <td><input type="checkbox" aria-label={`Select ${row.name}`} /></td>
                 <td className={section === "rooms" || section === "hotels" ? "admin-image-cell" : "admin-id"}>
@@ -694,7 +712,17 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
             </div>
           )}
         </div>
-        <div className="admin-table-foot"><span>{formatNumber(filtered.length)} records shown</span><div><span>Page 1 of 1</span><button type="button" aria-label="Previous page" disabled>‹</button><button type="button" aria-label="Next page" disabled>›</button></div></div>
+        <AdminPagination
+          currentPage={currentPage}
+          totalItems={filtered.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(newSize) => {
+            setPageSize(newSize);
+            setCurrentPage(1);
+          }}
+          itemLabel={`${content.title.toLowerCase()} records`}
+        />
       </section>
       {section === "hotels" && <div className="admin-footnote">StayEase Admin · All times in property local time</div>}
       {createOpen && (

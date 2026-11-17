@@ -5,6 +5,7 @@ import Link from "next/link";
 import { api, type AdminPayment, type AdminBooking } from "@/lib/api-client";
 import { exportToExcel } from "@/lib/export-excel";
 import { FigmaIcon } from "@/components/figma-icon";
+import { AdminPagination } from "./admin-pagination";
 import {
   BuildingIcon,
   CreditCardIcon,
@@ -279,6 +280,27 @@ export function PaymentsWorkspace() {
     };
   }, [payments]);
 
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [
+    searchQuery,
+    selectedHotels,
+    selectedMethods,
+    selectedStatuses,
+    dateField,
+    startDate,
+    endDate,
+  ]);
+
+  const paginatedPayments = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredPayments.slice(start, start + pageSize);
+  }, [filteredPayments, currentPage, pageSize]);
+
   // Checkbox helpers
   function toggleSelectAll() {
     if (selectedIds.size === filteredPayments.length) {
@@ -419,7 +441,7 @@ export function PaymentsWorkspace() {
           <div>
             <h2>All Payment Transactions</h2>
             <p>
-              Showing {filteredPayments.length} of {payments.length} database records
+              Showing {filteredPayments.length === 0 ? "0" : `${(currentPage - 1) * pageSize + 1}–${Math.min(filteredPayments.length, currentPage * pageSize)}`} of {filteredPayments.length} database records{filteredPayments.length !== payments.length ? ` (filtered from ${payments.length} total)` : ""}
             </p>
           </div>
           {activeFiltersCount > 0 && (
@@ -1074,7 +1096,7 @@ export function PaymentsWorkspace() {
                   </td>
                 </tr>
               ) : (
-                filteredPayments.map((row) => {
+                paginatedPayments.map((row) => {
                   const isChecked = selectedIds.has(row.id);
                   const isSuccess = row.status.toUpperCase() === "SUCCESS";
                   const isPending = row.status.toUpperCase() === "PENDING";
@@ -1244,21 +1266,18 @@ export function PaymentsWorkspace() {
         </div>
 
         {/* Table Footer */}
-        <div className="admin-table-foot">
-          <span>
-            {filteredPayments.length} record{filteredPayments.length === 1 ? "" : "s"} shown
-            {selectedIds.size > 0 && ` (${selectedIds.size} selected)`}
-          </span>
-          <div>
-            <span>Page 1 of 1</span>
-            <button type="button" aria-label="Previous page" disabled>
-              ‹
-            </button>
-            <button type="button" aria-label="Next page" disabled>
-              ›
-            </button>
-          </div>
-        </div>
+        <AdminPagination
+          currentPage={currentPage}
+          totalItems={filteredPayments.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(newSize) => {
+            setPageSize(newSize);
+            setCurrentPage(1);
+          }}
+          itemLabel="transactions"
+          selectedCount={selectedIds.size}
+        />
       </section>
 
       <div className="admin-footnote" style={{ marginTop: "12px" }}>

@@ -22,6 +22,7 @@ import {
   type PermissionMatrix,
 } from "@/lib/rbac";
 import { DownloadIcon, FilterIcon, PrinterIcon, RefreshIcon } from "@/components/icons";
+import { AdminPagination } from "./admin-pagination";
 
 const formatNumber = (value: number) => value.toLocaleString("en-IN");
 
@@ -277,6 +278,19 @@ export function RolesWorkspace() {
     });
   }, [employees, activeTab, filterHotel, filterDepartment, filterRole, query]);
 
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, filterHotel, filterDepartment, filterRole, query]);
+
+  const paginatedEmployees = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredEmployees.slice(start, start + pageSize);
+  }, [filteredEmployees, currentPage, pageSize]);
+
   // Statistics
   const adminCount = employees.filter((e) => e.role === "ADMIN").length;
   const customCount = employees.filter((e) => e.role === "CUSTOM" || Boolean(e.permissions)).length;
@@ -363,7 +377,9 @@ export function RolesWorkspace() {
         <div className="admin-panel-heading">
           <div>
             <h2>Role-Based Access Directory</h2>
-            <p>Click on any team member to configure their page-level view, create, edit, and delete permissions.</p>
+            <p>
+              Showing {filteredEmployees.length === 0 ? "0" : `${(currentPage - 1) * pageSize + 1}–${Math.min(filteredEmployees.length, currentPage * pageSize)}`} of {formatNumber(filteredEmployees.length)} team members listed{filteredEmployees.length !== employees.length ? ` (filtered from ${employees.length} total)` : ""}. Click Configure Access to manage permissions.
+            </p>
           </div>
         </div>
 
@@ -502,7 +518,7 @@ export function RolesWorkspace() {
                   </td>
                 </tr>
               ) : (
-                filteredEmployees.map((emp) => {
+                paginatedEmployees.map((emp) => {
                   const allowedCount = countAllowedModules(emp.permissions);
                   const isFull = allowedCount === ADMIN_MODULES.length;
                   return (
@@ -628,14 +644,17 @@ export function RolesWorkspace() {
           </table>
         </div>
 
-        <div className="admin-table-foot">
-          <span>{formatNumber(filteredEmployees.length)} team members listed</span>
-          <div>
-            <span>Page 1 of 1</span>
-            <button type="button" aria-label="Previous page" disabled>‹</button>
-            <button type="button" aria-label="Next page" disabled>›</button>
-          </div>
-        </div>
+        <AdminPagination
+          currentPage={currentPage}
+          totalItems={filteredEmployees.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(newSize) => {
+            setPageSize(newSize);
+            setCurrentPage(1);
+          }}
+          itemLabel="team members"
+        />
       </section>
 
       {/* Permissions Configuration Dialog */}

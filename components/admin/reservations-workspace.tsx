@@ -10,6 +10,7 @@ import {
 } from "@/lib/api-client";
 import { exportToExcel } from "@/lib/export-excel";
 import { canPerform, getEffectivePermissions } from "@/lib/rbac";
+import { AdminPagination } from "@/components/admin/admin-pagination";
 import {
   BuildingIcon,
   BedIcon,
@@ -293,6 +294,28 @@ export function ReservationsWorkspace() {
     };
   }, [filteredBookings]);
 
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Reset to page 1 on filter/search change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [
+    searchQuery,
+    selectedHotels,
+    selectedRoomTypes,
+    selectedStatuses,
+    startDate,
+    endDate,
+    dateField,
+  ]);
+
+  const paginatedBookings = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredBookings.slice(start, start + pageSize);
+  }, [filteredBookings, currentPage, pageSize]);
+
   // Bulk Selection Helpers
   const allSelected =
     filteredBookings.length > 0 &&
@@ -544,7 +567,7 @@ export function ReservationsWorkspace() {
           <div>
             <h2>All Reservations</h2>
             <p>
-              Showing {filteredBookings.length} of {bookings.length} database records
+              Showing {filteredBookings.length === 0 ? "0" : `${(currentPage - 1) * pageSize + 1}–${Math.min(filteredBookings.length, currentPage * pageSize)}`} of {filteredBookings.length} database records{filteredBookings.length !== bookings.length ? ` (filtered from ${bookings.length} total)` : ""}
             </p>
           </div>
           {activeFiltersCount > 0 && (
@@ -1183,7 +1206,7 @@ export function ReservationsWorkspace() {
                   </td>
                 </tr>
               ) : (
-                filteredBookings.map((row) => {
+                paginatedBookings.map((row) => {
                   const isConfirmed = row.status?.toUpperCase().includes("CONFIRM");
                   const isPending = row.status?.toUpperCase().includes("PENDING");
                   const isCancelled = row.status?.toUpperCase().includes("CANCEL");
@@ -1345,6 +1368,19 @@ export function ReservationsWorkspace() {
             </tbody>
           </table>
         </div>
+
+        <AdminPagination
+          currentPage={currentPage}
+          totalItems={filteredBookings.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(newSize) => {
+            setPageSize(newSize);
+            setCurrentPage(1);
+          }}
+          itemLabel="reservations"
+          selectedCount={selectedCodes.size}
+        />
       </section>
 
       {/* New Reservation Modal Dialog */}

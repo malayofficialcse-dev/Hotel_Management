@@ -408,12 +408,43 @@ func (s *BookingService) GetBookingByCode(ctx context.Context, code string) (*mo
 	return b, nil
 }
 
-func (s *BookingService) GetAdminBookings(ctx context.Context) (*models.BookingListResponse, error) {
+func (s *BookingService) GetAdminBookings(ctx context.Context, page, limit int) (*models.BookingListResponse, error) {
 	bookings, err := s.repo.GetAllBookings(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list bookings: %w", err)
 	}
-	return &models.BookingListResponse{Bookings: bookings, Total: len(bookings)}, nil
+	total := len(bookings)
+	if limit <= 0 {
+		return &models.BookingListResponse{
+			Bookings:   bookings,
+			Total:      total,
+			Page:       1,
+			Limit:      total,
+			TotalPages: 1,
+		}, nil
+	}
+	if page <= 0 {
+		page = 1
+	}
+	totalPages := (total + limit - 1) / limit
+	if totalPages == 0 {
+		totalPages = 1
+	}
+	start := (page - 1) * limit
+	if start > total {
+		start = total
+	}
+	end := start + limit
+	if end > total {
+		end = total
+	}
+	return &models.BookingListResponse{
+		Bookings:   bookings[start:end],
+		Total:      total,
+		Page:       page,
+		Limit:      limit,
+		TotalPages: totalPages,
+	}, nil
 }
 
 // GetUserBookings returns all bookings for a given user.

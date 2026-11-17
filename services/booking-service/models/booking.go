@@ -90,6 +90,9 @@ type HoldBookingResponse struct {
 
 // BookingListResponse wraps a paginated list of bookings.
 type BookingListResponse struct {
-	Bookings []*Booking `json:"bookings"`
-	Total    int        `json:"total"`
+	Bookings   []*Booking `json:"bookings"`
+	Total      int        `json:"total"`
+	Page       int        `json:"page,omitempty"`
+	Limit      int        `json:"limit,omitempty"`
+	TotalPages int        `json:"total_pages,omitempty"`
 }
