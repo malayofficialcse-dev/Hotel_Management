@@ -311,20 +311,8 @@ export function TotalPageSkeleton() {
                 <div className="skeleton-shimmer h-7 w-44 rounded-full" />
               </div>
 
-              {/* 6 hotel cards grid skeleton */}
-              <HotelGridSkeleton count={6} />
-
-              {/* Pagination bar skeleton */}
-              <div className="mt-6 flex items-center justify-between rounded-lg border border-[#e5e7e1] bg-white px-4 py-3">
-                <div className="skeleton-shimmer h-4 w-40 rounded" />
-                <div className="flex items-center gap-2">
-                  <div className="skeleton-shimmer h-7 w-7 rounded-md" />
-                  <div className="skeleton-shimmer h-7 w-7 rounded-md" />
-                  <div className="skeleton-shimmer h-7 w-7 rounded-md" />
-                  <div className="skeleton-shimmer h-7 w-7 rounded-md" />
-                </div>
-                <div className="skeleton-shimmer h-4 w-24 rounded" />
-              </div>
+              {/* 8 hotel cards grid skeleton */}
+              <HotelGridSkeleton count={8} />
             </div>
           </div>
         </section>

@@ -9,7 +9,6 @@ import { Button } from "@/components/ui";
 import { hotels, type Hotel } from "@/lib/data";
 import { api, type PublicRoom } from "@/lib/api-client";
 import { TotalPageSkeleton, HotelGridSkeleton } from "@/components/skeletons/home-page-skeleton";
-import { AdminPagination } from "@/components/admin/admin-pagination";
 
 const benefits = [
   { icon: "shield" as const, title: "Handpicked, not endless", subtitle: "Stays worth travelling for" },
@@ -100,7 +99,6 @@ export default function HomePage() {
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
   const [availabilityError, setAvailabilityError] = useState("");
   const [searchError, setSearchError] = useState("");
-  const [page, setPage] = useState(1);
   const [catalog, setCatalog] = useState(hotels);
   const [catalogError, setCatalogError] = useState("");
   const [heroSlides, setHeroSlides] = useState<HeroCarouselSlide[]>(() => createHotelSlides(hotels));
@@ -242,15 +240,6 @@ export default function HomePage() {
     return result;
   }, [catalog, searched, sort, minimumPrice, maximumPrice, priceBounds, rating, selectedAmenities, selectedCategories, availabilityByHotel]);
 
-  const [pageSize, setPageSize] = useState(6);
-  const totalPages = Math.max(1, Math.ceil(visibleHotels.length / pageSize));
-  const currentPage = Math.min(page, totalPages);
-  const pageHotels = visibleHotels.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-
-  useEffect(() => {
-    setPage(1);
-  }, [searched, sort, minimumPrice, maximumPrice, rating, selectedAmenities, selectedCategories, availabilityByHotel, pageSize]);
-
   async function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!checkInDate || !checkOutDate || checkOutDate <= checkInDate) {
@@ -328,7 +317,6 @@ export default function HomePage() {
     setAvailabilityLoading(false);
     setAvailabilityError("");
     setSearchError("");
-    setPage(1);
   }
 
   if (isPageLoading || forceSkeleton) {
@@ -685,11 +673,11 @@ export default function HomePage() {
                     <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-[#2d5a43] border-t-transparent" />
                     Checking live room availability for your dates and party size…
                   </div>
-                  <HotelGridSkeleton count={pageSize} />
+                  <HotelGridSkeleton count={8} />
                 </div>
               ) : visibleHotels.length ? (
                 <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-                  {pageHotels.map((hotel) => <HotelCard key={hotel.id} hotel={hotel} />)}
+                  {visibleHotels.map((hotel) => <HotelCard key={hotel.id} hotel={hotel} />)}
                 </div>
               ) : (
                 <div className="rounded-xl border border-[#e5e7e1] bg-white px-6 py-16 text-center">
@@ -697,19 +685,6 @@ export default function HomePage() {
                   <p className="mt-4 text-sm font-semibold text-[#263b31]">No stays match these preferences</p>
                   <p className="mt-2 text-xs text-[#879188]">Try widening your dates or relaxing a filter to discover more places.</p>
                   <button type="button" onClick={resetAll} className="mt-5 rounded-lg bg-[#244b3e] px-4 py-2.5 text-[11px] font-semibold text-white hover:bg-[#193c32]">Clear all filters</button>
-                </div>
-              )}
-              {visibleHotels.length > 0 && !availabilityLoading && (
-                <div className="mt-6 overflow-hidden rounded-xl border border-[#e5e7e1] bg-white shadow-sm">
-                  <AdminPagination
-                    currentPage={currentPage}
-                    totalItems={visibleHotels.length}
-                    pageSize={pageSize}
-                    onPageChange={(p) => setPage(p)}
-                    onPageSizeChange={(s) => setPageSize(s)}
-                    pageSizeOptions={[6, 12, 24, 48]}
-                    itemLabel="stays"
-                  />
                 </div>
               )}
             </div>
