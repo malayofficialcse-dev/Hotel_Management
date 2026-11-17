@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
-import { api, AdminPayment } from "@/lib/api-client";
+import { api, AdminPayment, type UserSession } from "@/lib/api-client";
+import { getEffectivePermissions } from "@/lib/rbac";
 import { FigmaIcon } from "@/components/figma-icon";
 import { PrinterIcon } from "@/components/icons";
 
@@ -35,6 +36,27 @@ export default function BillPage() {
   const [bill, setBill] = useState<BillData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [user, setUser] = useState<UserSession | null>(null);
+
+  useEffect(() => {
+    const syncUser = () => {
+      setUser(api.getUser());
+    };
+    syncUser();
+    window.addEventListener("stayease-user-updated", syncUser);
+    return () => window.removeEventListener("stayease-user-updated", syncUser);
+  }, []);
+
+  const effectivePerms = user ? getEffectivePermissions(user) : null;
+  const isSuperAdmin = Boolean(
+    user && (user.role === "ADMIN" || user.email?.toLowerCase() === "mala@gmail.com")
+  );
+  const canViewReservations = Boolean(
+    user && (isSuperAdmin || effectivePerms?.reservations?.view)
+  );
+  const canViewPayments = Boolean(
+    user && (isSuperAdmin || effectivePerms?.payments?.view)
+  );
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -147,18 +169,22 @@ export default function BillPage() {
               <PrinterIcon size={14} />
               <span>Print / Save PDF</span>
             </button>
-            <Link
-              href="/admin/reservations"
-              className="rounded border border-line bg-white px-3 py-2 text-xs font-medium text-forest hover:bg-mist"
-            >
-              Admin Reservations →
-            </Link>
-            <Link
-              href="/admin/payments"
-              className="rounded border border-line bg-white px-3 py-2 text-xs font-medium text-forest hover:bg-mist"
-            >
-              All Payments →
-            </Link>
+            {canViewReservations && (
+              <Link
+                href="/admin/reservations"
+                className="rounded border border-line bg-white px-3 py-2 text-xs font-medium text-forest hover:bg-mist"
+              >
+                Admin Reservations →
+              </Link>
+            )}
+            {canViewPayments && (
+              <Link
+                href="/admin/payments"
+                className="rounded border border-line bg-white px-3 py-2 text-xs font-medium text-forest hover:bg-mist"
+              >
+                All Payments →
+              </Link>
+            )}
           </div>
         </div>
 
@@ -170,9 +196,15 @@ export default function BillPage() {
           <div className="rounded-lg border border-red-200 bg-red-50 p-8 text-center text-sm text-red-700">
             {error}
             <div className="mt-4">
-              <Link href="/admin/reservations" className="text-xs font-semibold underline">
-                Return to Reservations
-              </Link>
+              {canViewReservations ? (
+                <Link href="/admin/reservations" className="text-xs font-semibold underline">
+                  Return to Reservations
+                </Link>
+              ) : (
+                <Link href="/" className="text-xs font-semibold underline">
+                  Return to Home
+                </Link>
+              )}
             </div>
           </div>
         ) : bill ? (

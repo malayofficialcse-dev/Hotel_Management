@@ -11,7 +11,8 @@ import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { Button, PageHeading, Surface, TextField } from "@/components/ui";
 import { useBooking } from "@/components/booking-provider";
-import { api } from "@/lib/api-client";
+import { api, type UserSession } from "@/lib/api-client";
+import { getEffectivePermissions } from "@/lib/rbac";
 
 const paymentMethods = [
   { id: "Credit / Debit card", label: "Credit / Debit Card", icon: "credit-card" as const },
@@ -38,6 +39,24 @@ export default function PaymentPage() {
   const [loadingBooking, setLoadingBooking] = useState(false);
   const [error, setError] = useState("");
   const [processing, setProcessing] = useState(false);
+  const [user, setUser] = useState<UserSession | null>(null);
+
+  useEffect(() => {
+    const syncUser = () => {
+      setUser(api.getUser());
+    };
+    syncUser();
+    window.addEventListener("stayease-user-updated", syncUser);
+    return () => window.removeEventListener("stayease-user-updated", syncUser);
+  }, []);
+
+  const effectivePerms = user ? getEffectivePermissions(user) : null;
+  const isSuperAdmin = Boolean(
+    user && (user.role === "ADMIN" || user.email?.toLowerCase() === "mala@gmail.com")
+  );
+  const canViewReservations = Boolean(
+    user && (isSuperAdmin || effectivePerms?.reservations?.view)
+  );
 
   // Loaded or context booking
   const [bookingCode, setBookingCode] = useState<string>("");
@@ -428,9 +447,15 @@ export default function PaymentPage() {
           </div>
 
           <div className="mt-6">
-            <Link href="/admin/reservations" className="text-xs font-semibold text-forest hover:underline">
-              ← Return to Reservations Workspace
-            </Link>
+            {canViewReservations ? (
+              <Link href="/admin/reservations" className="text-xs font-semibold text-forest hover:underline">
+                ← Return to Reservations Workspace
+              </Link>
+            ) : (
+              <Link href="/booking/review" className="text-xs font-semibold text-forest hover:underline">
+                ← Return to Review Details
+              </Link>
+            )}
           </div>
         </div>
 
