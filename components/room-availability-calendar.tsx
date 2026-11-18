@@ -135,9 +135,9 @@ export function RoomAvailabilityCalendar({ roomTypeId, roomCount, checkIn, check
           const past = key < today;
           const unavailable = !availability || availability.availableInventory < roomCount;
           const selectingCheckout = Boolean(anchor && key > anchor);
-          const soldOut = Boolean(availability && availability.availableInventory === 0);
-          const partiallyBooked = Boolean(availability && availability.bookedInventory > 0 && availability.availableInventory > 0);
-          const lowAvailability = Boolean(availability && availability.availableInventory > 0 && availability.availableInventory <= Math.ceil((calendar?.totalInventory ?? 1) * 0.3));
+          const soldOut = availability?.status === "FULL";
+          const partiallyBooked = availability?.status === "PARTIALLY_BOOKED";
+          const lowAvailability = availability?.status === "LIMITED";
           const selected = key === checkIn || key === checkOut || (key > checkIn && key < checkOut);
           const description = !availability
             ? "Availability not loaded"
@@ -164,7 +164,7 @@ export function RoomAvailabilityCalendar({ roomTypeId, roomCount, checkIn, check
                 }`}
             >
               {dayNumber}
-              {availability && !past && <span className="text-[8px] leading-3">{soldOut ? "Full" : selected || partiallyBooked ? `${availability.availableInventory} left` : "Open"}</span>}
+              {availability && !past && <span className="text-[8px] leading-3">{soldOut ? "Full" : partiallyBooked ? `${availability.bookedInventory} booked` : selected ? `${availability.availableInventory} left` : "Open"}</span>}
             </button>
           );
         })}

@@ -611,6 +611,26 @@
   padding: 11px 12px 10px;
 }
 
+.admin-stat-card:nth-child(4n + 1) {
+  border-color: #dcebe2;
+  background: #f0f7f3;
+}
+
+.admin-stat-card:nth-child(4n + 2) {
+  border-color: #dce8f2;
+  background: #f0f6fb;
+}
+
+.admin-stat-card:nth-child(4n + 3) {
+  border-color: #e8e0f1;
+  background: #f6f2fb;
+}
+
+.admin-stat-card:nth-child(4n) {
+  border-color: #f0e5d4;
+  background: #fbf5ec;
+}
+
 .admin-stat-top {
   display: flex;
   align-items: center;
@@ -838,6 +858,29 @@
   padding-bottom: 8px;
 }
 
+.admin-chart-panel>.admin-panel-heading,
+.admin-occupancy-panel>.admin-panel-heading,
+.admin-dashboard-table>.admin-panel-heading,
+.admin-activity-panel>.admin-panel-heading {
+  border-radius: 4px 4px 0 0;
+}
+
+.admin-chart-panel>.admin-panel-heading {
+  background: #f0f6fb;
+}
+
+.admin-occupancy-panel>.admin-panel-heading {
+  background: #f6f2fb;
+}
+
+.admin-dashboard-table>.admin-panel-heading {
+  background: #f0f7f3;
+}
+
+.admin-activity-panel>.admin-panel-heading {
+  background: #fbf5ec;
+}
+
 @media (min-width: 761px) {
   .admin-occupancy-panel {
     max-height: min(560px, 70vh);
@@ -850,7 +893,7 @@
     top: 0;
     z-index: 1;
     border-bottom: 1px solid var(--admin-line);
-    background: #fff;
+    background: #f6f2fb;
   }
 }
 

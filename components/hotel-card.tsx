@@ -12,7 +12,7 @@ export function HotelCard({ hotel }: { hotel: Hotel }) {
   const hotelHref = `/hotels/${encodeURIComponent(hotel.id)}`;
 
   return (
-    <article className="group overflow-hidden rounded-xl border border-[#e7e9e3] bg-white shadow-[0_6px_24px_rgba(24,43,36,0.045)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_18px_42px_rgba(24,43,36,0.12)]">
+    <article className="hotel-card group overflow-hidden rounded-xl border border-[#e7e9e3] bg-white shadow-[0_6px_24px_rgba(24,43,36,0.045)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_18px_42px_rgba(24,43,36,0.12)]">
       <div className="relative h-[210px] overflow-hidden bg-[#e8ede7] sm:h-[225px]">
         <Link href={hotelHref} aria-label={`View ${hotel.name}`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -27,8 +27,10 @@ export function HotelCard({ hotel }: { hotel: Hotel }) {
           onClick={() => toggleSavedHotel(hotel.id)}
           aria-label={saved ? `Remove ${hotel.name} from wishlist` : `Save ${hotel.name}`}
           aria-pressed={saved}
-          className={`absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/95 shadow-md backdrop-blur transition hover:scale-105 ${
-            saved ? "text-[#244b3e]" : "text-[#34443a]"
+          className={`absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full border shadow-md backdrop-blur transition hover:scale-105 ${
+            saved
+              ? "border-[#dcebe2] bg-[#f0f7f3] text-[#176b58] hover:bg-[#e5f2ea]"
+              : "border-white/80 bg-white/95 text-[#56645c] hover:border-[#dce8f2] hover:bg-[#f0f6fb]"
           }`}
         >
           <FigmaIcon name="heart" className="h-[17px] w-[17px]" />

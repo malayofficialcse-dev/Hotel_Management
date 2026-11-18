@@ -39,6 +39,30 @@
   background-clip: padding-box;
 }
 
+.hotel-card:nth-child(4n + 1),
+.benefit-card:nth-child(4n + 1) {
+  border-color: #dcebe2;
+  background-color: #f0f7f3;
+}
+
+.hotel-card:nth-child(4n + 2),
+.benefit-card:nth-child(4n + 2) {
+  border-color: #dce8f2;
+  background-color: #f0f6fb;
+}
+
+.hotel-card:nth-child(4n + 3),
+.benefit-card:nth-child(4n + 3) {
+  border-color: #e8e0f1;
+  background-color: #f6f2fb;
+}
+
+.hotel-card:nth-child(4n),
+.benefit-card:nth-child(4n) {
+  border-color: #f0e5d4;
+  background-color: #fbf5ec;
+}
+
 html {
   scroll-behavior: smooth;
 }

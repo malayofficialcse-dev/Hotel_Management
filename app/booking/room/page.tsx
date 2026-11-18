@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BookingStepper } from "@/components/booking-stepper";
 import { BookingSummary } from "@/components/booking-summary";
@@ -9,7 +9,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { Button, PageHeading, Surface } from "@/components/ui";
 import { useBooking } from "@/components/booking-provider";
-import { api, type PublicRoom } from "@/lib/api-client";
+import { api, type AdminRoomAvailability, type PublicRoom } from "@/lib/api-client";
 import { formatPrice } from "@/lib/data";
 import { RoomAvailabilityCalendar } from "@/components/room-availability-calendar";
 
@@ -20,12 +20,16 @@ export default function RoomSelectionPage() {
     selectedRoom, setSelectedRoom, setBookingDetails,
   } = useBooking();
   const [rooms, setRooms] = useState<PublicRoom[]>([]);
-  const [availability, setAvailability] = useState<Record<string, { isAvailable: boolean; availableInventory: number }>>({});
+  const [availability, setAvailability] = useState<Record<string, AdminRoomAvailability>>({});
   const [loadingRooms, setLoadingRooms] = useState(true);
   const [loadingAvailability, setLoadingAvailability] = useState(false);
   const [error, setError] = useState("");
   const [childrenCount, setChildrenCount] = useState(0);
   const [hotelTitle, setHotelTitle] = useState("");
+  const [maxPrice, setMaxPrice] = useState<number | null>(null);
+  const [bedFilter, setBedFilter] = useState("all");
+  const [amenityFilter, setAmenityFilter] = useState("all");
+  const [availableOnly, setAvailableOnly] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -95,6 +99,18 @@ export default function RoomSelectionPage() {
     selectedRoom && availability[selectedRoom.id]?.isAvailable && !loadingAvailability,
   );
   const activeRoom = rooms.find((room) => room.id === roomId) || selectedRoom;
+  const bedTypes = useMemo(() => [...new Set(rooms.map((room) => room.beds.split("·")[0]?.trim()).filter(Boolean))], [rooms]);
+  const amenities = useMemo(() => [...new Set(rooms.flatMap((room) => room.inclusions.split("·").map((item) => item.trim()).filter(Boolean)))].sort(), [rooms]);
+  const priceCeiling = useMemo(() => Math.max(...rooms.map((room) => room.price), 0), [rooms]);
+  const visibleRooms = useMemo(() => rooms.filter((room) => {
+    const roomAvailability = availability[room.id];
+    const matchesPrice = maxPrice === null || room.price <= maxPrice;
+    const matchesGuests = room.capacity * roomCount >= guestsCount;
+    const matchesBed = bedFilter === "all" || room.beds.startsWith(bedFilter);
+    const matchesAmenity = amenityFilter === "all" || room.inclusions.split("·").map((item) => item.trim()).includes(amenityFilter);
+    const matchesAvailability = !availableOnly || (roomAvailability?.isAvailable ?? false);
+    return matchesPrice && matchesGuests && matchesBed && matchesAmenity && matchesAvailability;
+  }), [rooms, availability, maxPrice, guestsCount, roomCount, bedFilter, amenityFilter, availableOnly]);
 
   return (
     <>
@@ -118,10 +134,38 @@ export default function RoomSelectionPage() {
           </Surface>
           <div className="mt-6 flex items-end justify-between">
             <h2 className="text-sm font-semibold">Choose your room</h2>
-            <span className="rounded-[4px] bg-sky px-2 py-1 text-[10px]">{rooms.length} room types</span>
+            <span className="rounded-[4px] bg-sky px-2 py-1 text-[10px]">{visibleRooms.length} of {rooms.length} room types</span>
           </div>
+          <Surface className="mt-3 p-3" aria-label="Room filters">
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="min-w-[150px] flex-1 text-[10px] font-medium">Maximum nightly price
+                <select value={maxPrice ?? ""} onChange={(event) => setMaxPrice(event.target.value ? Number(event.target.value) : null)} className="mt-1 h-9 w-full rounded border border-line bg-white px-2 text-xs font-normal">
+                  <option value="">Any price</option>
+                  {Array.from(new Set(rooms.map((room) => room.price))).sort((a, b) => a - b).map((price) => <option key={price} value={price}>Up to {formatPrice(price)}</option>)}
+                </select>
+              </label>
+              <label className="min-w-[130px] flex-1 text-[10px] font-medium">Bed type
+                <select value={bedFilter} onChange={(event) => setBedFilter(event.target.value)} className="mt-1 h-9 w-full rounded border border-line bg-white px-2 text-xs font-normal">
+                  <option value="all">Any bed type</option>
+                  {bedTypes.map((bed) => <option key={bed} value={bed}>{bed}</option>)}
+                </select>
+              </label>
+              <label className="min-w-[150px] flex-1 text-[10px] font-medium">Amenity
+                <select value={amenityFilter} onChange={(event) => setAmenityFilter(event.target.value)} className="mt-1 h-9 w-full rounded border border-line bg-white px-2 text-xs font-normal">
+                  <option value="all">Any amenity</option>
+                  {amenities.map((amenity) => <option key={amenity} value={amenity}>{amenity}</option>)}
+                </select>
+              </label>
+              <label className="flex h-9 items-center gap-2 rounded border border-line px-3 text-[10px] font-medium">
+                <input type="checkbox" checked={availableOnly} onChange={(event) => setAvailableOnly(event.target.checked)} className="accent-[#486958]" />
+                Available for my dates
+              </label>
+              <button type="button" onClick={() => { setMaxPrice(null); setBedFilter("all"); setAmenityFilter("all"); setAvailableOnly(false); }} className="h-9 px-2 text-[10px] font-medium text-forest underline">Clear</button>
+            </div>
+            <p className="mt-2 text-[9px] text-muted">Capacity is automatically matched to {guestsCount} guests in {roomCount} {roomCount === 1 ? "room" : "rooms"}.</p>
+          </Surface>
           <div className="mt-3 space-y-3">
-            {rooms.map((room) => {
+            {visibleRooms.map((room) => {
               const selected = room.id === roomId;
               const roomAvailability = availability[room.id];
               return (
@@ -142,8 +186,8 @@ export default function RoomSelectionPage() {
                       {!loadingAvailability && roomAvailability && !roomAvailability.isAvailable && (
                         <span className="rounded-[4px] bg-red-100 px-2 py-1 text-[9px] font-semibold text-red-700">Sold out</span>
                       )}
-                      {!loadingAvailability && roomAvailability && roomAvailability.isAvailable && roomAvailability.availableInventory === 1 && (
-                        <span className="rounded-[4px] bg-amber-100 px-2 py-1 text-[9px] font-semibold text-amber-800">Last room</span>
+                      {!loadingAvailability && roomAvailability && roomAvailability.isAvailable && roomAvailability.availableInventory <= 2 && (
+                        <span className="rounded-[4px] bg-amber-100 px-2 py-1 text-[9px] font-semibold text-amber-800">Only {roomAvailability.availableInventory} {roomAvailability.availableInventory === 1 ? "room" : "rooms"} left</span>
                       )}
                     </div>
                     <p className="mt-1 text-[10px] text-muted">{room.beds}</p>
@@ -156,9 +200,9 @@ export default function RoomSelectionPage() {
                         ? "Select dates to check availability"
                         : roomAvailability.availableInventory === 0
                         ? "No rooms available for these dates"
-                        : roomAvailability.availableInventory === 1
-                        ? "Only 1 room left for these dates"
-                        : `${roomAvailability.availableInventory} of ${room.totalInventory} rooms available`}
+                        : roomAvailability.availableInventory <= 2
+                        ? `Only ${roomAvailability.availableInventory} ${roomAvailability.availableInventory === 1 ? "room" : "rooms"} left for these dates`
+                        : `${roomAvailability.availableInventory} of ${room.totalInventory} rooms available (${roomAvailability.currentlyBooked} booked)`}
                     </p>
                   </div>
                   <div className="flex items-center justify-between gap-3 sm:flex-col sm:items-end">
@@ -178,6 +222,7 @@ export default function RoomSelectionPage() {
             })}
             {loadingRooms && <p className="rounded-[4px] bg-mist p-4 text-xs text-muted">Loading available rooms…</p>}
             {!loadingRooms && !rooms.length && !error && <p className="rounded-[4px] bg-mist p-4 text-xs text-muted">No rooms are currently listed for this hotel.</p>}
+            {!loadingRooms && rooms.length > 0 && !visibleRooms.length && <p className="rounded-[4px] bg-mist p-4 text-xs text-muted">No rooms match these filters. Clear a filter or choose different dates.</p>}
           </div>
           {activeRoom && (
             <div className="mt-5 grid min-w-0 items-start gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(340px,0.9fr)]">

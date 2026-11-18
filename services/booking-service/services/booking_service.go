@@ -36,6 +36,7 @@ type AvailabilityCalendarDay struct {
 	BookedInventory    int    `json:"bookedInventory"`
 	AvailableInventory int    `json:"availableInventory"`
 	IsAvailable        bool   `json:"isAvailable"`
+	Status             string `json:"status"`
 }
 
 type AvailabilityCalendar struct {
@@ -341,11 +342,20 @@ func (s *BookingService) GetAvailabilityCalendar(ctx context.Context, roomTypeID
 		if available < 0 {
 			available = 0
 		}
+		status := "AVAILABLE"
+		if available == 0 {
+			status = "FULL"
+		} else if available <= int(math.Ceil(float64(inventory)*0.3)) {
+			status = "LIMITED"
+		} else if day.BookedInventory > 0 {
+			status = "PARTIALLY_BOOKED"
+		}
 		days = append(days, AvailabilityCalendarDay{
 			Date:               day.Date.Format("2006-01-02"),
 			BookedInventory:    day.BookedInventory,
 			AvailableInventory: available,
 			IsAvailable:        available > 0,
+			Status:             status,
 		})
 	}
 	return &AvailabilityCalendar{

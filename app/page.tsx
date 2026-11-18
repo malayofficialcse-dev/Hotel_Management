@@ -514,7 +514,7 @@ export default function HomePage() {
 
           <section className="mt-7 grid gap-3 md:grid-cols-3">
             {benefits.map((benefit) => (
-              <div key={benefit.title} className="flex items-center gap-4 rounded-xl border border-[#e9e9e3] bg-white px-5 py-4 shadow-[0_4px_16px_rgba(24,43,36,0.035)]">
+              <div key={benefit.title} className="benefit-card flex items-center gap-4 rounded-xl border border-[#e9e9e3] bg-white px-5 py-4 shadow-[0_4px_16px_rgba(24,43,36,0.035)]">
                 <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#edf3ee] text-[#426653]">
                   <FigmaIcon name={benefit.icon} className="h-5 w-5" />
                 </span>

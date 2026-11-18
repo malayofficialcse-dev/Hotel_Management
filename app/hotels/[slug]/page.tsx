@@ -14,6 +14,7 @@ import { api, type PublicRoom } from "@/lib/api-client";
 import type { Hotel } from "@/lib/data";
 import { formatPrice } from "@/lib/data";
 import { HotelDetailSkeleton } from "@/components/skeletons/hotel-detail-skeleton";
+import { HotelDetailsExperience } from "@/components/hotel-details-experience";
 
 const fallbackImage = "/assets/figma/a0108.png";
 
@@ -61,7 +62,7 @@ export default function HotelDetailsPage() {
   return (
     <>
       <SiteHeader />
-      <main className="mx-auto max-w-[1296px] px-5 py-7 lg:px-0">
+      <main className="mx-auto w-full max-w-[1760px] px-4 py-7 sm:px-6 lg:px-10 lg:py-9 2xl:px-14">
         {loading && <HotelDetailSkeleton />}
         {!loading && error && <p role="alert" className="rounded-[4px] bg-blush p-5 text-sm text-red-800">{error}</p>}
         {!loading && !error && hotel && (
@@ -69,7 +70,7 @@ export default function HotelDetailsPage() {
             <p className="mb-4 text-[11px] text-muted">
               <Link href="/" className="hover:text-forest">Explore</Link> / {hotel.city} / {hotel.name}
             </p>
-            <div className="mb-5 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+            <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
               <div>
                 <span className="rounded-[4px] bg-mint px-2 py-1 text-[9px] font-semibold">{hotel.category.toUpperCase()}</span>
                 <h1 className="mt-3 text-[28px] font-semibold tracking-[-0.7px] sm:text-[34px]">{hotel.name}, {hotel.city}</h1>
@@ -81,24 +82,15 @@ export default function HotelDetailsPage() {
               </div>
             </div>
 
-            <div className="grid h-[250px] gap-2 overflow-hidden rounded-[4px] sm:h-[340px] sm:grid-cols-[1.45fr_1fr]">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={gallery[0]} alt={`${hotel.name} property`} className="h-full w-full object-cover" />
-              <div className="hidden grid-cols-2 grid-rows-2 gap-2 sm:grid">
-                {gallery.slice(1, 5).map((src, index) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img key={src} src={src} alt={`${hotel.name} gallery image ${index + 1}`} className="h-full w-full object-cover" />
-                ))}
-              </div>
-            </div>
+            <HotelDetailsExperience hotel={hotel} gallery={gallery} showGallery />
 
             <nav className="mt-5 flex gap-6 overflow-x-auto border-b border-line text-[11px]">
-              {["Overview", "Rooms", "Facilities", "Location"].map((item) => (
+              {["Overview", "Rooms", "Amenities", "Reviews", "Location", "Policies"].map((item) => (
                 <a key={item} href={`#${item.toLowerCase()}`} className="whitespace-nowrap border-b-2 border-transparent pb-3 text-muted hover:border-forest hover:text-forest">{item}</a>
               ))}
             </nav>
 
-            <div className="mt-7 grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+            <div className="mt-8 grid gap-7 xl:grid-cols-[minmax(0,1fr)_340px]">
               <div className="space-y-8">
                 <section id="overview" className="grid gap-5 md:grid-cols-[1fr_230px]">
                   <div>
@@ -156,14 +148,14 @@ export default function HotelDetailsPage() {
                     <p className="mt-3 text-lg font-semibold">{hotel.rating} / 5 <span className="text-xs font-normal text-muted"> · {hotel.reviews} reviews</span></p>
                     <p className="mt-3 text-xs leading-5 text-muted">{hotel.offer || "Contact the property for current offers."}</p>
                   </Surface>
-                  <Surface id="location" className="bg-sky p-4">
-                    <h2 className="text-sm font-semibold">Location</h2>
-                    <p className="mt-3 text-xs text-muted">{hotel.location}</p>
-                    <p className="mt-2 text-xs leading-5">{hotel.city}</p>
+                  <Surface className="bg-sky p-4">
+                    <h2 className="text-sm font-semibold">Book with confidence</h2>
+                    <p className="mt-3 text-xs leading-5 text-muted">Clear stay rules, verified-stay reviews and location details are available below.</p>
                   </Surface>
                 </section>
+                <HotelDetailsExperience hotel={hotel} gallery={gallery} />
               </div>
-              <div className="lg:sticky lg:top-24 lg:h-fit"><BookingSummary /></div>
+              <div className="xl:sticky xl:top-24 xl:h-fit"><BookingSummary /></div>
             </div>
           </>
         )}

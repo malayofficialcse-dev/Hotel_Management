@@ -22,6 +22,7 @@ export type RoomAvailabilityCalendar = {
     bookedInventory: number;
     availableInventory: number;
     isAvailable: boolean;
+    status: "AVAILABLE" | "PARTIALLY_BOOKED" | "LIMITED" | "FULL";
   }>;
 };
 

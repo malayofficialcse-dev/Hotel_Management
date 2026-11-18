@@ -65,6 +65,7 @@ export interface RoomAvailabilityCalendar {
     bookedInventory: number;
     availableInventory: number;
     isAvailable: boolean;
+    status: "AVAILABLE" | "PARTIALLY_BOOKED" | "LIMITED" | "FULL";
   }>;
 }
 
@@ -176,6 +177,19 @@ export interface PublicRoom {
   image: string;
   capacity: number;
   totalInventory: number;
+}
+
+export interface PublicReview {
+  _id: string;
+  hotelId: string;
+  userName: string;
+  rating: number;
+  title?: string;
+  comment: string;
+  stayDate?: string;
+  verifiedBooking?: boolean;
+  helpfulCount?: number;
+  createdAt?: string;
 }
 
 export interface UserSession {
@@ -533,7 +547,7 @@ export const api = {
       totalInventory: room.totalInventory,
     }));
   },
-  checkRoomAvailability(roomId: string, checkIn: string, checkOut: string, count = 1) { const params = new URLSearchParams({ checkIn, checkOut, count: String(count) }); return request<{ isAvailable: boolean; availableInventory: number }>(`/rooms/${encodeURIComponent(roomId)}/availability?${params}`); },
+  checkRoomAvailability(roomId: string, checkIn: string, checkOut: string, count = 1) { const params = new URLSearchParams({ checkIn, checkOut, count: String(count) }); return request<AdminRoomAvailability>(`/rooms/${encodeURIComponent(roomId)}/availability?${params}`); },
   async holdRoom(payload: HoldRoomPayload) {
     try {
       const result = await request<{
@@ -603,7 +617,7 @@ export const api = {
   addWishlist(hotelId: string, userId = "default-guest") { return request<any>("/users/me/wishlist", { method: "POST", headers: { "x-user-id": userId }, body: JSON.stringify({ hotelId }) }); },
   removeWishlist(hotelId: string, userId = "default-guest") { return request<any>(`/users/me/wishlist/${encodeURIComponent(hotelId)}`, { method: "DELETE", headers: { "x-user-id": userId } }); },
   getHousekeepingTasks(hotelId: string) { return request<any[]>(`/housekeeping/hotel/${hotelId}`); },
-  getHotelReviews(hotelId: string) { return request<any[]>(`/reviews/hotel/${hotelId}`); },
+  getHotelReviews(hotelId: string) { return request<PublicReview[]>(`/reviews/hotel/${encodeURIComponent(hotelId)}`); },
   createReview(data: Record<string, unknown>) { return request<any>("/reviews", { method: "POST", body: JSON.stringify(data) }); },
   getEmployees(departmentId?: string) { return request<any[]>(`/employees${departmentId ? `?departmentId=${encodeURIComponent(departmentId)}` : ""}`); },
   getDepartments() { return request<any[]>("/departments"); },
