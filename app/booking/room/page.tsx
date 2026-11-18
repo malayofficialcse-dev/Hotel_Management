@@ -125,23 +125,53 @@ export default function RoomSelectionPage() {
               const selected = room.id === roomId;
               const roomAvailability = availability[room.id];
               return (
-                <Surface key={room.id} className={`flex flex-col gap-3 p-3 sm:flex-row sm:items-center ${selected ? "border-forest bg-mint" : ""}`}>
+                <Surface key={room.id} className={`flex flex-col gap-3 p-3 sm:flex-row sm:items-center ${selected ? "border-forest bg-mint" : !loadingAvailability && roomAvailability && !roomAvailability.isAvailable ? "border-red-200 bg-red-50/40 opacity-80" : ""}`}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={room.image || "/assets/figma/a0108.png"} alt={room.name} className="h-[90px] w-full rounded-[4px] object-cover sm:w-[132px]" />
+                  <div className="relative h-[90px] w-full flex-shrink-0 sm:w-[132px]">
+                    <img src={room.image || "/assets/figma/a0108.png"} alt={room.name} className="h-full w-full rounded-[4px] object-cover" />
+                    {!loadingAvailability && roomAvailability && !roomAvailability.isAvailable && (
+                      <div className="absolute inset-0 flex items-center justify-center rounded-[4px] bg-red-900/60">
+                        <span className="rounded bg-red-600 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">Fully Booked</span>
+                      </div>
+                    )}
+                  </div>
                   <div className="flex-1">
-                    <div className="flex items-center gap-2"><h3 className="text-xs font-semibold">{room.name}</h3>{selected && <span className="rounded-[4px] bg-white px-2 py-1 text-[9px]">Selected</span>}</div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-xs font-semibold">{room.name}</h3>
+                      {selected && <span className="rounded-[4px] bg-white px-2 py-1 text-[9px]">Selected</span>}
+                      {!loadingAvailability && roomAvailability && !roomAvailability.isAvailable && (
+                        <span className="rounded-[4px] bg-red-100 px-2 py-1 text-[9px] font-semibold text-red-700">Sold out</span>
+                      )}
+                      {!loadingAvailability && roomAvailability && roomAvailability.isAvailable && roomAvailability.availableInventory === 1 && (
+                        <span className="rounded-[4px] bg-amber-100 px-2 py-1 text-[9px] font-semibold text-amber-800">Last room</span>
+                      )}
+                    </div>
                     <p className="mt-1 text-[10px] text-muted">{room.beds}</p>
                     <p className="mt-1 text-[10px] text-muted">{room.detail}</p>
                     <p className="mt-1 text-[10px] text-forest">{room.inclusions}</p>
                     <p className="mt-1 text-[10px] text-muted">
-                      {loadingAvailability ? "Checking availability…" : roomAvailability ? `${roomAvailability.availableInventory} available` : "Availability not checked"}
+                      {loadingAvailability
+                        ? "Checking availability…"
+                        : !roomAvailability
+                        ? "Select dates to check availability"
+                        : roomAvailability.availableInventory === 0
+                        ? "No rooms available for these dates"
+                        : roomAvailability.availableInventory === 1
+                        ? "Only 1 room left for these dates"
+                        : `${roomAvailability.availableInventory} of ${room.totalInventory} rooms available`}
                     </p>
                   </div>
                   <div className="flex items-center justify-between gap-3 sm:flex-col sm:items-end">
                     <div className="text-right"><p className="text-sm font-semibold">{formatPrice(room.price)}</p><p className="text-[9px] text-muted">per night + taxes</p></div>
-                    <Button type="button" variant={selected ? "primary" : "outline"} className="min-h-8 px-3" onClick={() => setSelectedRoom(room)} disabled={loadingAvailability || !roomAvailability?.isAvailable}>
-                      {selected ? "✓ Selected" : "Select room"}
-                    </Button>
+                    {!loadingAvailability && roomAvailability && !roomAvailability.isAvailable ? (
+                      <span className="inline-flex min-h-8 items-center rounded-[4px] border border-red-200 bg-red-50 px-3 text-[10px] font-semibold text-red-700">
+                        Unavailable
+                      </span>
+                    ) : (
+                      <Button type="button" variant={selected ? "primary" : "outline"} className="min-h-8 px-3" onClick={() => setSelectedRoom(room)} disabled={loadingAvailability || (Boolean(roomAvailability) && !roomAvailability?.isAvailable)}>
+                        {selected ? "✓ Selected" : "Select room"}
+                      </Button>
+                    )}
                   </div>
                 </Surface>
               );

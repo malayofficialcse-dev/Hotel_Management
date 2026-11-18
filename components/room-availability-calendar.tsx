@@ -137,6 +137,7 @@ export function RoomAvailabilityCalendar({ roomTypeId, roomCount, checkIn, check
           const selectingCheckout = Boolean(anchor && key > anchor);
           const soldOut = Boolean(availability && availability.availableInventory === 0);
           const partiallyBooked = Boolean(availability && availability.bookedInventory > 0 && availability.availableInventory > 0);
+          const lowAvailability = Boolean(availability && availability.availableInventory > 0 && availability.availableInventory <= Math.ceil((calendar?.totalInventory ?? 1) * 0.3));
           const selected = key === checkIn || key === checkOut || (key > checkIn && key < checkOut);
           const description = !availability
             ? "Availability not loaded"
@@ -150,7 +151,17 @@ export function RoomAvailabilityCalendar({ roomTypeId, roomCount, checkIn, check
               aria-label={`${new Date(`${key}T00:00:00`).toLocaleDateString()}, ${description}`}
               title={description}
               className={`relative flex min-h-10 flex-col items-center justify-center rounded text-[11px] transition-colors disabled:cursor-not-allowed ${
-                selected ? "bg-forest font-semibold text-white" : soldOut ? "bg-red-100 text-red-500 line-through" : partiallyBooked ? "bg-amber-50 text-amber-900 hover:bg-amber-100" : availability && !past ? "bg-emerald-50 text-emerald-900 hover:bg-emerald-100" : "bg-stone-50 text-stone-400"
+                selected
+                  ? "bg-forest font-semibold text-white"
+                  : soldOut
+                  ? "bg-red-100 text-red-500 line-through cursor-not-allowed"
+                  : partiallyBooked
+                  ? lowAvailability
+                    ? "bg-orange-100 text-orange-900 hover:bg-orange-200"
+                    : "bg-amber-50 text-amber-900 hover:bg-amber-100"
+                  : availability && !past
+                  ? "bg-emerald-50 text-emerald-900 hover:bg-emerald-100"
+                  : "bg-stone-50 text-stone-400"
               }`}
             >
               {dayNumber}
@@ -163,6 +174,7 @@ export function RoomAvailabilityCalendar({ roomTypeId, roomCount, checkIn, check
       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-[9px] text-muted" aria-label="Availability legend">
         <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-sm bg-emerald-100" /> Available</span>
         <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-sm bg-amber-100" /> Partially booked</span>
+        <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-sm bg-orange-100" /> Low availability</span>
         <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-sm bg-red-100" /> Fully reserved</span>
         {checkIn && checkOut && <span className="ml-auto">Selected: {checkIn} → {checkOut}</span>}
       </div>
