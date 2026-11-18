@@ -9,6 +9,7 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "seed:departments-employees": "node scripts/seed-departments-employees.mjs",
+    "seed:reservations": "node services/infra/seed-reservations.js",
     "services:up": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\start-services.ps1",
     "services:down": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\stop-services.ps1"
   },

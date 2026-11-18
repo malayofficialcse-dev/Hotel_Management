@@ -838,6 +838,22 @@
   padding-bottom: 8px;
 }
 
+@media (min-width: 761px) {
+  .admin-occupancy-panel {
+    max-height: min(560px, 70vh);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .admin-occupancy-panel>.admin-panel-heading {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    border-bottom: 1px solid var(--admin-line);
+    background: #fff;
+  }
+}
+
 .admin-occupancy-row {
   display: grid;
   grid-template-columns: 102px 1fr 30px;

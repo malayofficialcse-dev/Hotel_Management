@@ -12,7 +12,7 @@ import { useBooking } from "@/components/booking-provider";
 
 export default function BookingReviewPage() {
   const router = useRouter();
-  const { guestDetails } = useBooking();
+  const { guestDetails, checkInDate, checkOutDate } = useBooking();
   const guestName = `${guestDetails.firstName} ${guestDetails.lastName}`.trim();
   const guestAddress = [guestDetails.street, guestDetails.city, guestDetails.state, guestDetails.postalCode, guestDetails.country].filter(Boolean).join(", ");
   const [agreed, setAgreed] = useState(true);
@@ -36,8 +36,8 @@ export default function BookingReviewPage() {
             <h3 className="mt-4 text-lg font-semibold">The Palm House, Goa</h3>
             <p className="mt-2 text-[11px] text-muted">Candolim Beach Road, North Goa, India</p>
             <div className="mt-4 grid gap-3 rounded-[4px] bg-sky p-4 text-[10px] sm:grid-cols-3">
-              <div><p className="text-muted">CHECK-IN</p><p className="mt-1 font-semibold">Fri, 18 Dec 2026</p><p className="mt-1 text-muted">From 2:00 PM</p></div>
-              <div><p className="text-muted">CHECK-OUT</p><p className="mt-1 font-semibold">Mon, 21 Dec 2026</p><p className="mt-1 text-muted">By 11:00 AM</p></div>
+              <div><p className="text-muted">CHECK-IN</p><p className="mt-1 font-semibold">{formatStayDate(checkInDate)}</p><p className="mt-1 text-muted">From 2:00 PM</p></div>
+              <div><p className="text-muted">CHECK-OUT</p><p className="mt-1 font-semibold">{formatStayDate(checkOutDate)}</p><p className="mt-1 text-muted">By 11:00 AM</p></div>
               <div><p className="text-muted">YOUR STAY</p><p className="mt-1 font-semibold">3 nights</p><p className="mt-1 text-muted">2 adults · 1 room</p></div>
             </div>
             <p className="mt-4 text-[11px] font-semibold">Deluxe Room · 1 king bed · 32 m²</p>
@@ -80,4 +80,10 @@ export default function BookingReviewPage() {
       <SiteFooter />
     </>
   );
+}
+
+function formatStayDate(value: string) {
+  const date = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return "Select a date";
+  return new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(date);
 }

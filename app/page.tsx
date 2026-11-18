@@ -568,89 +568,91 @@ export default function HomePage() {
               <aside className="h-fit rounded-xl border border-[#e5e7e1] bg-white p-5 shadow-[0_6px_24px_rgba(24,43,36,0.04)] xl:sticky xl:top-24">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-sm font-semibold text-[#263b31]">Refine your stay</h3>
-                    <p className="mt-1 text-[10px] text-[#879188]">Find the details that matter</p>
+                    <h3 className="text-sm font-semibold text-[#263b31]">Filters</h3>
+                    <p className="mt-1 text-[10px] text-[#879188]">Narrow down your stay</p>
                   </div>
                   <button type="button" onClick={resetAll} className="text-[10px] font-semibold text-[#496b59] hover:underline">Reset</button>
                 </div>
-                <div className="my-5 border-t border-[#edf0eb]" />
-                <fieldset>
-                  <legend className="text-[11px] font-semibold text-[#354b40]">Price per night</legend>
-                  <p className="mt-2 text-[11px] font-medium text-[#496b59]">
-                    ₹{(minimumPrice ?? priceBounds.min).toLocaleString("en-IN")} – ₹{(maximumPrice ?? priceBounds.max).toLocaleString("en-IN")}
-                  </p>
-                  <input
-                    aria-label="Minimum price"
-                    type="range"
-                    min={priceBounds.min}
-                    max={maximumPrice ?? priceBounds.max}
-                    value={minimumPrice ?? priceBounds.min}
-                    onChange={(event) => setMinimumPrice(Number(event.target.value))}
-                    className="mt-3 w-full accent-[#496b59]"
-                  />
-                  <input
-                    aria-label="Maximum price"
-                    type="range"
-                    min={minimumPrice ?? priceBounds.min}
-                    max={priceBounds.max}
-                    value={maximumPrice ?? priceBounds.max}
-                    onChange={(event) => setMaximumPrice(Number(event.target.value))}
-                    className="mt-2 w-full accent-[#496b59]"
-                  />
-                  <div className="mt-2 flex justify-between text-[9px] text-[#879188]">
-                    <span>₹{priceBounds.min.toLocaleString("en-IN")}</span>
-                    <button type="button" onClick={() => { setMinimumPrice(null); setMaximumPrice(null); }} className="font-medium text-[#496b59] hover:underline">
-                      Reset price
-                    </button>
-                    <span>₹{priceBounds.max.toLocaleString("en-IN")}</span>
-                  </div>
-                </fieldset>
-                <fieldset className="mt-5 border-t border-[#edf0eb] pt-4">
-                  <legend className="text-[11px] font-semibold text-[#354b40]">Guest rating</legend>
-                  {[{ value: "", label: "Any rating" }, { value: "4.5", label: "4.5 & above" }, { value: "4.8", label: "4.8 & above" }, { value: "3.5", label: "3.5 & above" }].map((item) => (
-                    <label key={item.label} className="mt-3 flex items-center gap-2 text-[11px] text-[#68756d]">
-                      <input type="radio" name="rating" checked={rating === item.value} onChange={() => setRating(item.value)} className="accent-[#496b59]" />
-                      {item.label}
-                    </label>
-                  ))}
-                </fieldset>
-                <fieldset className="mt-5 border-t border-[#edf0eb] pt-4">
-                  <legend className="text-[11px] font-semibold text-[#354b40]">Amenities</legend>
-                  {amenityOptions.map((item) => (
-                    <label key={item.key} className="mt-3 flex items-center gap-2 text-[11px] text-[#68756d]">
-                      <input
-                        type="checkbox"
-                        checked={selectedAmenities.includes(item.key)}
-                        onChange={(event) => setSelectedAmenities((current) =>
-                          event.target.checked
-                            ? [...current, item.key]
-                            : current.filter((feature) => feature !== item.key),
-                        )}
-                        className="accent-[#496b59]"
-                      />
-                      {item.label}
-                    </label>
-                  ))}
-                  {amenityOptions.length === 0 && <p className="mt-3 text-[10px] text-[#879188]">No amenities listed for these stays.</p>}
-                </fieldset>
-                <fieldset className="mt-5 border-t border-[#edf0eb] pt-4">
-                  <legend className="text-[11px] font-semibold text-[#354b40]">Stay style</legend>
-                  {stayStyles.map((item) => (
-                    <label key={item} className="mt-3 flex items-center gap-2 text-[11px] text-[#68756d]">
-                      <input
-                        type="checkbox"
-                        checked={selectedCategories.includes(item)}
-                        onChange={(event) => setSelectedCategories((current) =>
-                          event.target.checked
-                            ? [...current, item]
-                            : current.filter((category) => category !== item),
-                        )}
-                        className="accent-[#496b59]"
-                      />
-                      {item}
-                    </label>
-                  ))}
-                </fieldset>
+                <div className="xl:max-h-[calc(100vh-14rem)] xl:overflow-y-auto xl:overscroll-contain xl:pr-2">
+                  <div className="my-5 border-t border-[#edf0eb]" />
+                  <fieldset>
+                    <legend className="text-[11px] font-semibold text-[#354b40]">Price per night</legend>
+                    <p className="mt-2 text-[11px] font-medium text-[#496b59]">
+                      ₹{(minimumPrice ?? priceBounds.min).toLocaleString("en-IN")} – ₹{(maximumPrice ?? priceBounds.max).toLocaleString("en-IN")}
+                    </p>
+                    <input
+                      aria-label="Minimum price"
+                      type="range"
+                      min={priceBounds.min}
+                      max={maximumPrice ?? priceBounds.max}
+                      value={minimumPrice ?? priceBounds.min}
+                      onChange={(event) => setMinimumPrice(Number(event.target.value))}
+                      className="mt-3 w-full accent-[#496b59]"
+                    />
+                    <input
+                      aria-label="Maximum price"
+                      type="range"
+                      min={minimumPrice ?? priceBounds.min}
+                      max={priceBounds.max}
+                      value={maximumPrice ?? priceBounds.max}
+                      onChange={(event) => setMaximumPrice(Number(event.target.value))}
+                      className="mt-2 w-full accent-[#496b59]"
+                    />
+                    <div className="mt-2 flex justify-between text-[9px] text-[#879188]">
+                      <span>₹{priceBounds.min.toLocaleString("en-IN")}</span>
+                      <button type="button" onClick={() => { setMinimumPrice(null); setMaximumPrice(null); }} className="font-medium text-[#496b59] hover:underline">
+                        Reset price
+                      </button>
+                      <span>₹{priceBounds.max.toLocaleString("en-IN")}</span>
+                    </div>
+                  </fieldset>
+                  <fieldset className="mt-5 border-t border-[#edf0eb] pt-4">
+                    <legend className="text-[11px] font-semibold text-[#354b40]">Guest rating</legend>
+                    {[{ value: "", label: "Any rating" }, { value: "4.5", label: "4.5 & above" }, { value: "4.8", label: "4.8 & above" }, { value: "3.5", label: "3.5 & above" }].map((item) => (
+                      <label key={item.label} className="mt-3 flex items-center gap-2 text-[11px] text-[#68756d]">
+                        <input type="radio" name="rating" checked={rating === item.value} onChange={() => setRating(item.value)} className="accent-[#496b59]" />
+                        {item.label}
+                      </label>
+                    ))}
+                  </fieldset>
+                  <fieldset className="mt-5 border-t border-[#edf0eb] pt-4">
+                    <legend className="text-[11px] font-semibold text-[#354b40]">Amenities</legend>
+                    {amenityOptions.map((item) => (
+                      <label key={item.key} className="mt-3 flex items-center gap-2 text-[11px] text-[#68756d]">
+                        <input
+                          type="checkbox"
+                          checked={selectedAmenities.includes(item.key)}
+                          onChange={(event) => setSelectedAmenities((current) =>
+                            event.target.checked
+                              ? [...current, item.key]
+                              : current.filter((feature) => feature !== item.key),
+                          )}
+                          className="accent-[#496b59]"
+                        />
+                        {item.label}
+                      </label>
+                    ))}
+                    {amenityOptions.length === 0 && <p className="mt-3 text-[10px] text-[#879188]">No amenities listed for these stays.</p>}
+                  </fieldset>
+                  <fieldset className="mt-5 border-t border-[#edf0eb] pt-4">
+                    <legend className="text-[11px] font-semibold text-[#354b40]">Stay style</legend>
+                    {stayStyles.map((item) => (
+                      <label key={item} className="mt-3 flex items-center gap-2 text-[11px] text-[#68756d]">
+                        <input
+                          type="checkbox"
+                          checked={selectedCategories.includes(item)}
+                          onChange={(event) => setSelectedCategories((current) =>
+                            event.target.checked
+                              ? [...current, item]
+                              : current.filter((category) => category !== item),
+                          )}
+                          className="accent-[#496b59]"
+                        />
+                        {item}
+                      </label>
+                    ))}
+                  </fieldset>
+                </div>
               </aside>
 
               <div>

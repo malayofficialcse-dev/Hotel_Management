@@ -24,7 +24,7 @@ END:VEVENT
 END:VCALENDAR`;
 
 export default function BookingConfirmationPage() {
-  const { guestDetails } = useBooking();
+  const { guestDetails, checkInDate, checkOutDate } = useBooking();
   const guestName = `${guestDetails.firstName} ${guestDetails.lastName}`.trim() || "Guest";
   const [bookingCode, setBookingCode] = useState("SE-261218-0482");
   const [userChecked, setUserChecked] = useState(false);
@@ -131,8 +131,8 @@ export default function BookingConfirmationPage() {
                 </div>
               </div>
               <div className="mt-4 grid grid-cols-2 gap-3 border-t border-line pt-4 text-[10px]">
-                <div><p className="text-muted">CHECK-IN</p><p className="mt-1 font-semibold">18 Dec 2026, Friday</p><p className="mt-1 text-muted">From 2:00 PM</p></div>
-                <div><p className="text-muted">CHECK-OUT</p><p className="mt-1 font-semibold">21 Dec 2026, Monday</p><p className="mt-1 text-muted">By 11:00 AM</p></div>
+                <div><p className="text-muted">CHECK-IN</p><p className="mt-1 font-semibold">{formatStayDate(checkInDate)}</p><p className="mt-1 text-muted">From 2:00 PM</p></div>
+                <div><p className="text-muted">CHECK-OUT</p><p className="mt-1 font-semibold">{formatStayDate(checkOutDate)}</p><p className="mt-1 text-muted">By 11:00 AM</p></div>
               </div>
               <div className="mt-4 flex items-center justify-between gap-4 border-t border-line pt-4">
                 <div className="text-[10px]">
@@ -171,4 +171,10 @@ export default function BookingConfirmationPage() {
       <SiteFooter />
     </>
   );
+}
+
+function formatStayDate(value: string) {
+  const date = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return "Select a date";
+  return new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(date);
 }

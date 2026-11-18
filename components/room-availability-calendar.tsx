@@ -150,22 +150,21 @@ export function RoomAvailabilityCalendar({ roomTypeId, roomCount, checkIn, check
               onClick={() => chooseDate(key)}
               aria-label={`${new Date(`${key}T00:00:00`).toLocaleDateString()}, ${description}`}
               title={description}
-              className={`relative flex min-h-10 flex-col items-center justify-center rounded text-[11px] transition-colors disabled:cursor-not-allowed ${
-                selected
+              className={`relative flex min-h-10 flex-col items-center justify-center rounded text-[11px] transition-colors disabled:cursor-not-allowed ${selected
                   ? "bg-forest font-semibold text-white"
                   : soldOut
-                  ? "bg-red-100 text-red-500 line-through cursor-not-allowed"
-                  : partiallyBooked
-                  ? lowAvailability
-                    ? "bg-orange-100 text-orange-900 hover:bg-orange-200"
-                    : "bg-amber-50 text-amber-900 hover:bg-amber-100"
-                  : availability && !past
-                  ? "bg-emerald-50 text-emerald-900 hover:bg-emerald-100"
-                  : "bg-stone-50 text-stone-400"
-              }`}
+                    ? "bg-red-100 text-red-500 line-through cursor-not-allowed"
+                    : partiallyBooked
+                      ? lowAvailability
+                        ? "bg-orange-100 text-orange-900 hover:bg-orange-200"
+                        : "bg-amber-50 text-amber-900 hover:bg-amber-100"
+                      : availability && !past
+                        ? "bg-emerald-50 text-emerald-900 hover:bg-emerald-100"
+                        : "bg-stone-50 text-stone-400"
+                }`}
             >
               {dayNumber}
-              {availability && !selected && !past && <span className="text-[8px] leading-3">{soldOut ? "Full" : partiallyBooked ? `${availability.availableInventory} left` : "Open"}</span>}
+              {availability && !past && <span className="text-[8px] leading-3">{soldOut ? "Full" : selected || partiallyBooked ? `${availability.availableInventory} left` : "Open"}</span>}
             </button>
           );
         })}
