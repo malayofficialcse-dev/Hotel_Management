@@ -63,6 +63,118 @@
   background-color: #fbf5ec;
 }
 
+.stayease-price-pin {
+  display: flex !important;
+  justify-content: center;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+.stayease-price-pin > span {
+  position: relative;
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  border: 1px solid #d5e4d8;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgb(38 59 49 / 22%);
+  color: #244b3e;
+  font-family: Inter, Arial, sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.stayease-price-pin > span::after {
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  width: 7px;
+  height: 7px;
+  transform: translateX(-50%) rotate(45deg);
+  border-right: 1px solid #d5e4d8;
+  border-bottom: 1px solid #d5e4d8;
+  background: inherit;
+  content: "";
+}
+
+.stayease-price-pin.is-selected {
+  z-index: 1000 !important;
+}
+
+.stayease-price-pin.is-selected > span {
+  border-color: #244b3e;
+  background: #244b3e;
+  color: #ffffff;
+}
+
+.stayease-price-pin.is-selected > span::after {
+  border-color: #244b3e;
+}
+
+.stayease-price-pin:hover {
+  z-index: 1000 !important;
+}
+
+.leaflet-tooltip.stayease-map-tooltip {
+  padding: 0;
+  border: 1px solid #dfe5dd;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 6px 20px rgb(38 59 49 / 20%);
+  color: #263b31;
+}
+
+.stayease-map-tooltip-content {
+  display: flex;
+  width: 220px;
+  align-items: center;
+  gap: 9px;
+  padding: 8px;
+}
+
+.stayease-map-tooltip-content > img {
+  width: 62px;
+  height: 54px;
+  flex: none;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.stayease-map-tooltip-details {
+  min-width: 0;
+}
+
+.stayease-map-tooltip-name {
+  overflow: hidden;
+  color: #263b31;
+  font-size: 11px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stayease-map-tooltip-city {
+  overflow: hidden;
+  margin-top: 3px;
+  color: #78847c;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stayease-map-tooltip-price {
+  margin-top: 4px;
+  color: #385a49;
+  font-size: 9px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 html {
   scroll-behavior: smooth;
 }

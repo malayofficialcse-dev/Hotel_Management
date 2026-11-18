@@ -16,6 +16,8 @@ export interface AdminHotel {
   name: string;
   city: string;
   location: string;
+  latitude?: number;
+  longitude?: number;
   mainImage?: string;
   galleryImages?: string[];
   basePrice: number;
@@ -319,6 +321,8 @@ function toPublicHotel(hotel: AdminHotel): Hotel {
     name: hotel.name,
     city: hotel.city,
     location: hotel.location,
+    latitude: hotel.latitude,
+    longitude: hotel.longitude,
     image: hotel.mainImage || "",
     galleryImages: hotel.galleryImages || [],
     price: hotel.basePrice,

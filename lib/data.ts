@@ -3,6 +3,8 @@ export type Hotel = {
   name: string;
   city: string;
   location: string;
+  latitude?: number;
+  longitude?: number;
   image: string;
   galleryImages?: string[];
   price: number;

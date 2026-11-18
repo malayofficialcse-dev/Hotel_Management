@@ -143,6 +143,8 @@ const createFields: Partial<Record<AdminSection, CreateField[]>> = {
     { name: "slug", label: "URL slug", placeholder: "Leave blank to generate from hotel name" },
     { name: "city", label: "City", required: true },
     { name: "location", label: "Location", required: true },
+    { name: "latitude", label: "Latitude", type: "number" },
+    { name: "longitude", label: "Longitude", type: "number" },
     { name: "category", label: "Category", required: true },
     { name: "basePrice", label: "Base price per night", type: "number", required: true },
     { name: "description", label: "Description", type: "textarea" },

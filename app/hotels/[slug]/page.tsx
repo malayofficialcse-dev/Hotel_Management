@@ -15,6 +15,7 @@ import type { Hotel } from "@/lib/data";
 import { formatPrice } from "@/lib/data";
 import { HotelDetailSkeleton } from "@/components/skeletons/hotel-detail-skeleton";
 import { HotelDetailsExperience } from "@/components/hotel-details-experience";
+import { HotelDiscoveryMap } from "@/components/hotel-discovery-map";
 
 const fallbackImage = "/assets/figma/a0108.png";
 
@@ -152,6 +153,9 @@ export default function HotelDetailsPage() {
                     <h2 className="text-sm font-semibold">Book with confidence</h2>
                     <p className="mt-3 text-xs leading-5 text-muted">Clear stay rules, verified-stay reviews and location details are available below.</p>
                   </Surface>
+                </section>
+                <section id="location">
+                  <HotelDiscoveryMap hotels={[hotel]} />
                 </section>
                 <HotelDetailsExperience hotel={hotel} gallery={gallery} />
               </div>

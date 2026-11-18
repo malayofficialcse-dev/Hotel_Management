@@ -233,7 +233,8 @@ export default function RoomSelectionPage() {
                 checkOut={checkOutDate}
                 onDatesChange={(checkIn, checkOut) => setBookingDetails({ checkInDate: checkIn, checkOutDate: checkOut })}
               />
-              <Surface className="grid min-w-0 gap-4 p-4 sm:grid-cols-[150px_1fr] xl:grid-cols-1 2xl:grid-cols-[150px_1fr]">
+              <Surface className="min-w-0 p-4">
+                <div className="grid gap-4 sm:grid-cols-[150px_1fr] xl:grid-cols-1 2xl:grid-cols-[150px_1fr]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={activeRoom.image || "/assets/figma/a0108.png"} alt={activeRoom.name} className="h-28 w-full rounded-[4px] object-cover sm:h-full" />
                 <div>
@@ -243,6 +244,27 @@ export default function RoomSelectionPage() {
                   <p className="mt-2 text-[10px] leading-5 text-muted">{activeRoom.detail}</p>
                   <p className="mt-1 text-[10px] font-medium text-forest">{activeRoom.inclusions || "Room features vary by property."}</p>
                   <p className="mt-2 text-[10px] text-muted">Up to {activeRoom.capacity} guests per room · {activeRoom.totalInventory} rooms in this room type</p>
+                </div>
+                </div>
+                <div className="mt-4 border-t border-line pt-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-[10px] font-semibold text-ink">Your selected rooms</p>
+                    <span className="rounded-full bg-mint px-2 py-1 text-[9px] font-semibold text-forest">{roomCount} {roomCount === 1 ? "room" : "rooms"} selected</span>
+                  </div>
+                  <div className="mt-3 flex -space-x-2" aria-label={`${roomCount} selected ${activeRoom.name} rooms`}>
+                    {Array.from({ length: Math.min(roomCount, 5) }, (_, index) => (
+                      <div key={index} className="h-9 w-9 overflow-hidden rounded-full border-2 border-white bg-mist" title={`${activeRoom.name} ${index + 1}`}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={activeRoom.image || "/assets/figma/a0108.png"} alt="" className="h-full w-full object-cover" />
+                      </div>
+                    ))}
+                    {roomCount > 5 && <span className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-forest text-[9px] font-semibold text-white">+{roomCount - 5}</span>}
+                  </div>
+                  <p className="mt-3 text-[10px] leading-4 text-muted">
+                    {loadingAvailability ? "Checking live inventory for every selected room…" : availability[activeRoom.id]
+                      ? `${availability[activeRoom.id].availableInventory} units remain for ${checkInDate} to ${checkOutDate}. Your ${roomCount} selected ${roomCount === 1 ? "unit is" : "units are"} ${availability[activeRoom.id].isAvailable ? "available" : "not available"}.`
+                      : "Choose valid dates to verify each selected room."}
+                  </p>
                 </div>
               </Surface>
             </div>

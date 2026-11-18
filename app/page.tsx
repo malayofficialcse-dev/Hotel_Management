@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { FigmaIcon } from "@/components/figma-icon";
 import { HotelCard } from "@/components/hotel-card";
+import { HotelDiscoveryMap } from "@/components/hotel-discovery-map";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { Button } from "@/components/ui";
@@ -107,6 +108,7 @@ export default function HomePage() {
   const [carouselNotice, setCarouselNotice] = useState("");
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [forceSkeleton, setForceSkeleton] = useState(false);
+  const [mapVisible, setMapVisible] = useState(false);
   const searchRequestId = useRef(0);
   const activeSlide = heroSlides[activeHeroSlide] || heroSlides[0];
 
@@ -668,7 +670,9 @@ export default function HomePage() {
                       ? `${new Date(`${searchedDates.checkIn}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })} – ${new Date(`${searchedDates.checkOut}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })} · ${Math.round((Date.parse(`${searchedDates.checkOut}T00:00:00Z`) - Date.parse(`${searchedDates.checkIn}T00:00:00Z`)) / 86400000)} nights`
                       : "Choose dates to check availability"}
                   </span>
+                  <button type="button" onClick={() => setMapVisible((visible) => !visible)} className="rounded-full border border-[#dfe5dd] px-3 py-1.5 text-[10px] font-semibold text-[#385a49] hover:bg-[#f4f7f3]">{mapVisible ? "List view" : "Map view"}</button>
                 </div>
+                {mapVisible && <div className="mb-5"><HotelDiscoveryMap hotels={visibleHotels} /></div>}
                 {availabilityLoading ? (
                   <div className="space-y-4">
                     <div className="flex items-center gap-2 rounded-xl border border-[#cbe0d3] bg-[#edf3ee] px-4 py-3 text-xs font-medium text-[#2d5a43] shadow-sm">

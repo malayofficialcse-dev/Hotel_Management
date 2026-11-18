@@ -9,7 +9,7 @@ import { canPerform } from "@/lib/rbac";
 export default function AdminHotelDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [hotel, setHotel] = useState<AdminHotel | null>(null);
-  const [form, setForm] = useState({ name: "", city: "", location: "", category: "", basePrice: "", description: "", isActive: true });
+  const [form, setForm] = useState({ name: "", city: "", location: "", latitude: "", longitude: "", category: "", basePrice: "", description: "", isActive: true });
   const [mainImage, setMainImage] = useState("");
   const [galleryImages, setGalleryImages] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,7 +25,7 @@ export default function AdminHotelDetailPage() {
       if (!active) return;
       if (!found) { setNotice("This property is not present in the hotel database."); return; }
       setHotel(found);
-      setForm({ name: found.name, city: found.city, location: found.location, category: found.category, basePrice: String(found.basePrice), description: found.description || "", isActive: found.isActive });
+      setForm({ name: found.name, city: found.city, location: found.location, latitude: found.latitude === undefined ? "" : String(found.latitude), longitude: found.longitude === undefined ? "" : String(found.longitude), category: found.category, basePrice: String(found.basePrice), description: found.description || "", isActive: found.isActive });
       setMainImage(found.mainImage || "");
       setGalleryImages(found.galleryImages || []);
     }).catch((error: unknown) => { if (active) setNotice(error instanceof Error ? error.message : "Could not load property details."); })
@@ -45,6 +45,8 @@ export default function AdminHotelDetailPage() {
       const updated = await api.updateHotel(hotel.slug || hotel._id, {
         ...form,
         basePrice: Number(form.basePrice),
+        latitude: form.latitude === "" ? undefined : Number(form.latitude),
+        longitude: form.longitude === "" ? undefined : Number(form.longitude),
         mainImage,
         galleryImages,
       });
@@ -107,6 +109,7 @@ export default function AdminHotelDetailPage() {
             <label>Property name<input value={form.name} onChange={(event) => setField("name", event.target.value)} /></label>
             <div className="admin-hotel-two-cols"><label>City<input value={form.city} onChange={(event) => setField("city", event.target.value)} /></label><label>Category<input value={form.category} onChange={(event) => setField("category", event.target.value)} /></label></div>
             <label>Address<input value={form.location} onChange={(event) => setField("location", event.target.value)} /></label>
+            <div className="admin-hotel-two-cols"><label>Latitude<input type="number" step="any" min="-90" max="90" value={form.latitude} onChange={(event) => setField("latitude", event.target.value)} placeholder="e.g. 15.5170" /></label><label>Longitude<input type="number" step="any" min="-180" max="180" value={form.longitude} onChange={(event) => setField("longitude", event.target.value)} placeholder="e.g. 73.7620" /></label></div>
             <label>About this stay<textarea value={form.description} onChange={(event) => setField("description", event.target.value)} rows={4} /></label>
             <div className="admin-hotel-two-cols"><label>Starting price<input type="number" min="0" value={form.basePrice} onChange={(event) => setField("basePrice", event.target.value)} /></label><label>Property status<select value={form.isActive ? "active" : "inactive"} onChange={(event) => setField("isActive", event.target.value === "active")}><option value="active">Active</option><option value="inactive">Inactive</option></select></label></div>
             <h2 className="admin-hotel-subhead">Property images</h2>

@@ -6,6 +6,8 @@ const hotelSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true, maxlength: 160 },
     city: { type: String, required: true, trim: true, index: true },
     location: { type: String, required: true, trim: true },
+    latitude: { type: Number, min: -90, max: 90 },
+    longitude: { type: Number, min: -180, max: 180 },
     mainImage: { type: String, default: "" },
     galleryImages: { type: [String], default: [] },
     basePrice: { type: Number, required: true, min: 0 },
