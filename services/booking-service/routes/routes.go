@@ -35,6 +35,11 @@ func SetupRoutes(c *controllers.BookingController, authServiceURL string) *chi.M
 		api.Get("/code", c.GetBookingByCode)
 		api.Get("/code/{code}", c.GetBookingByCode)
 		api.Get("/code/*", c.GetBookingByCode)
+
+		// Contactless QR Pass & Digital Check-In
+		api.Get("/{id}/qr-pass", c.GetQRPass)
+		api.Get("/qr-pass", c.GetQRPass)
+		api.Post("/verify-qr", c.VerifyQRPass)
 	})
 
 	r.Get("/internal/rooms/{roomTypeId}/availability", c.GetAvailabilityCalendar)

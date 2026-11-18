@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { Button, PageHeading, Surface } from "@/components/ui";
@@ -191,17 +192,23 @@ export default function BookingsPage() {
             )}
 
             {tab === "upcoming" && nextBooking && (
-              <div className="mt-5 flex items-center gap-3 rounded-[4px] bg-butter p-4 text-[10px]">
-                <span aria-hidden="true" className="text-base">✦</span>
-                <div>
-                  <p className="font-semibold">
-                    Your next stay: {nextHotel ? `${nextHotel.name}, ${nextHotel.city}` : nextBooking.hotel_name}.
-                  </p>
-                  <p className="mt-1 text-muted">
-                    {formatBookingDate(nextBooking.check_in_date)} · {statusLabel(nextBooking.status)}
-                  </p>
+              <Link
+                href={`/booking/confirmation?code=${encodeURIComponent(nextBooking.booking_code)}`}
+                className="mt-5 flex items-center justify-between gap-3 rounded-[4px] bg-butter p-4 text-[10px] hover:bg-[#faeec5] transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <span aria-hidden="true" className="text-base">✦</span>
+                  <div>
+                    <p className="font-semibold text-charcoal">
+                      Your next stay: {nextHotel ? `${nextHotel.name}, ${nextHotel.city}` : nextBooking.hotel_name}.
+                    </p>
+                    <p className="mt-1 text-muted">
+                      {formatBookingDate(nextBooking.check_in_date)} · {statusLabel(nextBooking.status)}
+                    </p>
+                  </div>
                 </div>
-              </div>
+                <span className="font-semibold text-forest whitespace-nowrap">View Digital Pass ↗</span>
+              </Link>
             )}
 
             {visibleBookings.length ? (
@@ -272,29 +279,35 @@ function BookingCard({
       ? "bg-sky text-charcoal"
       : "bg-mint text-forest";
 
+  const confirmationUrl = `/booking/confirmation?code=${encodeURIComponent(booking.booking_code)}`;
+
   return (
-    <Surface className="p-4 sm:p-5">
+    <Surface className="group relative overflow-hidden p-4 transition-all hover:shadow-md hover:border-forest/40 sm:p-5">
       <div className="flex items-center justify-between gap-3 text-[9px] text-muted">
-        <span>BOOKING ID · {booking.booking_code}</span>
+        <span>BOOKING ID · <strong className="font-mono text-charcoal">{booking.booking_code}</strong></span>
         <span className={`rounded-[4px] px-2 py-1 font-semibold ${statusStyle}`}>
           {statusLabel(booking.status)}
         </span>
       </div>
-      <div className="mt-4 grid gap-4 sm:grid-cols-[140px_1fr_150px]">
-        {hotel?.image ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={hotel.image} alt={hotel.name} className="h-[105px] w-full rounded-[4px] object-cover" />
-        ) : (
-          <div aria-hidden="true" className="flex h-[105px] items-center justify-center rounded-[4px] bg-mint text-2xl font-semibold text-forest">
-            {booking.hotel_name.charAt(0).toUpperCase()}
-          </div>
-        )}
+      <div className="mt-4 grid gap-4 sm:grid-cols-[140px_1fr_170px]">
+        <Link href={confirmationUrl} className="block overflow-hidden rounded-[4px]">
+          {hotel?.image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={hotel.image} alt={hotel.name} className="h-[105px] w-full rounded-[4px] object-cover transition-transform duration-200 group-hover:scale-105" />
+          ) : (
+            <div aria-hidden="true" className="flex h-[105px] items-center justify-center rounded-[4px] bg-mint text-2xl font-semibold text-forest">
+              {booking.hotel_name.charAt(0).toUpperCase()}
+            </div>
+          )}
+        </Link>
         <div>
-          <h2 className="text-sm font-semibold">
-            {hotel ? `${hotel.name}, ${hotel.city}` : booking.hotel_name}
-          </h2>
+          <Link href={confirmationUrl} className="hover:text-forest transition-colors">
+            <h2 className="text-sm font-bold text-charcoal group-hover:text-forest">
+              {hotel ? `${hotel.name}, ${hotel.city}` : booking.hotel_name}
+            </h2>
+          </Link>
           {hotel?.location && <p className="mt-1 text-[10px] text-muted">{hotel.location}</p>}
-          <p className="mt-2 text-[11px] font-semibold">
+          <p className="mt-2 text-[11px] font-semibold text-charcoal">
             {formatBookingDate(booking.check_in_date)} – {formatBookingDate(booking.check_out_date)}
             {" · "}{booking.total_nights} {booking.total_nights === 1 ? "night" : "nights"}
           </p>
@@ -302,11 +315,18 @@ function BookingCard({
             {booking.room_type_name} · {booking.guests_count} {booking.guests_count === 1 ? "adult" : "adults"} · {booking.room_count} {booking.room_count === 1 ? "room" : "rooms"}
           </p>
         </div>
-        <div className="flex flex-row items-center justify-between gap-3 sm:flex-col sm:items-end">
+        <div className="flex flex-row items-center justify-between gap-3 sm:flex-col sm:items-end sm:justify-between">
           <div className="text-right">
-            <p className="text-lg font-semibold">{formatPrice(booking.total_price)}</p>
+            <p className="text-lg font-semibold text-charcoal">{formatPrice(booking.total_price)}</p>
             <p className="text-[9px] text-muted">Total booking price</p>
           </div>
+          <Link
+            href={confirmationUrl}
+            className="inline-flex items-center gap-1.5 rounded bg-forest px-3 py-1.5 text-[11px] font-semibold text-white shadow-xs hover:bg-[#344d40] transition-colors"
+          >
+            <span>🔑 Digital Pass & QR</span>
+            <span>→</span>
+          </Link>
         </div>
       </div>
     </Surface>

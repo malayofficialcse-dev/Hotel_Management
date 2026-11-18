@@ -10,6 +10,7 @@ import (
 	"math"
 	"math/rand"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 	"unicode"
@@ -18,6 +19,7 @@ import (
 
 	"booking-service/models"
 	"booking-service/repository"
+	"booking-service/utils"
 )
 
 // bookingCodeChars is the alphabet for booking code generation (no ambiguous chars).
@@ -560,6 +562,126 @@ func (s *BookingService) GetOverlappingCount(ctx context.Context, roomTypeID, ch
 		return 0, fmt.Errorf("availability range must be between 1 and 365 nights")
 	}
 	return s.repo.GetOverlappingCount(ctx, nil, roomTypeID, ciTime, coTime)
+}
+
+// --------------------------------------------------------------------------
+// QR Check-In
+// --------------------------------------------------------------------------
+
+// qrPassSecret returns the JWT signing secret from env or a safe default.
+func qrPassSecret() string {
+	if s := os.Getenv("JWT_ACCESS_SECRET"); s != "" {
+		return s
+	}
+	return "hotel-jwt-secret-key-2026"
+}
+
+// GenerateQRPass creates a signed HMAC-SHA256 JWT pass for a confirmed booking.
+// The pass expires 48 h after check-in (plenty of time for the front-desk scan).
+func (s *BookingService) GenerateQRPass(ctx context.Context, bookingID uuid.UUID) (string, *models.Booking, error) {
+	booking, err := s.repo.GetBookingByID(ctx, bookingID)
+	if err != nil {
+		if errors.Is(err, repository.ErrBookingNotFound) {
+			return "", nil, ErrBookingNotFound
+		}
+		return "", nil, err
+	}
+	if booking.Status != models.StatusConfirmed && booking.Status != models.StatusCheckedIn {
+		return "", nil, fmt.Errorf("QR pass is only available for CONFIRMED or CHECKED_IN bookings (current: %s)", booking.Status)
+	}
+
+	now := time.Now().UTC()
+	exp := booking.CheckInDate.Add(48 * time.Hour).Unix()
+	if exp < now.Unix() {
+		// booking is in the past — extend to now+1h so staff can still scan
+		exp = now.Add(1 * time.Hour).Unix()
+	}
+
+	claims := utils.QRPassClaims{
+		Sub:          booking.ID.String(),
+		BookingCode:  booking.BookingCode,
+		HotelID:      booking.HotelID,
+		HotelName:    booking.HotelName,
+		RoomTypeID:   booking.RoomTypeID,
+		RoomTypeName: booking.RoomTypeName,
+		GuestName:    strings.TrimSpace(booking.GuestFirstName + " " + booking.GuestLastName),
+		GuestEmail:   booking.GuestEmail,
+		CheckInDate:  booking.CheckInDate.Format("2006-01-02"),
+		CheckOutDate: booking.CheckOutDate.Format("2006-01-02"),
+		TotalNights:  booking.TotalNights,
+		RoomCount:    booking.RoomCount,
+		IssuedAt:     now.Unix(),
+		ExpiresAt:    exp,
+	}
+
+	token, err := utils.SignQRPass(qrPassSecret(), claims)
+	if err != nil {
+		return "", nil, fmt.Errorf("sign QR pass: %w", err)
+	}
+	return token, booking, nil
+}
+
+// CheckInByQR verifies a QR pass token and transitions the booking to CHECKED_IN.
+func (s *BookingService) CheckInByQR(ctx context.Context, token string) (*models.Booking, bool, error) {
+	claims, err := utils.VerifyQRPass(qrPassSecret(), token)
+	if err != nil {
+		if errors.Is(err, utils.ErrQRPassExpired) {
+			return nil, false, fmt.Errorf("QR pass has expired — please ask the guest to refresh their pass")
+		}
+		return nil, false, fmt.Errorf("invalid QR pass: %w", err)
+	}
+
+	bookingID, err := uuid.Parse(claims.Sub)
+	if err != nil {
+		return nil, false, fmt.Errorf("malformed booking ID in QR pass")
+	}
+
+	booking, err := s.repo.GetBookingByID(ctx, bookingID)
+	if err != nil {
+		if errors.Is(err, repository.ErrBookingNotFound) {
+			return nil, false, ErrBookingNotFound
+		}
+		return nil, false, err
+	}
+
+	alreadyCheckedIn := booking.Status == models.StatusCheckedIn
+	if alreadyCheckedIn {
+		return booking, true, nil // idempotent
+	}
+
+	if booking.Status != models.StatusConfirmed {
+		return booking, false, fmt.Errorf("cannot check in a booking with status %q", booking.Status)
+	}
+
+	if err := s.repo.UpdateStatus(ctx, bookingID, models.StatusCheckedIn); err != nil {
+		return nil, false, fmt.Errorf("update status: %w", err)
+	}
+	booking.Status = models.StatusCheckedIn
+
+	// Publish checked-in event
+	if s.publisher != nil {
+		userIDStr := ""
+		if booking.UserID != nil {
+			userIDStr = booking.UserID.String()
+		}
+		go func() {
+			_ = s.publisher.Publish(context.Background(), "booking.checked_in", BookingEvent{
+				EventType:   "booking.checked_in",
+				BookingID:   booking.ID.String(),
+				BookingCode: booking.BookingCode,
+				UserID:      userIDStr,
+				GuestEmail:  booking.GuestEmail,
+				GuestName:   strings.TrimSpace(booking.GuestFirstName + " " + booking.GuestLastName),
+				HotelName:   booking.HotelName,
+				RoomType:    booking.RoomTypeName,
+				CheckIn:     booking.CheckInDate.Format("2006-01-02"),
+				CheckOut:    booking.CheckOutDate.Format("2006-01-02"),
+				TotalPrice:  booking.TotalPrice,
+			})
+		}()
+	}
+
+	return booking, false, nil
 }
 
 // --------------------------------------------------------------------------

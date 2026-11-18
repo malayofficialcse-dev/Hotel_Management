@@ -5,17 +5,27 @@ import { FigmaIcon } from "@/components/figma-icon";
 import { Surface } from "@/components/ui";
 import { useBooking } from "@/components/booking-provider";
 import { formatPrice, roomTypes } from "@/lib/data";
+import type { AdminBooking, UserBooking } from "@/lib/api-client";
 
-export function BookingSummary() {
-  const { roomId, selectedRoom, checkInDate, checkOutDate, guestsCount, roomCount } = useBooking();
+export function BookingSummary({ booking }: { booking?: AdminBooking | UserBooking | null }) {
+  const { roomId, selectedRoom, checkInDate: ctxCheckIn, checkOutDate: ctxCheckOut, guestsCount: ctxGuests, roomCount: ctxRooms } = useBooking();
   const room = selectedRoom ?? roomTypes.find((item) => item.id === roomId) ?? roomTypes[2];
-  const stayNights = Math.max(
+
+  const hotelName = booking?.hotel_name || "The Palm House, Goa";
+  const roomName = booking?.room_type_name || room.name;
+  const checkInDate = booking?.check_in_date ? String(booking.check_in_date).split("T")[0] : ctxCheckIn;
+  const checkOutDate = booking?.check_out_date ? String(booking.check_out_date).split("T")[0] : ctxCheckOut;
+  const guestsCount = booking?.guests_count || ctxGuests;
+  const roomCount = booking?.room_count || ctxRooms;
+  const totalAmount = booking?.total_price;
+
+  const stayNights = booking?.total_nights || Math.max(
     1,
     (Date.parse(`${checkOutDate}T00:00:00Z`) - Date.parse(`${checkInDate}T00:00:00Z`)) / 86_400_000,
   );
   const subtotal = room.price * stayNights * roomCount;
   const taxes = Math.round(subtotal * 0.12);
-  const total = subtotal + taxes;
+  const total = totalAmount ?? (subtotal + taxes);
 
   return (
     <aside className="space-y-3">
@@ -25,24 +35,24 @@ export function BookingSummary() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={selectedRoom?.image || "/assets/figma/7bc4e.png"}
-            alt={selectedRoom?.name || "The Palm House pool"}
+            alt={selectedRoom?.name || hotelName}
             className="h-full w-full object-cover"
           />
         </div>
-        <h3 className="mt-3 text-sm font-semibold">The Palm House, Goa</h3>
-        <p className="mt-1 text-[10px] text-muted">Candolim, North Goa · ★ 4.8 (324 reviews)</p>
+        <h3 className="mt-3 text-sm font-semibold">{hotelName}</h3>
+        <p className="mt-1 text-[10px] text-muted">Luxury Stay · ★ 4.8 (Verified StayEase Partner)</p>
         <div className="my-3 space-y-3 border-y border-line py-3 text-[11px]">
           <div className="flex justify-between gap-3"><span className="text-muted">Check-in</span><span>{formatStayDate(checkInDate)}</span></div>
           <div className="flex justify-between gap-3"><span className="text-muted">Check-out</span><span>{formatStayDate(checkOutDate)}</span></div>
-          <span className="inline-block rounded-[4px] bg-sky px-2 py-1 text-[9px]">{stayNights} nights · {guestsCount} guests · {roomCount} {roomCount === 1 ? "room" : "rooms"}</span>
+          <span className="inline-block rounded-[4px] bg-sky px-2 py-1 text-[9px]">{stayNights} {stayNights === 1 ? "night" : "nights"} · {guestsCount} guests · {roomCount} {roomCount === 1 ? "room" : "rooms"}</span>
         </div>
         <div className="border-b border-line pb-3">
-          <p className="text-[11px] font-semibold">{room.name} · {room.beds}</p>
-          <p className="mt-2 text-[10px] text-muted">{room.inclusions}</p>
+          <p className="text-[11px] font-semibold">{roomName}</p>
+          <p className="mt-2 text-[10px] text-muted">Breakfast included · Free Wi-Fi</p>
         </div>
         <div className="space-y-3 py-3 text-[11px]">
-          <div className="flex justify-between"><span className="text-muted">{formatPrice(room.price)} × {stayNights} nights × {roomCount} rooms</span><span>{formatPrice(subtotal)}</span></div>
-          <div className="flex justify-between"><span className="text-muted">Taxes &amp; fees (12%)</span><span>{formatPrice(taxes)}</span></div>
+          <div className="flex justify-between"><span className="text-muted">Stay duration</span><span>{stayNights} nights × {roomCount} rooms</span></div>
+          <div className="flex justify-between"><span className="text-muted">Taxes &amp; fees (included)</span><span>12% GST</span></div>
         </div>
         <div className="flex items-center justify-between border-t border-line pt-3">
           <span className="text-[11px] text-muted">Total amount</span>

@@ -3,6 +3,7 @@ package controllers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -247,3 +248,92 @@ func (c *BookingController) GetAvailabilityCalendar(w http.ResponseWriter, r *ht
 	}
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "data": calendar})
 }
+
+func (c *BookingController) GetQRPass(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	idOrCode := chi.URLParam(r, "id")
+	if idOrCode == "" {
+		idOrCode = r.URL.Query().Get("id")
+	}
+	if idOrCode == "" {
+		idOrCode = r.URL.Query().Get("code")
+	}
+
+	var bookingID uuid.UUID
+	var err error
+
+	bookingID, err = uuid.Parse(idOrCode)
+	if err != nil {
+		// Try to lookup by booking code
+		booking, getErr := c.bookingService.GetBookingByCode(r.Context(), idOrCode)
+		if getErr != nil {
+			w.WriteHeader(http.StatusNotFound)
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "message": "Booking not found"})
+			return
+		}
+		bookingID = booking.ID
+	}
+
+	token, booking, err := c.bookingService.GenerateQRPass(r.Context(), bookingID)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "message": err.Error()})
+		return
+	}
+
+	// Generate digital room pass details
+	passInfo := map[string]interface{}{
+		"token":   token,
+		"booking": booking,
+		"digitalPass": map[string]interface{}{
+			"wifiSsid":        fmt.Sprintf("StayEase_%s", strings.ReplaceAll(booking.HotelName, " ", "")),
+			"wifiPassword":    "StayEase@" + booking.CheckInDate.Format("2006"),
+			"hotelPhone":      "+91 832 245 6789",
+			"emergencyPhone":  "+91 832 245 9999",
+			"frontDesk":       "Dial 9 / Lobby Tower A",
+			"digitalPassMode": "HMAC-SHA256 Signed FastPass",
+			"roomAssigned":    booking.RoomTypeName,
+		},
+	}
+
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"data":    passInfo,
+	})
+}
+
+type verifyQRRequest struct {
+	Token string `json:"token"`
+}
+
+func (c *BookingController) VerifyQRPass(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	var req verifyQRRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || strings.TrimSpace(req.Token) == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "message": "Valid token required in body"})
+		return
+	}
+
+	booking, alreadyCheckedIn, err := c.bookingService.CheckInByQR(r.Context(), req.Token)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "message": err.Error()})
+		return
+	}
+
+	message := "Guest checked in successfully. Digital Room Pass validated."
+	if alreadyCheckedIn {
+		message = "Guest is already checked in. Pass is active and valid."
+	}
+
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":          true,
+		"message":          message,
+		"alreadyCheckedIn": alreadyCheckedIn,
+		"data":             booking,
+	})
+}
+

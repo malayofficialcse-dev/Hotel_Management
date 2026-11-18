@@ -230,6 +230,16 @@ export function AdminShell({ children }: { children: ReactNode }) {
                     <span className="admin-nav-icon" aria-hidden="true">{icons[item.id]}</span>
                     <span>{item.label}</span>
                   </Link>
+                  {item.id === "reservations" && (
+                    <Link
+                      href="/admin/check-in"
+                      className={`admin-nav-link ${current === "check-in" ? "is-active" : ""}`}
+                      style={{ paddingLeft: "1.75rem", fontSize: "0.75rem" }}
+                    >
+                      <span className="admin-nav-icon" aria-hidden="true">🔑</span>
+                      <span>QR Check-In Scanner</span>
+                    </Link>
+                  )}
                 </div>
               );
             });

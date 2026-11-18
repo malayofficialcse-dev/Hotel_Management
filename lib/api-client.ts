@@ -128,6 +128,7 @@ export interface AdminBooking {
   room_type_name: string;
   check_in_date: string;
   check_out_date: string;
+  total_nights?: number;
   guests_count?: number;
   room_count?: number;
   total_price: number;
@@ -625,6 +626,15 @@ export const api = {
   createReview(data: Record<string, unknown>) { return request<any>("/reviews", { method: "POST", body: JSON.stringify(data) }); },
   getEmployees(departmentId?: string) { return request<any[]>(`/employees${departmentId ? `?departmentId=${encodeURIComponent(departmentId)}` : ""}`); },
   getDepartments() { return request<any[]>("/departments"); },
+  getQRPass(bookingIdOrCode: string) {
+    return request<{ success: boolean; data: QRPassResponse }>(`/bookings/${encodeURIComponent(bookingIdOrCode)}/qr-pass`);
+  },
+  verifyQRPass(token: string) {
+    return request<VerifyQRResponse>("/bookings/verify-qr", {
+      method: "POST",
+      body: JSON.stringify({ token }),
+    });
+  },
   async getAnalyticsOverview() {
     const overview = await request<Record<string, unknown>>("/analytics/overview");
     if (!getAdminDataScope()) return overview;
@@ -670,3 +680,25 @@ export interface AdminPayment {
   refunds?: { amount: number; status: string }[];
 }
 export interface AdminReview { _id: string; hotelId: string; userName: string; rating: number; title?: string; comment: string; isApproved: boolean; isHidden: boolean; createdAt: string; }
+
+export interface QRPassResponse {
+  token: string;
+  booking: AdminBooking;
+  digitalPass: {
+    wifiSsid: string;
+    wifiPassword: string;
+    hotelPhone: string;
+    emergencyPhone: string;
+    frontDesk: string;
+    digitalPassMode: string;
+    roomAssigned: string;
+  };
+}
+
+export interface VerifyQRResponse {
+  success: boolean;
+  message: string;
+  alreadyCheckedIn: boolean;
+  data: AdminBooking;
+}
+
