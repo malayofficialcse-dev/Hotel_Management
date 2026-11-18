@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BookingSummary } from "@/components/booking-summary";
 import { FigmaIcon } from "@/components/figma-icon";
 import { SaveHotelButton } from "@/components/save-hotel-button";
@@ -27,6 +27,9 @@ export default function HotelDetailsPage() {
   const [rooms, setRooms] = useState<PublicRoom[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [openingRooms, setOpeningRooms] = useState(false);
+  const [openingRoomId, setOpeningRoomId] = useState<string | null>(null);
+  const navigationInFlight = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -54,7 +57,10 @@ export default function HotelDetailsPage() {
   }, [hotel]);
 
   function chooseRoom(room?: PublicRoom) {
-    if (!hotel) return;
+    if (!hotel || navigationInFlight.current) return;
+    navigationInFlight.current = true;
+    setOpeningRooms(true);
+    setOpeningRoomId(room?.id || null);
     setBookingDetails({ hotelId: hotel.id });
     if (room) setSelectedRoom(room);
     router.push("/booking/room");
@@ -113,7 +119,9 @@ export default function HotelDetailsPage() {
                     <p className="mt-2 text-xs tracking-[2px] text-forest">★★★★★</p>
                     <p className="mt-3 border-t border-[#cfe4d8] pt-3 text-[10px] text-muted">Rooms from</p>
                     <p className="mt-1 text-lg font-semibold">{formatPrice(hotel.price)} <span className="text-[10px] font-normal text-muted">/ night</span></p>
-                    <Button type="button" onClick={() => chooseRoom()} className="mt-3 w-full">Choose a room</Button>
+                    <Button type="button" onClick={() => chooseRoom()} loading={openingRooms && openingRoomId === null} disabled={openingRooms} className="mt-3 w-full">
+                      {openingRooms && openingRoomId === null ? "Opening rooms…" : "Choose a room"}
+                    </Button>
                   </Surface>
                 </section>
 
@@ -135,7 +143,9 @@ export default function HotelDetailsPage() {
                             <p className="text-sm font-semibold">{formatPrice(room.price)}</p>
                             <p className="text-[9px] text-muted">per night + taxes</p>
                           </div>
-                          <Button type="button" variant="outline" className="min-h-8 px-3" onClick={() => chooseRoom(room)}>Select room</Button>
+                          <Button type="button" variant="outline" className="min-h-8 px-3" onClick={() => chooseRoom(room)} loading={openingRoomId === room.id} disabled={openingRooms}>
+                            {openingRoomId === room.id ? "Opening…" : "Select room"}
+                          </Button>
                         </div>
                       </Surface>
                     ))}

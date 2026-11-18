@@ -7,6 +7,7 @@ export function Button({
   variant = "primary",
   className = "",
   type = "button",
+  loading = false,
   ...props
 }: {
   children: ReactNode;
@@ -14,7 +15,10 @@ export function Button({
   variant?: "primary" | "outline" | "soft";
   className?: string;
   type?: "button" | "submit";
+  loading?: boolean;
 } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  const { disabled, ...buttonProps } = props;
+  const unavailable = Boolean(disabled || loading);
   const base =
     "inline-flex min-h-10 items-center justify-center gap-2 rounded-[4px] px-4 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50";
   const variants = {
@@ -25,13 +29,24 @@ export function Button({
   const classes = `${base} ${variants[variant]} ${className}`;
   if (href) {
     return (
-      <Link href={href} className={classes}>
+      <Link
+        href={href}
+        aria-disabled={unavailable || undefined}
+        aria-busy={loading || undefined}
+        tabIndex={unavailable ? -1 : undefined}
+        onClick={(event) => {
+          if (unavailable) event.preventDefault();
+        }}
+        className={`${classes} ${unavailable ? "pointer-events-none opacity-50" : ""}`}
+      >
+        {loading && <span aria-hidden="true" className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-r-transparent" />}
         {children}
       </Link>
     );
   }
   return (
-    <button type={type} className={classes} {...props}>
+    <button type={type} className={classes} disabled={unavailable} aria-busy={loading || undefined} {...buttonProps}>
+      {loading && <span aria-hidden="true" className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-r-transparent" />}
       {children}
     </button>
   );

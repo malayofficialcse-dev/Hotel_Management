@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BookingStepper } from "@/components/booking-stepper";
 import { BookingSummary } from "@/components/booking-summary";
@@ -19,6 +19,7 @@ export default function GuestDetailsPage() {
   } = useBooking();
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const submissionInFlight = useRef(false);
   const [user, setUser] = useState<{ name: string; email: string; phone?: string } | null>(null);
 
   useEffect(() => {
@@ -63,6 +64,7 @@ export default function GuestDetailsPage() {
 
   async function continueToReview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submissionInFlight.current) return;
     setError("");
     if (!roomId || selectedRoom?.id !== roomId) {
       setError("Please select a room before continuing.");
@@ -77,7 +79,9 @@ export default function GuestDetailsPage() {
       setError(`This room can accommodate up to ${selectedRoom.capacity * roomCount} guests.`);
       return;
     }
+    submissionInFlight.current = true;
     setSubmitting(true);
+    let navigationStarted = false;
     try {
       const hotel = await api.getHotel(hotelId);
       const result = await api.holdRoom({
@@ -101,10 +105,14 @@ export default function GuestDetailsPage() {
       }
       setBooking({ bookingId: result.data.bookingId, bookingCode: result.data.bookingCode, totalPrice: result.data.totalPrice });
       router.push("/booking/review");
+      navigationStarted = true;
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "We couldn't reserve that room. Please try again.");
     } finally {
-      setSubmitting(false);
+      if (!navigationStarted) {
+        submissionInFlight.current = false;
+        setSubmitting(false);
+      }
     }
   }
 
@@ -114,6 +122,7 @@ export default function GuestDetailsPage() {
       <BookingStepper active={1} />
       <main className="mx-auto grid max-w-[1160px] gap-6 px-5 py-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:px-0">
         <form onSubmit={continueToReview}>
+          <fieldset disabled={submitting} aria-busy={submitting} className="m-0 min-w-0 border-0 p-0">
           <PageHeading title="Let’s make it your stay." description="A few details, and you’re one step closer to Goa." />
           <div className="mt-6 rounded-[4px] bg-sky p-4 text-[10px]">
             <p className="flex items-center gap-2 font-semibold"><FigmaIcon name="shield" className="h-4 w-4" /> You’re booking as {user?.name || "StayEase Guest"}</p>
@@ -157,9 +166,13 @@ export default function GuestDetailsPage() {
           </Surface>
           <label className="mt-4 flex items-center gap-2 text-[10px]"><input type="checkbox" defaultChecked className="accent-[#486958]" /> Save these details for my next getaway</label>
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
-            <Button href="/booking/room" variant="outline">Back to rooms</Button>
-            <Button type="submit" disabled={submitting || !selectedRoom || selectedRoom.id !== roomId}>{submitting ? "Reserving…" : "Review my booking"} <FigmaIcon name="arrow-right" className="h-4 w-4" /></Button>
+            <Button href="/booking/room" variant="outline" disabled={submitting}>Back to rooms</Button>
+            <Button type="submit" loading={submitting} disabled={!selectedRoom || selectedRoom.id !== roomId}>
+              {submitting ? "Reserving…" : "Review my booking"}
+              {!submitting && <FigmaIcon name="arrow-right" className="h-4 w-4" />}
+            </Button>
           </div>
+          </fieldset>
           {error && <p role="alert" className="mt-3 rounded-[4px] bg-blush p-3 text-[10px] text-red-800">{error}</p>}
         </form>
         <div className="lg:sticky lg:top-24 lg:h-fit"><BookingSummary /></div>

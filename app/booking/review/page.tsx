@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BookingStepper } from "@/components/booking-stepper";
 import { BookingSummary } from "@/components/booking-summary";
@@ -16,8 +16,13 @@ export default function BookingReviewPage() {
   const guestName = `${guestDetails.firstName} ${guestDetails.lastName}`.trim();
   const guestAddress = [guestDetails.street, guestDetails.city, guestDetails.state, guestDetails.postalCode, guestDetails.country].filter(Boolean).join(", ");
   const [agreed, setAgreed] = useState(true);
+  const [continuing, setContinuing] = useState(false);
+  const navigationInFlight = useRef(false);
   function continueToPayment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!agreed || navigationInFlight.current) return;
+    navigationInFlight.current = true;
+    setContinuing(true);
     router.push("/booking/payment");
   }
 
@@ -27,11 +32,12 @@ export default function BookingReviewPage() {
       <BookingStepper active={2} />
       <main className="mx-auto grid max-w-[1160px] gap-6 px-5 py-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:px-0">
         <form onSubmit={continueToPayment}>
+          <fieldset disabled={continuing} aria-busy={continuing} className="m-0 min-w-0 border-0 p-0">
           <PageHeading title="One last look before you go." description="Everything for your coastal escape, all in one place." />
           <Surface className="mt-6 p-5">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold">Your stay</h2>
-              <Button href="/booking/room" variant="outline" className="min-h-8 border-0 px-2">Edit room &amp; dates</Button>
+              <Button href="/booking/room" variant="outline" className="min-h-8 border-0 px-2" disabled={continuing}>Edit room &amp; dates</Button>
             </div>
             <h3 className="mt-4 text-lg font-semibold">The Palm House, Goa</h3>
             <p className="mt-2 text-[11px] text-muted">Candolim Beach Road, North Goa, India</p>
@@ -46,7 +52,7 @@ export default function BookingReviewPage() {
           <Surface className="mt-4 p-5">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold">Guest information</h2>
-              <Button href="/booking/guest" variant="outline" className="min-h-8 border-0 px-2">Edit details</Button>
+              <Button href="/booking/guest" variant="outline" className="min-h-8 border-0 px-2" disabled={continuing}>Edit details</Button>
             </div>
             <div className="mt-4 grid gap-4 text-[11px] sm:grid-cols-2">
               <div><p className="font-semibold">{guestName || "Guest"}</p><p className="mt-2 text-muted">{guestDetails.email}</p><p className="mt-2 text-muted">{guestDetails.phone}</p></div>
@@ -71,9 +77,13 @@ export default function BookingReviewPage() {
             </label>
           </Surface>
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
-            <Button href="/booking/guest" variant="outline">Back to guest details</Button>
-            <Button type="submit" disabled={!agreed}>Continue to payment <FigmaIcon name="arrow-right" className="h-4 w-4" /></Button>
+            <Button href="/booking/guest" variant="outline" disabled={continuing}>Back to guest details</Button>
+            <Button type="submit" loading={continuing} disabled={!agreed}>
+              {continuing ? "Opening payment…" : "Continue to payment"}
+              {!continuing && <FigmaIcon name="arrow-right" className="h-4 w-4" />}
+            </Button>
           </div>
+          </fieldset>
         </form>
         <div className="lg:sticky lg:top-24 lg:h-fit"><BookingSummary /></div>
       </main>

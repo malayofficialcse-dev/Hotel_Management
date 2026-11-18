@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BookingStepper } from "@/components/booking-stepper";
 import { BookingSummary } from "@/components/booking-summary";
@@ -30,6 +30,8 @@ export default function RoomSelectionPage() {
   const [bedFilter, setBedFilter] = useState("all");
   const [amenityFilter, setAmenityFilter] = useState("all");
   const [availableOnly, setAvailableOnly] = useState(false);
+  const [navigatingTo, setNavigatingTo] = useState<"guest" | "login" | null>(null);
+  const continueInFlight = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -111,6 +113,19 @@ export default function RoomSelectionPage() {
     const matchesAvailability = !availableOnly || (roomAvailability?.isAvailable ?? false);
     return matchesPrice && matchesGuests && matchesBed && matchesAmenity && matchesAvailability;
   }), [rooms, availability, maxPrice, guestsCount, roomCount, bedFilter, amenityFilter, availableOnly]);
+
+  function continueBooking() {
+    if (!canContinue || continueInFlight.current) return;
+    continueInFlight.current = true;
+    const token = api.getToken();
+    if (!token) {
+      setNavigatingTo("login");
+      router.push(`/auth/login?returnUrl=${encodeURIComponent("/booking/guest")}`);
+    } else {
+      setNavigatingTo("guest");
+      router.push("/booking/guest");
+    }
+  }
 
   return (
     <>
@@ -277,18 +292,12 @@ export default function RoomSelectionPage() {
           <div className="mt-5 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
             <p className="text-[10px] text-muted">No payment needed just yet.</p>
             <Button
-              disabled={!canContinue}
-              onClick={() => {
-                if (!canContinue) return;
-                const token = api.getToken();
-                if (!token) {
-                  router.push(`/auth/login?returnUrl=${encodeURIComponent("/booking/guest")}`);
-                } else {
-                  router.push("/booking/guest");
-                }
-              }}
+              disabled={!canContinue || navigatingTo !== null}
+              loading={navigatingTo !== null}
+              onClick={continueBooking}
             >
-              Continue to guest details <FigmaIcon name="arrow-right" className="h-4 w-4" />
+              {navigatingTo === "login" ? "Opening sign in…" : navigatingTo === "guest" ? "Opening guest details…" : "Continue to guest details"}
+              {navigatingTo === null && <FigmaIcon name="arrow-right" className="h-4 w-4" />}
             </Button>
           </div>
         </div>

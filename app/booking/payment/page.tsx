@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { QRCodeSVG } from "qrcode.react";
@@ -39,6 +39,7 @@ export default function PaymentPage() {
   const [loadingBooking, setLoadingBooking] = useState(false);
   const [error, setError] = useState("");
   const [processing, setProcessing] = useState(false);
+  const paymentInFlight = useRef(false);
   const [userChecked, setUserChecked] = useState(false);
   const [user, setUser] = useState<UserSession | null>(null);
 
@@ -138,8 +139,11 @@ export default function PaymentPage() {
 
   async function submitPayment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (paymentInFlight.current) return;
+    paymentInFlight.current = true;
     setProcessing(true);
     setError("");
+    let navigationStarted = false;
 
     try {
       const activeBookingId = bookingId || ctxBooking?.bookingId;
@@ -191,10 +195,14 @@ export default function PaymentPage() {
       // 4. Navigate directly to the generated sequential bill
       const billParam = result.billNumber ? `&invoice=${encodeURIComponent(result.billNumber)}` : "";
       router.push(`/booking/bill?code=${encodeURIComponent(activeBookingCode)}${billParam}`);
+      navigationStarted = true;
     } catch (paymentError: any) {
       setError(paymentError instanceof Error ? paymentError.message : "Payment processing failed. Please try again.");
     } finally {
-      setProcessing(false);
+      if (!navigationStarted) {
+        paymentInFlight.current = false;
+        setProcessing(false);
+      }
     }
   }
 
@@ -286,6 +294,7 @@ export default function PaymentPage() {
           </div>
 
           <form onSubmit={submitPayment}>
+            <fieldset disabled={processing} aria-busy={processing} className="m-0 min-w-0 border-0 p-0">
             <Surface className="mt-4 p-5">
               <h2 className="text-sm font-semibold">How would you like to pay?</h2>
 
@@ -492,15 +501,16 @@ export default function PaymentPage() {
                 </div>
               </div>
 
-              <Button type="submit" disabled={processing} className="mt-4 w-full">
+              <Button type="submit" loading={processing} className="mt-4 w-full">
                 {processing ? "Processing Payment & Generating Bill…" : `Pay ₹${totalPrice.toLocaleString("en-IN")} & Get Bill`}
-                <FigmaIcon name="lock" className="h-4 w-4" />
+                {!processing && <FigmaIcon name="lock" className="h-4 w-4" />}
               </Button>
 
               <p className="mt-3 text-center text-[10px] text-muted">
                 Clicking confirm generates your sequential tax invoice and secures your room instantly.
               </p>
             </Surface>
+            </fieldset>
           </form>
 
           {error && <p role="alert" className="mt-3 rounded-[4px] bg-blush p-3 text-xs text-red-800">{error}</p>}
@@ -513,11 +523,11 @@ export default function PaymentPage() {
 
           <div className="mt-6">
             {canViewReservations ? (
-              <Link href="/admin/reservations" className="text-xs font-semibold text-forest hover:underline">
+              <Link href="/admin/reservations" aria-disabled={processing || undefined} tabIndex={processing ? -1 : undefined} onClick={(event) => { if (processing) event.preventDefault(); }} className={`text-xs font-semibold text-forest hover:underline ${processing ? "pointer-events-none opacity-50" : ""}`}>
                 ← Return to Reservations Workspace
               </Link>
             ) : (
-              <Link href="/booking/review" className="text-xs font-semibold text-forest hover:underline">
+              <Link href="/booking/review" aria-disabled={processing || undefined} tabIndex={processing ? -1 : undefined} onClick={(event) => { if (processing) event.preventDefault(); }} className={`text-xs font-semibold text-forest hover:underline ${processing ? "pointer-events-none opacity-50" : ""}`}>
                 ← Return to Review Details
               </Link>
             )}

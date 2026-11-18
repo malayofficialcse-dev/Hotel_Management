@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api, type RoomAvailabilityCalendar as CalendarData } from "@/lib/api-client";
 
 type Props = {
@@ -34,6 +34,8 @@ export function RoomAvailabilityCalendar({ roomTypeId, roomCount, checkIn, check
   const [anchor, setAnchor] = useState<string | null>(null);
   const [selectionError, setSelectionError] = useState("");
   const [checkingRange, setCheckingRange] = useState(false);
+  const [pendingDate, setPendingDate] = useState<string | null>(null);
+  const rangeCheckInFlight = useRef(false);
 
   const year = month.getFullYear();
   const monthIndex = month.getMonth();
@@ -80,6 +82,7 @@ export function RoomAvailabilityCalendar({ roomTypeId, roomCount, checkIn, check
   const monthLabel = month.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
   async function chooseDate(selectedDate: string) {
+    if (rangeCheckInFlight.current) return;
     setSelectionError("");
     if (!anchor || selectedDate <= anchor) {
       const day = dayMap.get(selectedDate);
@@ -92,7 +95,9 @@ export function RoomAvailabilityCalendar({ roomTypeId, roomCount, checkIn, check
       return;
     }
 
+    rangeCheckInFlight.current = true;
     setCheckingRange(true);
+    setPendingDate(selectedDate);
     try {
       const range = await api.checkRoomAvailability(roomTypeId, anchor, selectedDate, roomCount);
       if (!range.isAvailable) {
@@ -103,7 +108,9 @@ export function RoomAvailabilityCalendar({ roomTypeId, roomCount, checkIn, check
       setSelectionError(cause instanceof Error ? cause.message : "Could not verify that date range.");
       return;
     } finally {
+      rangeCheckInFlight.current = false;
       setCheckingRange(false);
+      setPendingDate(null);
     }
     onDatesChange(anchor, selectedDate);
     setAnchor(null);
@@ -147,6 +154,7 @@ export function RoomAvailabilityCalendar({ roomTypeId, roomCount, checkIn, check
               key={key}
               type="button"
               disabled={past || (!availability && !selectingCheckout) || (unavailable && !selectingCheckout) || checkingRange}
+              aria-busy={checkingRange && pendingDate === key}
               onClick={() => chooseDate(key)}
               aria-label={`${new Date(`${key}T00:00:00`).toLocaleDateString()}, ${description}`}
               title={description}
@@ -163,7 +171,9 @@ export function RoomAvailabilityCalendar({ roomTypeId, roomCount, checkIn, check
                         : "bg-stone-50 text-stone-400"
                 }`}
             >
-              {dayNumber}
+              {checkingRange && pendingDate === key
+                ? <span aria-hidden="true" className="h-3 w-3 animate-spin rounded-full border-2 border-current border-r-transparent" />
+                : dayNumber}
               {availability && !past && <span className="text-[8px] leading-3">{soldOut ? "Full" : partiallyBooked ? `${availability.bookedInventory} booked` : selected ? `${availability.availableInventory} left` : "Open"}</span>}
             </button>
           );
