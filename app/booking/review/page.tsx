@@ -2,6 +2,7 @@
 
 import { FormEvent, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { BookingStepper } from "@/components/booking-stepper";
 import { BookingSummary } from "@/components/booking-summary";
 import { FigmaIcon } from "@/components/figma-icon";
@@ -71,9 +72,23 @@ export default function BookingReviewPage() {
           <Surface className="mt-4 p-5">
             <h2 className="text-sm font-semibold">Book with peace of mind</h2>
             <p className="mt-3 text-[10px] leading-5 text-muted">Cancel for free before 15 Dec 2026, 2:00 PM (IST). After this time, a charge of ₹8,960 applies. No-shows are charged the full booking amount.</p>
-            <label className="mt-4 flex items-start gap-2 text-[10px]">
+            <label className="mt-4 flex items-start gap-2 text-[10px] text-stone-700">
               <input type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} className="mt-0.5 accent-[#486958]" />
-              I agree to the hotel policies, cancellation policy and StayEase terms of use.
+              <span>
+                I agree to the{" "}
+                <Link href="/terms#conduct" target="_blank" className="font-semibold text-forest underline hover:text-[#2d4738]">
+                  hotel policies
+                </Link>
+                ,{" "}
+                <Link href="/terms#cancellation" target="_blank" className="font-semibold text-forest underline hover:text-[#2d4738]">
+                  cancellation policy
+                </Link>
+                , and{" "}
+                <Link href="/terms" target="_blank" className="font-semibold text-forest underline hover:text-[#2d4738]">
+                  StayEase Terms & Conditions
+                </Link>
+                .
+              </span>
             </label>
           </Surface>
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3">

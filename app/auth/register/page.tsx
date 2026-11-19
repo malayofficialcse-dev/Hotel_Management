@@ -143,6 +143,18 @@ function RegisterForm() {
             {loading ? "Creating your account…" : "Register & Complete"}
           </button>
 
+          <p className="mt-2 text-center text-[11px] text-stone-500 leading-normal">
+            By creating an account, you agree to StayEase&apos;s{" "}
+            <Link href="/terms" target="_blank" className="font-semibold text-forest underline hover:text-[#2d4738]">
+              Terms and Conditions
+            </Link>{" "}
+            and{" "}
+            <Link href="/privacy" target="_blank" className="font-semibold text-forest underline hover:text-[#2d4738]">
+              Privacy Policy
+            </Link>
+            .
+          </p>
+
           <div className="pt-4 border-t border-stone-100 text-center text-xs text-stone-600">
             Already have an account?{" "}
             <Link

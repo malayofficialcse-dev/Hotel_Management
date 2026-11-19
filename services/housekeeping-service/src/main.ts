@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import { createApp } from "./app.js";
 import { connectDatabase } from "./config/database.js";
 import { startGrpcServer } from "./grpc/server.js";
+import { attachWebSocketGateway } from "./websocket/ws-gateway.js";
 
 const port = Number(process.env.PORT || 8008);
 const grpcPort = Number(process.env.GRPC_PORT || 50058);
@@ -25,6 +26,8 @@ async function start() {
     throw error;
   }
   console.log(`[Housekeeping Service] HTTP listening on ${port}`);
+  await attachWebSocketGateway(httpServer);
+  console.log(`[Housekeeping Service] WebSocket gateway attached`);
 
   const shutdown = () => {
     grpcServer.tryShutdown(() => undefined);

@@ -506,8 +506,20 @@ export default function PaymentPage() {
                 {!processing && <FigmaIcon name="lock" className="h-4 w-4" />}
               </Button>
 
-              <p className="mt-3 text-center text-[10px] text-muted">
-                Clicking confirm generates your sequential tax invoice and secures your room instantly.
+              <p className="mt-3 text-center text-[10px] text-muted leading-relaxed">
+                By confirming your reservation, you agree to StayEase&apos;s{" "}
+                <Link href="/terms" target="_blank" className="font-semibold text-forest underline hover:text-[#2d4738]">
+                  Terms and Conditions
+                </Link>
+                ,{" "}
+                <Link href="/terms#cancellation" target="_blank" className="font-semibold text-forest underline hover:text-[#2d4738]">
+                  Cancellation Policy
+                </Link>
+                , and{" "}
+                <Link href="/privacy" target="_blank" className="font-semibold text-forest underline hover:text-[#2d4738]">
+                  Privacy Policy
+                </Link>
+                . Sequential tax invoice is generated upon payment.
               </p>
             </Surface>
             </fieldset>

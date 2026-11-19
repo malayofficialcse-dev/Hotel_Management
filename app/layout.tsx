@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { BookingProvider } from "@/components/booking-provider";
 import { AiConcierge } from "@/components/ai-concierge";
+import { CookieBanner } from "@/components/cookie-banner";
 
 export const metadata: Metadata = {
   title: "StayEase — Effortless getaways",
@@ -15,6 +16,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <BookingProvider>
           {children}
           <AiConcierge />
+          <CookieBanner />
         </BookingProvider>
       </body>
     </html>

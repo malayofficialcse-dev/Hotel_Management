@@ -441,3 +441,6 @@ export function AiConcierge() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
