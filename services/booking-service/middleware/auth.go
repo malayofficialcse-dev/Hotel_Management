@@ -18,6 +18,7 @@ const (
 	UserIDKey    contextKey = "user_id"
 	UserEmailKey contextKey = "user_email"
 	UserRoleKey  contextKey = "user_role"
+	UserHotelIDKey contextKey = "user_hotel_id"
 )
 
 type validateTokenResponse struct {
@@ -26,6 +27,7 @@ type validateTokenResponse struct {
 		ID    string `json:"id"`
 		Email string `json:"email"`
 		Role  string `json:"role"`
+		HotelID string `json:"hotelId"`
 	} `json:"user"`
 }
 
@@ -124,6 +126,7 @@ func RequireAuth(authServiceURL string) func(next http.Handler) http.Handler {
 			ctx := context.WithValue(r.Context(), UserIDKey, parsedID)
 			ctx = context.WithValue(ctx, UserEmailKey, valRes.User.Email)
 			ctx = context.WithValue(ctx, UserRoleKey, valRes.User.Role)
+				ctx = context.WithValue(ctx, UserHotelIDKey, valRes.User.HotelID)
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -163,6 +166,7 @@ func OptionalAuth(authServiceURL string) func(next http.Handler) http.Handler {
 					ctx := context.WithValue(r.Context(), UserIDKey, parsedID)
 					ctx = context.WithValue(ctx, UserEmailKey, valRes.User.Email)
 					ctx = context.WithValue(ctx, UserRoleKey, valRes.User.Role)
+					ctx = context.WithValue(ctx, UserHotelIDKey, valRes.User.HotelID)
 					next.ServeHTTP(w, r.WithContext(ctx))
 					return
 				}

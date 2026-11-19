@@ -12,6 +12,7 @@ import { HousekeepingWorkspace } from "./housekeeping-workspace";
 import { EmployeesWorkspace } from "./employees-workspace";
 import { ProfileWorkspace } from "./profile-workspace";
 import { RolesWorkspace } from "./roles-workspace";
+import { GuestRequestsWorkspace } from "./guest-requests-workspace";
 import { ADMIN_MODULES, canPerform, getEffectivePermissions, type AdminModule } from "@/lib/rbac";
 import {
   sectionTabs,
@@ -476,7 +477,7 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
   const user = api.getUser();
   const effectiveMatrix = getEffectivePermissions(user);
   const isSuperAdmin = user?.role === "ADMIN" || user?.email?.toLowerCase() === "mala@gmail.com";
-  const modPerm = effectiveMatrix[section as AdminModule] || {
+  const modPerm = effectiveMatrix[(section === "guest-requests" ? "housekeeping" : section) as AdminModule] || {
     view: false,
     create: false,
     edit: false,
@@ -550,6 +551,8 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
       </div>
     );
   }
+
+  if (section === "guest-requests") return <GuestRequestsWorkspace />;
 
   if (section === "dashboard") {
     return <Dashboard />;

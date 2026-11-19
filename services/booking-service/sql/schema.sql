@@ -42,3 +42,15 @@ CREATE INDEX IF NOT EXISTS idx_bookings_code ON bookings (booking_code);
 -- Index for expired holds cron cleanup
 CREATE INDEX IF NOT EXISTS idx_bookings_expires_at ON bookings (status, expires_at);
 
+CREATE TABLE IF NOT EXISTS guest_service_requests (
+    id UUID PRIMARY KEY,
+    booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL,
+    request_type VARCHAR(40) NOT NULL,
+    details VARCHAR(500) NOT NULL DEFAULT '',
+    status VARCHAR(24) NOT NULL DEFAULT 'OPEN',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_guest_requests_booking ON guest_service_requests (booking_id, created_at DESC);
+

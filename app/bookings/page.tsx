@@ -6,7 +6,7 @@ import Link from "next/link";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { Button, PageHeading, Surface } from "@/components/ui";
-import { api, type UserBooking } from "@/lib/api-client";
+import { api, type GuestServiceRequest, type UserBooking } from "@/lib/api-client";
 import { formatPrice, type Hotel } from "@/lib/data";
 import { AdminPagination } from "@/components/admin/admin-pagination";
 import { BookingsSkeleton } from "@/components/skeletons/bookings-skeleton";
@@ -273,6 +273,37 @@ function BookingCard({
   hotel?: Hotel;
   group: BookingGroup;
 }) {
+  const [requestsOpen, setRequestsOpen] = useState(false);
+  const [requests, setRequests] = useState<GuestServiceRequest[]>([]);
+  const [requestType, setRequestType] = useState("EXTRA_TOWELS");
+  const [requestDetails, setRequestDetails] = useState("");
+  const [requestBusy, setRequestBusy] = useState(false);
+  const [requestMessage, setRequestMessage] = useState("");
+
+  async function toggleRequests() {
+    const open = !requestsOpen;
+    setRequestsOpen(open);
+    setRequestMessage("");
+    if (open) {
+      try { setRequests(await api.getGuestServiceRequests(booking.id)); }
+      catch { setRequestMessage("Requests could not be loaded. Please try again."); }
+    }
+  }
+
+  async function submitRequest(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setRequestBusy(true);
+    setRequestMessage("");
+    try {
+      const created = await api.createGuestServiceRequest(booking.id, requestType, requestDetails.trim());
+      setRequests((current) => [created, ...current]);
+      setRequestDetails("");
+      setRequestMessage("Request sent to the hotel team.");
+    } catch (error) {
+      setRequestMessage(error instanceof Error ? error.message : "Could not send your request.");
+    } finally { setRequestBusy(false); }
+  }
+
   const statusStyle = group === "cancelled"
     ? "bg-rose-50 text-rose-700"
     : group === "completed"
@@ -329,6 +360,34 @@ function BookingCard({
           </Link>
         </div>
       </div>
+      {group === "upcoming" && ["CONFIRMED", "CHECKED_IN"].includes(booking.status.toUpperCase()) && (
+        <div className="mt-4 border-t border-line pt-3">
+          <button type="button" onClick={() => void toggleRequests()} className="text-[11px] font-semibold text-forest hover:underline">
+            {requestsOpen ? "Hide stay requests" : "Request something for your stay"}
+          </button>
+          {requestsOpen && <div className="mt-3 grid gap-4 sm:grid-cols-2">
+            <form onSubmit={(event) => void submitRequest(event)} className="space-y-2">
+              <label className="block text-[10px] font-semibold text-charcoal">What do you need?
+                <select value={requestType} onChange={(event) => setRequestType(event.target.value)} className="mt-1 block h-9 w-full rounded border border-line bg-white px-2 text-xs font-normal">
+                  <option value="EXTRA_TOWELS">Extra towels</option><option value="HOUSEKEEPING">Housekeeping</option><option value="MAINTENANCE">Maintenance</option><option value="LATE_CHECKOUT">Late checkout</option><option value="ACCESSIBILITY">Accessibility request</option><option value="OTHER">Other</option>
+                </select>
+              </label>
+              <label className="block text-[10px] font-semibold text-charcoal">Details (optional)
+                <textarea value={requestDetails} onChange={(event) => setRequestDetails(event.target.value)} maxLength={500} rows={2} className="mt-1 block w-full rounded border border-line px-2 py-2 text-xs font-normal" placeholder="Add timing or other details" />
+              </label>
+              <button disabled={requestBusy} className="rounded bg-forest px-3 py-2 text-[10px] font-semibold text-white disabled:opacity-50">{requestBusy ? "Sending…" : "Send request"}</button>
+              {requestMessage && <p role="status" className="text-[10px] text-muted">{requestMessage}</p>}
+            </form>
+            <div>
+              <p className="text-[10px] font-semibold text-charcoal">Recent requests</p>
+              {requests.length ? <ul className="mt-2 space-y-2">{requests.map((item) => <li key={item.id} className="rounded bg-mint/50 p-2 text-[10px]">
+                <span className="font-semibold">{item.requestType.replaceAll("_", " ")}</span><span className="float-right rounded bg-white px-1.5 py-0.5">{item.status}</span>
+                {item.details && <p className="mt-1 text-muted">{item.details}</p>}
+              </li>)}</ul> : <p className="mt-2 text-[10px] text-muted">No requests yet.</p>}
+            </div>
+          </div>}
+        </div>
+      )}
     </Surface>
   );
 }

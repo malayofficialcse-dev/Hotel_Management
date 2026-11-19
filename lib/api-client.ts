@@ -157,6 +157,23 @@ export interface UserBooking {
   created_at: string;
 }
 
+export interface GuestServiceRequest {
+  id: string;
+  bookingId: string;
+  requestType: string;
+  details: string;
+  status: string;
+  createdAt: string;
+  updatedAt?: string;
+  hotelId?: string;
+  hotelName?: string;
+  bookingCode?: string;
+  guestName?: string;
+  guestEmail?: string;
+  checkIn?: string;
+  checkOut?: string;
+}
+
 export interface AdminOffer {
   _id: string;
   hotelId?: string;
@@ -600,6 +617,10 @@ export const api = {
       return res?.data || res;
     }
   },
+  getGuestServiceRequests(bookingId: string) { return request<GuestServiceRequest[]>(`/bookings/${encodeURIComponent(bookingId)}/service-requests`); },
+  createGuestServiceRequest(bookingId: string, requestType: string, details: string) { return request<GuestServiceRequest>(`/bookings/${encodeURIComponent(bookingId)}/service-requests`, { method: "POST", body: JSON.stringify({ requestType, details }) }); },
+  getAdminGuestServiceRequests() { return request<GuestServiceRequest[]>("/bookings/service-requests/admin"); },
+  updateGuestServiceRequestStatus(id: string, status: string) { return request<GuestServiceRequest>(`/bookings/service-requests/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ status }) }); },
   getMyBookings() {
     return request<{ bookings: UserBooking[]; total: number }>("/bookings/mine");
   },

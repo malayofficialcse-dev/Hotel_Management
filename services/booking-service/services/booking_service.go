@@ -544,6 +544,22 @@ func (s *BookingService) GetAdminBookings(ctx context.Context, page, limit int) 
 }
 
 // GetUserBookings returns all bookings for a given user.
+func (s *BookingService) CreateGuestServiceRequest(ctx context.Context, bookingID, userID uuid.UUID, requestType, details string) (*models.GuestServiceRequest, error) {
+	return s.repo.CreateGuestServiceRequest(ctx, bookingID, userID, requestType, details)
+}
+
+func (s *BookingService) ListGuestServiceRequests(ctx context.Context, bookingID, userID uuid.UUID) ([]*models.GuestServiceRequest, error) {
+	return s.repo.ListGuestServiceRequests(ctx, bookingID, userID)
+}
+
+func (s *BookingService) ListAllGuestServiceRequests(ctx context.Context, hotelID string) ([]*models.GuestServiceRequest, error) {
+	return s.repo.ListAllGuestServiceRequests(ctx, hotelID)
+}
+
+func (s *BookingService) UpdateGuestServiceRequestStatus(ctx context.Context, id uuid.UUID, status, hotelID string) (*models.GuestServiceRequest, error) {
+	return s.repo.UpdateGuestServiceRequestStatus(ctx, id, status, hotelID)
+}
+
 func (s *BookingService) GetUserBookings(ctx context.Context, userID uuid.UUID) ([]*models.Booking, error) {
 	return s.repo.GetBookingsByUser(ctx, userID)
 }

@@ -20,6 +20,7 @@ const icons: Record<AdminSection, string> = {
   departments: "♧",
   employees: "♙",
   housekeeping: "♧",
+  "guest-requests": "✉",
   roles: "⛨",
   payments: "▱",
   offers: "◇",
@@ -75,7 +76,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
       if (secId === "notifications") {
         return Object.values(effectivePermissions).some((p) => p && p.view);
       }
-      const modPerm = effectivePermissions[secId as AdminModule];
+      const modPerm = effectivePermissions[(secId === "guest-requests" ? "housekeeping" : secId) as AdminModule];
       return Boolean(modPerm && modPerm.view);
     }
     return adminNavigation.filter((item) => canViewSection(item.id));
@@ -209,7 +210,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
             let lastGroup = "";
             return visibleNavItems.map((item) => {
               const currentGroup = item.group || (
-                ["dashboard", "hotels", "rooms", "reservations", "customers", "departments", "employees", "housekeeping", "roles", "payments", "offers", "reviews"].includes(item.id)
+                ["dashboard", "hotels", "rooms", "reservations", "customers", "departments", "employees", "housekeeping", "guest-requests", "roles", "payments", "offers", "reviews"].includes(item.id)
                   ? "WORKSPACE"
                   : ["reports"].includes(item.id)
                     ? "INSIGHTS"

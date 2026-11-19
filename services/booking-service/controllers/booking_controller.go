@@ -213,6 +213,95 @@ func (c *BookingController) ListMyBookings(w http.ResponseWriter, r *http.Reques
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "data": result})
 }
 
+func (c *BookingController) CreateGuestServiceRequest(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(uuid.UUID)
+	bookingID, parseErr := uuid.Parse(chi.URLParam(r, "id"))
+	var payload struct {
+		RequestType string `json:"requestType"`
+		Details     string `json:"details"`
+	}
+	if !ok || parseErr != nil || json.NewDecoder(r.Body).Decode(&payload) != nil {
+		http.Error(w, `{"success":false,"message":"Invalid request"}`, http.StatusBadRequest)
+		return
+	}
+	payload.RequestType = strings.TrimSpace(payload.RequestType)
+	payload.Details = strings.TrimSpace(payload.Details)
+	allowed := map[string]bool{"EXTRA_TOWELS": true, "HOUSEKEEPING": true, "MAINTENANCE": true, "LATE_CHECKOUT": true, "ACCESSIBILITY": true, "OTHER": true}
+	if !allowed[payload.RequestType] || len(payload.Details) > 500 {
+		http.Error(w, `{"success":false,"message":"Choose a valid request type and keep details under 500 characters"}`, http.StatusBadRequest)
+		return
+	}
+	item, err := c.bookingService.CreateGuestServiceRequest(r.Context(), bookingID, userID, payload.RequestType, payload.Details)
+	if err != nil {
+		http.Error(w, `{"success":false,"message":"Booking not found, unavailable, or not yours"}`, http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "data": item})
+}
+
+func (c *BookingController) ListGuestServiceRequests(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(uuid.UUID)
+	bookingID, parseErr := uuid.Parse(chi.URLParam(r, "id"))
+	if !ok || parseErr != nil {
+		http.Error(w, `{"success":false,"message":"Invalid request"}`, http.StatusBadRequest)
+		return
+	}
+	items, err := c.bookingService.ListGuestServiceRequests(r.Context(), bookingID, userID)
+	if err != nil {
+		http.Error(w, `{"success":false,"message":"Could not load requests"}`, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "data": items})
+}
+
+func (c *BookingController) ListAdminGuestServiceRequests(w http.ResponseWriter, r *http.Request) {
+	role, _ := r.Context().Value(middleware.UserRoleKey).(string)
+	hotelID, _ := r.Context().Value(middleware.UserHotelIDKey).(string)
+	if role != "ADMIN" && hotelID == "" {
+		http.Error(w, `{"success":false,"message":"Your staff account is not assigned to a hotel"}`, http.StatusForbidden)
+		return
+	}
+	if role == "ADMIN" { hotelID = "" }
+	items, err := c.bookingService.ListAllGuestServiceRequests(r.Context(), hotelID)
+	if err != nil {
+		http.Error(w, `{"success":false,"message":"Could not load guest service requests"}`, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "data": items})
+}
+
+func (c *BookingController) UpdateGuestServiceRequestStatus(w http.ResponseWriter, r *http.Request) {
+	role, _ := r.Context().Value(middleware.UserRoleKey).(string)
+	hotelID, _ := r.Context().Value(middleware.UserHotelIDKey).(string)
+	if role != "ADMIN" && hotelID == "" {
+		http.Error(w, `{"success":false,"message":"Your staff account is not assigned to a hotel"}`, http.StatusForbidden)
+		return
+	}
+	id, err := uuid.Parse(chi.URLParam(r, "requestId"))
+	var payload struct { Status string `json:"status"` }
+	if err != nil || json.NewDecoder(r.Body).Decode(&payload) != nil {
+		http.Error(w, `{"success":false,"message":"Invalid request"}`, http.StatusBadRequest)
+		return
+	}
+	allowed := map[string]bool{"ACKNOWLEDGED": true, "IN_PROGRESS": true, "COMPLETED": true, "DECLINED": true}
+	if !allowed[payload.Status] {
+		http.Error(w, `{"success":false,"message":"Invalid request status"}`, http.StatusBadRequest)
+		return
+	}
+	if role == "ADMIN" { hotelID = "" }
+	item, err := c.bookingService.UpdateGuestServiceRequestStatus(r.Context(), id, payload.Status, hotelID)
+	if err != nil {
+		http.Error(w, `{"success":false,"message":"Request not found for your property"}`, http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "data": item})
+}
+
 func (c *BookingController) GetBookedRoomCount(w http.ResponseWriter, r *http.Request) {
 	roomTypeID := chi.URLParam(r, "roomTypeId")
 	checkIn := r.URL.Query().Get("checkIn")
@@ -336,4 +425,3 @@ func (c *BookingController) VerifyQRPass(w http.ResponseWriter, r *http.Request)
 		"data":             booking,
 	})
 }
-

@@ -9,6 +9,7 @@ export type AdminSection =
   | "departments"
   | "employees"
   | "housekeeping"
+  | "guest-requests"
   | "roles"
   | "payments"
   | "offers"
@@ -39,6 +40,7 @@ export const adminNavigation: { id: AdminSection; label: string; group?: string 
   { id: "departments", label: "Departments" },
   { id: "employees", label: "Employees" },
   { id: "housekeeping", label: "Housekeeping" },
+  { id: "guest-requests", label: "Guest requests" },
   { id: "roles", label: "Roles & Permissions (RBAC)" },
   { id: "payments", label: "Payments" },
   { id: "offers", label: "Offers" },
@@ -59,6 +61,7 @@ export const sectionTitles: Record<AdminSection, { title: string; subtitle: stri
   departments: { title: "Departments", subtitle: "Departments stored for your properties.", action: "Add department" },
   employees: { title: "Employees", subtitle: "Employee records stored in the employee service.", action: "Add employee" },
   housekeeping: { title: "Housekeeping", subtitle: "Tasks stored by the housekeeping service.", action: "Create task" },
+  "guest-requests": { title: "Guest service requests", subtitle: "Requests submitted by guests for their active stays.", action: "Review requests" },
   roles: { title: "Roles & permissions", subtitle: "Role records require a persistent RBAC service.", action: "Create role" },
   payments: { title: "Payments", subtitle: "Payments are recorded through the checkout workflow.", action: "View payments" },
   offers: { title: "Offers", subtitle: "Offers stored in the hotel catalog.", action: "Create offer" },

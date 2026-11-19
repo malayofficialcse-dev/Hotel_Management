@@ -127,6 +127,8 @@ export class AuthService {
       email: user.email,
       name: user.name,
       role: effectiveRole,
+      hotelId: employeeData?.hotelId || employeeData?.department?.hotelId,
+      departmentId: employeeData?.departmentId || employeeData?.department?.id || employeeData?.department?._id,
     });
 
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
@@ -151,7 +153,7 @@ export class AuthService {
 
   async refreshToken(refreshToken: string) {
     try {
-      const decoded = verifyRefreshToken(refreshToken) as { id: string };
+      const decoded = verifyRefreshToken(refreshToken) as { id: string; role?: string; hotelId?: string; departmentId?: string };
       const savedToken = await this.repo.findRefreshToken(refreshToken);
 
       if (!savedToken || savedToken.expiresAt < new Date()) {
@@ -163,7 +165,9 @@ export class AuthService {
         id: user.id,
         email: user.email,
         name: user.name,
-        role: user.role,
+        role: decoded.role || user.role,
+        hotelId: decoded.hotelId,
+        departmentId: decoded.departmentId,
       });
 
       await this.repo.deleteRefreshToken(refreshToken);

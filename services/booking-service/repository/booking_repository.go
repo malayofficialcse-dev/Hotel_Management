@@ -85,6 +85,64 @@ func (r *BookingRepository) GetBookingByID(ctx context.Context, id uuid.UUID) (*
 	return scanBooking(row)
 }
 
+func (r *BookingRepository) CreateGuestServiceRequest(ctx context.Context, bookingID, userID uuid.UUID, requestType, details string) (*models.GuestServiceRequest, error) {
+	request := &models.GuestServiceRequest{ID: uuid.New(), BookingID: bookingID, UserID: userID, RequestType: requestType, Details: details, Status: "OPEN"}
+	err := r.db.QueryRow(ctx, `
+		INSERT INTO guest_service_requests (id, booking_id, user_id, request_type, details, status)
+		SELECT $1, b.id, $2, $4, $5, 'OPEN' FROM bookings b
+		WHERE b.id = $3 AND b.user_id = $2 AND b.status IN ('CONFIRMED', 'CHECKED_IN')
+		RETURNING created_at, updated_at`, request.ID, userID, bookingID, requestType, details).Scan(&request.CreatedAt, &request.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return request, nil
+}
+
+func (r *BookingRepository) ListGuestServiceRequests(ctx context.Context, bookingID, userID uuid.UUID) ([]*models.GuestServiceRequest, error) {
+	rows, err := r.db.Query(ctx, `SELECT id, booking_id, user_id, request_type, details, status, created_at, updated_at
+		FROM guest_service_requests WHERE booking_id = $1 AND user_id = $2 ORDER BY created_at DESC`, bookingID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	requests := make([]*models.GuestServiceRequest, 0)
+	for rows.Next() {
+		item := &models.GuestServiceRequest{}
+		if err := rows.Scan(&item.ID, &item.BookingID, &item.UserID, &item.RequestType, &item.Details, &item.Status, &item.CreatedAt, &item.UpdatedAt); err != nil {
+			return nil, err
+		}
+		requests = append(requests, item)
+	}
+	return requests, rows.Err()
+}
+
+func (r *BookingRepository) ListAllGuestServiceRequests(ctx context.Context, hotelID string) ([]*models.GuestServiceRequest, error) {
+	rows, err := r.db.Query(ctx, `SELECT sr.id, sr.booking_id, sr.user_id, sr.request_type, sr.details, sr.status, sr.created_at, sr.updated_at,
+		b.hotel_id, b.hotel_name, b.booking_code, concat_ws(' ', b.guest_first_name, b.guest_last_name), b.guest_email, b.check_in_date, b.check_out_date
+		FROM guest_service_requests sr JOIN bookings b ON b.id = sr.booking_id
+		WHERE ($1 = '' OR b.hotel_id = $1) ORDER BY sr.created_at DESC`, hotelID)
+	if err != nil { return nil, err }
+	defer rows.Close()
+	requests := make([]*models.GuestServiceRequest, 0)
+	for rows.Next() {
+		item := &models.GuestServiceRequest{}
+		if err := rows.Scan(&item.ID, &item.BookingID, &item.UserID, &item.RequestType, &item.Details, &item.Status, &item.CreatedAt, &item.UpdatedAt,
+			&item.HotelID, &item.HotelName, &item.BookingCode, &item.GuestName, &item.GuestEmail, &item.CheckIn, &item.CheckOut); err != nil { return nil, err }
+		requests = append(requests, item)
+	}
+	return requests, rows.Err()
+}
+
+func (r *BookingRepository) UpdateGuestServiceRequestStatus(ctx context.Context, id uuid.UUID, status, hotelID string) (*models.GuestServiceRequest, error) {
+	item := &models.GuestServiceRequest{}
+	err := r.db.QueryRow(ctx, `UPDATE guest_service_requests sr SET status = $2, updated_at = NOW()
+		FROM bookings b WHERE sr.id = $1 AND b.id = sr.booking_id AND ($3 = '' OR b.hotel_id = $3)
+		RETURNING sr.id, sr.booking_id, sr.user_id, sr.request_type, sr.details, sr.status, sr.created_at, sr.updated_at`, id, status, hotelID).
+		Scan(&item.ID, &item.BookingID, &item.UserID, &item.RequestType, &item.Details, &item.Status, &item.CreatedAt, &item.UpdatedAt)
+	if err != nil { return nil, err }
+	return item, nil
+}
+
 // GetBookingByCode fetches a booking by its human-readable booking code.
 func (r *BookingRepository) GetBookingByCode(ctx context.Context, code string) (*models.Booking, error) {
 	const q = `SELECT ` + bookingColumns + ` FROM bookings WHERE booking_code = $1`
