@@ -27,8 +27,18 @@ const proxyRoutes = [
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  const allowedClientOrigins = new Set(["http://localhost:3000", "http://127.0.0.1:3000"]);
+  try {
+    const configuredOrigin = new URL(env.CLIENT_URL).origin;
+    if (["http:", "https:"].includes(new URL(configuredOrigin).protocol)) {
+      allowedClientOrigins.add(configuredOrigin);
+    }
+  } catch {
+    console.warn("[API Gateway] Ignoring invalid CLIENT_URL; using local frontend origins.");
+  }
+
   app.enableCors({
-    origin: env.CLIENT_URL,
+    origin: [...allowedClientOrigins],
     methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
     credentials: true,
   });

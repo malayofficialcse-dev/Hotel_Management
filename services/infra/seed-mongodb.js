@@ -1,4 +1,4 @@
-/**
+﻿/**
  * StayEase Enterprise Hotel Platform - MongoDB Seed Script
  * Seeds:
  *  1. hotel_catalog.hotels (7 luxury/boutique properties)
@@ -8,7 +8,7 @@
  *  5. hotel_reviews.reviews (verified guest reviews with detailed rating breakdowns)
  */
 
-const mongoose = require('d:/all/Major_Project/hotel_management/services/hotel-service/node_modules/mongoose');
+const mongoose = require('../operations-service/node_modules/mongoose');
 
 const MONGODB_HOST = process.env.MONGODB_URI || 'mongodb://localhost:27017';
 
@@ -420,8 +420,8 @@ const OFFERS_DATA = [
   },
   {
     code: 'BEACHVIBES',
-    name: 'Coastal Retreat ₹2,500 Off',
-    description: 'Flat ₹2,500 off on 3+ night bookings at beachfront properties in Goa & Havelock.',
+    name: 'Coastal Retreat â‚¹2,500 Off',
+    description: 'Flat â‚¹2,500 off on 3+ night bookings at beachfront properties in Goa & Havelock.',
     discountType: 'FIXED',
     discountValue: 2500,
     startsAt: new Date('2026-03-01'),
@@ -432,16 +432,16 @@ const OFFERS_DATA = [
 ];
 
 async function seedMongoDB() {
-  console.log('🚀 Connecting to MongoDB...');
+  console.log('ðŸš€ Connecting to MongoDB...');
   await mongoose.connect(`${MONGODB_HOST}/hotel_catalog`);
-  console.log('✅ Connected to MongoDB.');
+  console.log('âœ… Connected to MongoDB.');
 
   const catalogDb = mongoose.connection.useDb('hotel_catalog');
   const housekeepingDb = mongoose.connection.useDb('hotel_housekeeping');
   const reviewsDb = mongoose.connection.useDb('hotel_reviews');
 
   // 1. Seed Hotels
-  console.log('🏨 Seeding Hotels into hotel_catalog.hotels...');
+  console.log('ðŸ¨ Seeding Hotels into hotel_catalog.hotels...');
   const hotelsCol = catalogDb.collection('hotels');
   for (const hotel of HOTELS_DATA) {
     await hotelsCol.updateOne(
@@ -451,7 +451,7 @@ async function seedMongoDB() {
     );
   }
   const hotelsCount = await hotelsCol.countDocuments();
-  console.log(`✅ Hotels seeded! Total in collection: ${hotelsCount}`);
+  console.log(`âœ… Hotels seeded! Total in collection: ${hotelsCount}`);
 
   // Fetch updated hotels map to get both slugs and ObjectIds
   const allHotels = await hotelsCol.find({}).toArray();
@@ -461,7 +461,7 @@ async function seedMongoDB() {
   }
 
   // 2. Seed Rooms
-  console.log('🛏️  Seeding Rooms into hotel_catalog.rooms...');
+  console.log('ðŸ›ï¸  Seeding Rooms into hotel_catalog.rooms...');
   const roomsCol = catalogDb.collection('rooms');
   for (const room of ROOMS_DATA) {
     await roomsCol.updateOne(
@@ -471,10 +471,10 @@ async function seedMongoDB() {
     );
   }
   const roomsCount = await roomsCol.countDocuments();
-  console.log(`✅ Rooms seeded! Total in collection: ${roomsCount}`);
+  console.log(`âœ… Rooms seeded! Total in collection: ${roomsCount}`);
 
   // 3. Seed Offers
-  console.log('🏷️  Seeding Offers into hotel_catalog.offers...');
+  console.log('ðŸ·ï¸  Seeding Offers into hotel_catalog.offers...');
   const offersCol = catalogDb.collection('offers');
   for (const offer of OFFERS_DATA) {
     await offersCol.updateOne(
@@ -484,10 +484,10 @@ async function seedMongoDB() {
     );
   }
   const offersCount = await offersCol.countDocuments();
-  console.log(`✅ Offers seeded! Total in collection: ${offersCount}`);
+  console.log(`âœ… Offers seeded! Total in collection: ${offersCount}`);
 
   // 4. Seed Housekeeping Tasks
-  console.log('🧹 Seeding Housekeeping Tasks into hotel_housekeeping.housekeepingtasks...');
+  console.log('ðŸ§¹ Seeding Housekeeping Tasks into hotel_housekeeping.housekeepingtasks...');
   const hkCol = housekeepingDb.collection('housekeepingtasks');
   const hkTasks = [
     { hotelId: 'palm-house', roomNumber: '101', status: 'CLEAN', priority: 'NORMAL', taskType: 'STANDARD', guestName: 'Aarav Shah', taskDate: '2026-11-16', checklist: ['Change bed linen', 'Sanitize bath', 'Replenish mini-bar'], assignedTo: 'Pooja Menon' },
@@ -507,10 +507,10 @@ async function seedMongoDB() {
     );
   }
   const hkCount = await hkCol.countDocuments();
-  console.log(`✅ Housekeeping tasks seeded! Total: ${hkCount}`);
+  console.log(`âœ… Housekeeping tasks seeded! Total: ${hkCount}`);
 
   // 5. Seed Reviews
-  console.log('⭐ Seeding Reviews into hotel_reviews.reviews...');
+  console.log('â­ Seeding Reviews into hotel_reviews.reviews...');
   const revCol = reviewsDb.collection('reviews');
   const sampleReviews = [
     {
@@ -592,13 +592,13 @@ async function seedMongoDB() {
     );
   }
   const revCount = await revCol.countDocuments();
-  console.log(`✅ Reviews seeded! Total: ${revCount}`);
+  console.log(`âœ… Reviews seeded! Total: ${revCount}`);
 
   await mongoose.disconnect();
-  console.log('✨ MongoDB Seeding Complete!');
+  console.log('âœ¨ MongoDB Seeding Complete!');
 }
 
 seedMongoDB().catch((err) => {
-  console.error('❌ MongoDB seed failed:', err);
+  console.error('âŒ MongoDB seed failed:', err);
   process.exit(1);
 });

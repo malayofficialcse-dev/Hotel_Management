@@ -3,8 +3,8 @@
  * Adds iconic Kolkata luxury & heritage hotels with high-resolution imagery and rooms
  */
 
-const HOTEL_SERVICE_URL = process.env.HOTEL_SERVICE_URL || "http://localhost:8003/api/v1";
-const ROOM_SERVICE_URL = process.env.ROOM_SERVICE_URL || "http://localhost:8004/api/v1";
+const HOTEL_SERVICE_URL = process.env.HOTEL_SERVICE_URL || "http://localhost:8020/api/v1";
+const ROOM_SERVICE_URL = process.env.ROOM_SERVICE_URL || "http://localhost:8020/api/v1";
 
 const KOLKATA_HOTELS = [
   {

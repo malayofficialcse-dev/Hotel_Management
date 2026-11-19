@@ -3,8 +3,8 @@
  * Adds premium Indian hotels across iconic destinations and their rooms
  */
 
-const HOTEL_SERVICE_URL = process.env.HOTEL_SERVICE_URL || "http://localhost:8003/api/v1";
-const ROOM_SERVICE_URL = process.env.ROOM_SERVICE_URL || "http://localhost:8004/api/v1";
+const HOTEL_SERVICE_URL = process.env.HOTEL_SERVICE_URL || "http://localhost:8020/api/v1";
+const ROOM_SERVICE_URL = process.env.ROOM_SERVICE_URL || "http://localhost:8020/api/v1";
 
 const INDIAN_HOTELS = [
   {
@@ -697,7 +697,7 @@ const INDIAN_ROOMS = [
 async function seed() {
   console.log("Starting Indian Hotels & Rooms seed...");
 
-  // 1. Fetch existing hotels from hotel-service
+  // 1. Fetch existing hotels from the Operations Service
   const hotelsRes = await fetch(`${HOTEL_SERVICE_URL}/hotels?includeInactive=true`);
   const existingHotels = hotelsRes.ok ? await hotelsRes.json() : [];
   console.log(`Found ${existingHotels.length} existing hotels in database.`);

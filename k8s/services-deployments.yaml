@@ -1,4 +1,4 @@
-apiVersion: apps/v1
+﻿apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: api-gateway
@@ -114,77 +114,44 @@ spec:
   ports: [{ port: 8002, targetPort: 8002 }]
   selector: { app: user-service }
 ---
-# 3. Hotel Catalog Service
+# Unified Operations Service
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: hotel-service
+  name: operations-service
   namespace: hotel-platform
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: hotel-service
+      app: operations-service
   template:
     metadata:
       labels:
-        app: hotel-service
+        app: operations-service
     spec:
       containers:
-        - name: hotel-service
-          image: ghcr.io/yourorg/hotel-management-service:latest
+        - name: operations-service
+          image: ghcr.io/yourorg/hotel-operations-service:latest
           ports:
-            - containerPort: 8003
+            - containerPort: 8020
           envFrom:
             - configMapRef:
                 name: hotel-platform-config
+            - secretRef:
+                name: hotel-platform-secrets
+                optional: true
           readinessProbe:
-            httpGet: { path: /api/v1/hotels/health, port: 8003 }
+            httpGet: { path: /health, port: 8020 }
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: hotel-service
+  name: operations-service
   namespace: hotel-platform
 spec:
-  ports: [{ port: 8003, targetPort: 8003 }]
-  selector: { app: hotel-service }
----
-# 4. Room Management Service
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: room-service
-  namespace: hotel-platform
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: room-service
-  template:
-    metadata:
-      labels:
-        app: room-service
-    spec:
-      containers:
-        - name: room-service
-          image: ghcr.io/yourorg/hotel-room-service:latest
-          ports:
-            - containerPort: 8004
-          envFrom:
-            - configMapRef:
-                name: hotel-platform-config
-          readinessProbe:
-            httpGet: { path: /api/v1/rooms/health, port: 8004 }
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: room-service
-  namespace: hotel-platform
-spec:
-  ports: [{ port: 8004, targetPort: 8004 }]
-  selector: { app: room-service }
+  ports: [{ port: 8020, targetPort: 8020 }]
+  selector: { app: operations-service }
 ---
 # 5. Booking Service [Go Engine]
 apiVersion: apps/v1
@@ -274,115 +241,7 @@ spec:
   ports: [{ port: 8006, targetPort: 8006 }]
   selector: { app: payment-service }
 ---
-# 7. Employee & Department Service
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: employee-service
-  namespace: hotel-platform
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: employee-service
-  template:
-    metadata:
-      labels:
-        app: employee-service
-    spec:
-      containers:
-        - name: employee-service
-          image: ghcr.io/yourorg/hotel-employee-service:latest
-          ports:
-            - containerPort: 8007
-          envFrom:
-            - configMapRef:
-                name: hotel-platform-config
-          readinessProbe:
-            httpGet: { path: /api/v1/employees/health, port: 8007 }
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: employee-service
-  namespace: hotel-platform
-spec:
-  ports: [{ port: 8007, targetPort: 8007 }]
-  selector: { app: employee-service }
----
-# 8. Housekeeping Service
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: housekeeping-service
-  namespace: hotel-platform
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: housekeeping-service
-  template:
-    metadata:
-      labels:
-        app: housekeeping-service
-    spec:
-      containers:
-        - name: housekeeping-service
-          image: ghcr.io/yourorg/hotel-housekeeping-service:latest
-          ports:
-            - containerPort: 8008
-          envFrom:
-            - configMapRef:
-                name: hotel-platform-config
-          readinessProbe:
-            httpGet: { path: /api/v1/housekeeping/health, port: 8008 }
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: housekeeping-service
-  namespace: hotel-platform
-spec:
-  ports: [{ port: 8008, targetPort: 8008 }]
-  selector: { app: housekeeping-service }
----
-# 9. Review Service
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: review-service
-  namespace: hotel-platform
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: review-service
-  template:
-    metadata:
-      labels:
-        app: review-service
-    spec:
-      containers:
-        - name: review-service
-          image: ghcr.io/yourorg/hotel-review-service:latest
-          ports:
-            - containerPort: 8009
-          envFrom:
-            - configMapRef:
-                name: hotel-platform-config
-          readinessProbe:
-            httpGet: { path: /api/v1/reviews/health, port: 8009 }
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: review-service
-  namespace: hotel-platform
-spec:
-  ports: [{ port: 8009, targetPort: 8009 }]
-  selector: { app: review-service }
----
-# 10. Notification Service [Go]
+ # 10. Notification Service [Go]
 apiVersion: apps/v1
 kind: Deployment
 metadata:

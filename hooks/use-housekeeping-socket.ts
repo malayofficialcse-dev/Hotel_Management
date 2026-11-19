@@ -3,7 +3,7 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import type { RoomStatusEvent } from "@/types/housekeeping-ws";
 
-const WS_URL = process.env.NEXT_PUBLIC_HOUSEKEEPING_WS_URL || "http://localhost:8008";
+const WS_URL = process.env.NEXT_PUBLIC_HOUSEKEEPING_WS_URL || "http://localhost:8020";
 
 export interface UseHousekeepingSocketOptions {
   hotelIds: string[];

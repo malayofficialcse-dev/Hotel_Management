@@ -4,7 +4,7 @@ const path = require("node:path");
 
 const servicesDir = path.resolve(__dirname, "..");
 const userServiceDir = path.join(servicesDir, "user-service");
-const hotelServiceDir = path.join(servicesDir, "hotel-service");
+const hotelServiceDir = path.join(servicesDir, "operations-service");
 const bookingServiceDir = path.join(servicesDir, "booking-service");
 
 const dotenv = require(path.join(userServiceDir, "node_modules", "dotenv"));

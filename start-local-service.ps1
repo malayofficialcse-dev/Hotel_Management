@@ -53,6 +53,9 @@ if ($Runtime -eq "Node") {
     $ServiceExitCode = $LASTEXITCODE
 } else {
     $GoCommand = Get-Command go.exe -ErrorAction Stop
+    $GoBuildCache = Join-Path ([System.IO.Path]::GetTempPath()) "stayease-go-build"
+    New-Item -ItemType Directory -Path $GoBuildCache -Force | Out-Null
+    $env:GOCACHE = $GoBuildCache
     & $GoCommand.Source run .
     $ServiceExitCode = $LASTEXITCODE
 }

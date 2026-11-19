@@ -26,13 +26,13 @@ export const env = {
   },
 
   // Downstream Microservices
-  HOTEL_SERVICE_URL: (process.env.HOTEL_SERVICE_URL || "http://localhost:8003").replace(/\/$/, ""),
-  HOUSEKEEPING_SERVICE_URL: (process.env.HOUSEKEEPING_SERVICE_URL || "http://localhost:8008").replace(/\/$/, ""),
+  HOTEL_SERVICE_URL: (process.env.HOTEL_SERVICE_URL || "http://localhost:8020").replace(/\/$/, ""),
+  HOUSEKEEPING_SERVICE_URL: (process.env.HOUSEKEEPING_SERVICE_URL || "http://localhost:8020").replace(/\/$/, ""),
   API_GATEWAY_URL: (process.env.API_GATEWAY_URL || "http://localhost:8000").replace(/\/$/, ""),
 
   SERVICES: {
-    HOTEL: (process.env.HOTEL_SERVICE_URL || "http://localhost:8003").replace(/\/$/, ""),
-    HOUSEKEEPING: (process.env.HOUSEKEEPING_SERVICE_URL || "http://localhost:8008").replace(/\/$/, ""),
+    HOTEL: (process.env.HOTEL_SERVICE_URL || "http://localhost:8020").replace(/\/$/, ""),
+    HOUSEKEEPING: (process.env.HOUSEKEEPING_SERVICE_URL || "http://localhost:8020").replace(/\/$/, ""),
     GATEWAY: (process.env.API_GATEWAY_URL || "http://localhost:8000").replace(/\/$/, ""),
   },
 } as const;

@@ -4,6 +4,8 @@ import { RegisterDto, LoginDto } from "../models/auth.dto.js";
 import { generateTokenPair, verifyAccessToken, verifyRefreshToken } from "../utils/token.util.js";
 import bcrypt from "bcryptjs";
 
+const EMPLOYEE_SERVICE_URL = process.env.EMPLOYEE_SERVICE_URL || "http://localhost:8020";
+
 @Injectable()
 export class AuthService {
   constructor(@Inject(AuthRepository) private readonly repo: AuthRepository) { }
@@ -42,9 +44,9 @@ export class AuthService {
     let emailToLookup = input.toLowerCase();
     let employeeData: any = null;
 
-    // 1. Try to find employee by employeeCode or ID from employee-service
+    // 1. Look up staff credentials in the unified Operations Service
     try {
-      const empRes = await fetch(`http://localhost:8007/api/v1/employees/${encodeURIComponent(input)}`);
+      const empRes = await fetch(`${EMPLOYEE_SERVICE_URL}/api/v1/employees/${encodeURIComponent(input)}`);
       if (empRes.ok) {
         const emp = await empRes.json();
         if (emp && emp.email) {
@@ -53,13 +55,13 @@ export class AuthService {
         }
       }
     } catch {
-      // employee-service unavailable
+      // Operations Service unavailable
     }
 
-    // 2. If not found by code, try to find employee by email in employee-service
+    // 2. If not found by code, try to find the employee by email
     if (!employeeData && input.includes("@")) {
       try {
-        const listRes = await fetch("http://localhost:8007/api/v1/employees");
+        const listRes = await fetch(`${EMPLOYEE_SERVICE_URL}/api/v1/employees`);
         if (listRes.ok) {
           const list = await listRes.json();
           if (Array.isArray(list)) {
@@ -190,7 +192,7 @@ export class AuthService {
     }
     let employeeData: any = null;
     try {
-      const listRes = await fetch("http://localhost:8007/api/v1/employees");
+      const listRes = await fetch(`${EMPLOYEE_SERVICE_URL}/api/v1/employees`);
       if (listRes.ok) {
         const list = await listRes.json();
         if (Array.isArray(list)) {
@@ -251,7 +253,7 @@ export class AuthService {
     const updated = await this.repo.updateProfile(userId, updateData);
     let employeeData: any = null;
     try {
-      const listRes = await fetch("http://localhost:8007/api/v1/employees");
+      const listRes = await fetch(`${EMPLOYEE_SERVICE_URL}/api/v1/employees`);
       if (listRes.ok) {
         const list = await listRes.json();
         if (Array.isArray(list)) {

@@ -1,9 +1,7 @@
-# 🏨 Enterprise Hotel Management Platform — Architecture Blueprint
+﻿# ðŸ¨ Enterprise Hotel Management Platform â€” Architecture Blueprint
 ### Polyglot Microservices (NestJS + Go + PostgreSQL + MongoDB + Redis + RabbitMQ + gRPC + Kubernetes)
 
-> **Visual Diagram**: A vector diagram has been generated at [`architecture-diagram.svg`](./architecture-diagram.svg) and an interactive web viewer at [`architecture-diagram.html`](./architecture-diagram.html).
-
-![StayEase Architecture Diagram](./architecture-diagram.svg)
+The current service topology is shown in the Mermaid diagram below.
 
 ---
 
@@ -11,25 +9,20 @@
 
 | Layer / Service | Technology | Database / State Store | ORM / Driver | Protocols / Ports |
 | :--- | :--- | :--- | :--- | :--- |
-| **API Gateway** | **NestJS** | — | — | HTTP REST (`:8000`), Rate Limiting, Reverse Proxy |
+| **API Gateway** | **NestJS** | â€” | â€” | HTTP REST (`:8000`), Rate Limiting, Reverse Proxy |
 | **Authentication** | **NestJS** | **PostgreSQL** (`hotel_auth_db`) | **Prisma** | HTTP (`:8001`), Redis |
 | **Guest / User Management** | **NestJS** | **PostgreSQL** (`hotel_users_db`) | **Prisma** | HTTP (`:8002`), Profiles, KYC, Preferences |
-| **Hotel Management** | **Node.js + Express** | **MongoDB** (`hotel_catalog`) | **Mongoose** | REST (`:8003`), gRPC (`:50053`) |
-| **Room Management** | **Node.js + Express** | **MongoDB** (`hotel_catalog`) | **Mongoose** | REST (`:8004`), gRPC (`:50054`), booking-backed inventory |
+| **Unified Operations** | **Node.js + Express** | **MongoDB** (`hotel_catalog`, `hotel_departments`, `hotel_housekeeping`, `hotel_reviews`) + **PostgreSQL** (`hotel_operations_db`) | **Mongoose + Prisma** | REST (`:8020`), all six domain APIs in one process |
 | **Booking Engine** | **Go (Golang)** | **PostgreSQL** (`hotel_bookings_db`) | **pgx / sqlc** | HTTP (`:8005`), gRPC (`:50051`), Redis Distributed Lock |
 | **Payment & Invoicing** | **NestJS** | **PostgreSQL** (`hotel_payments_db`) | **Prisma** | HTTP (`:8006`), Stripe Webhooks, Ledgers |
-| **Employee** | **Node.js + Express** | **PostgreSQL** (`hotel_operations_db`) | **Prisma** | REST (`:8007`), gRPC (`:50057`), department lookup |
-| **Department** | **Node.js + Express** | **MongoDB** (`hotel_departments`) | **Mongoose** | REST (`:8012`), gRPC (`:50059`), hotel validation |
-| **Housekeeping & Maintenance** | **Node.js + Express** | **MongoDB** (`hotel_housekeeping`) | **Mongoose** | REST (`:8008`), gRPC (`:50058`), employee validation |
-| **Guest Reviews & Ratings** | **NestJS** | **MongoDB** (`hotel_reviews`) | **Mongoose** | REST (`:8009`), Multi-criteria Ratings, Photos |
 | **Notifications** | **Go (Golang)** | **MongoDB / PostgreSQL** | **pgx / Mongoose** | HTTP (`:8010`), gRPC (`:50052`), RabbitMQ Consumer |
 | **Analytics & Reporting** | **Go (Golang)** | **PostgreSQL / ClickHouse** | **pgx / sqlc** | HTTP (`:8011`), Occupancy, ADR, RevPAR metrics |
 | **Distributed Cache & Locks**| **Redis 7** | In-Memory Cluster | `ioredis` / `go-redis` | Port `:6379`, 10-Min Hold TTL, `SET NX EX` locks |
 | **Message Broker** | **RabbitMQ** | Disk-Backed AMQP | `amqplib` / `amqp091-go`| Ports `:5672`, Management UI `:15672` |
-| **Internal RPC** | **gRPC** | Protocol Buffers (`proto/`) | `@grpc/grpc-js` / `google.golang.org/grpc` | Synchronous high-throughput inter-service RPC |
-| **Containerization** | **Docker** | Multi-Stage Alpine Builds | — | OCI compliant container images |
-| **Orchestration** | **Kubernetes (K8s)**| Namespaced Manifests (`k8s/`) | — | Ingress-NGINX, Horizontal Pod Autoscalers (HPA) |
-| **CI/CD Pipeline** | **GitHub Actions**| Automated CI/CD (`.github/`) | — | Build, Vet, Test, Container Push, Cluster Rollout |
+| **Internal RPC** | **gRPC** | Protocol Buffers (`proto/`) | Go service interfaces | Used by remaining booking and notification components |
+| **Containerization** | **Docker** | Multi-Stage Alpine Builds | â€” | OCI compliant container images |
+| **Orchestration** | **Kubernetes (K8s)**| Namespaced Manifests (`k8s/`) | â€” | Ingress-NGINX, Horizontal Pod Autoscalers (HPA) |
+| **CI/CD Pipeline** | **GitHub Actions**| Automated CI/CD (`.github/`) | â€” | Build, Vet, Test, Container Push, Cluster Rollout |
 
 ---
 
@@ -49,13 +42,8 @@ flowchart TD
     subgraph TypeScriptServices["TypeScript Services (NestJS + Express)"]
         AuthSvc["Auth Service\n(NestJS + Prisma) :8001"]
         UserSvc["Guest Management\n(NestJS + Prisma) :8002"]
-        HotelSvc["Hotel Catalog\n(Express + Mongo) :8003 / gRPC :50053"]
-        RoomSvc["Room Inventory\n(Express + Mongo) :8004 / gRPC :50054"]
+        OperationsSvc["Operations Service\nHotels, rooms, departments, employees, housekeeping, reviews\n(Express + Mongoose / Prisma) :8020"]
         PaySvc["Payment Service\n(NestJS + Prisma) :8006"]
-        EmpSvc["Employee Directory\n(Express + PostgreSQL) :8007 / gRPC :50057"]
-        DeptSvc["Department Directory\n(Express + Mongo) :8012 / gRPC :50059"]
-        HouseSvc["Housekeeping\n(Express + Mongo) :8008 / gRPC :50058"]
-        ReviewSvc["Review Service\n(NestJS + Mongo) :8009"]
     end
 
     subgraph GoServices["High-Performance Go Microservices"]
@@ -81,23 +69,19 @@ flowchart TD
     %% Gateway routes
     GW -->|/api/v1/auth| AuthSvc
     GW -->|/api/v1/users| UserSvc
-    GW -->|/api/v1/hotels| HotelSvc
-    GW -->|/api/v1/rooms| RoomSvc
+    GW -->|/api/v1/hotels, rooms, offers| OperationsSvc
+
     GW -->|/api/v1/bookings| BookingSvc
     GW -->|/api/v1/payments| PaySvc
-    GW -->|/api/v1/employees| EmpSvc
-    GW -->|/api/v1/departments| DeptSvc
-    GW -->|/api/v1/housekeeping| HouseSvc
-    GW -->|/api/v1/reviews| ReviewSvc
+    GW -->|/api/v1/employees, departments, housekeeping, reviews| OperationsSvc
+
+
+
     GW -->|/api/v1/analytics| AnalyticsSvc
 
     %% Internal service communication
-    BookingSvc -.->|REST room inventory| RoomSvc
-    RoomSvc -.->|REST booked-room count| BookingSvc
-    RoomSvc -.->|gRPC hotel validation| HotelSvc
-    DeptSvc -.->|gRPC hotel validation| HotelSvc
-    EmpSvc -.->|gRPC department lookup| DeptSvc
-    HouseSvc -.->|gRPC employee validation| EmpSvc
+    BookingSvc -.->|REST inventory and availability| OperationsSvc
+    OperationsSvc -.->|booking availability lookup| BookingSvc
     PaySvc -.->|Booking confirmation| BookingSvc
 
     %% Data Connections
@@ -105,13 +89,8 @@ flowchart TD
     UserSvc --> PG
     BookingSvc --> PG
     PaySvc --> PG
-    EmpSvc --> PG
-
-    HotelSvc --> Mongo
-    RoomSvc --> Mongo
-    DeptSvc --> Mongo
-    HouseSvc --> Mongo
-    ReviewSvc --> Mongo
+    OperationsSvc --> PG
+    OperationsSvc --> Mongo
 
     BookingSvc --> RedisMaster
 
@@ -141,7 +120,7 @@ sequenceDiagram
 
     Guest->>GW: POST /api/v1/bookings/hold (Room, Dates, Guest Info)
     GW->>Booking: Forward Request (with Auth context)
-    
+
     Booking->>Redis: Acquire Distributed Lock: lock:room:{roomId}:{dates} (TTL 5s)
     alt Lock Failed
         Booking-->>Guest: 409 Conflict ("Room in reservation checkout by another guest")

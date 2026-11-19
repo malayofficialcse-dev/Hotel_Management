@@ -1,10 +1,9 @@
 <#
 .SYNOPSIS
-    Start each StayEase backend microservice in its own local PowerShell window.
+    Start each active StayEase backend process in its own local PowerShell window.
 .DESCRIPTION
-    Runs the Node.js and Go services directly on Windows. The local PostgreSQL,
-    MongoDB, Redis, and RabbitMQ services must already be running. This script
-    does not use Docker.
+    Runs the Node.js and Go services directly on Windows. Local PostgreSQL,
+    MongoDB, Redis, and RabbitMQ services must already be running.
 #>
 
 [CmdletBinding()]
@@ -15,14 +14,9 @@ $ErrorActionPreference = "Stop"
 $Services = @(
     @{ Name = "auth-service";         Runtime = "Node"; Port = 8001; Script = "dev" },
     @{ Name = "user-service";         Runtime = "Node"; Port = 8002; Script = "dev" },
-    @{ Name = "hotel-service";        Runtime = "Node"; Port = 8003; Script = "dev" },
-    @{ Name = "room-service";         Runtime = "Node"; Port = 8004; Script = "dev" },
-    @{ Name = "booking-service";      Runtime = "Go";   Port = 8005; Script = $null },
+    @{ Name = "operations-service";   Runtime = "Node"; Port = 8020; Script = "dev" },
+    @{ Name = "booking-service";      Runtime = "Go";   Port = 8055; Script = $null },
     @{ Name = "payment-service";      Runtime = "Node"; Port = 8006; Script = "dev" },
-    @{ Name = "employee-service";     Runtime = "Node"; Port = 8007; Script = "dev" },
-    @{ Name = "department-service";   Runtime = "Node"; Port = 8012; Script = "dev" },
-    @{ Name = "housekeeping-service"; Runtime = "Node"; Port = 8008; Script = "dev" },
-    @{ Name = "review-service";       Runtime = "Node"; Port = 8009; Script = "dev" },
     @{ Name = "notification-service"; Runtime = "Go";   Port = 8010; Script = $null },
     @{ Name = "analytics-service";    Runtime = "Go";   Port = 8011; Script = $null },
     @{ Name = "ai-service";           Runtime = "Node"; Port = 8013; Script = "dev" },
@@ -155,7 +149,7 @@ if ($MissingLocalDependencies.Count -gt 0) {
     foreach ($Issue in $MissingLocalDependencies) {
         Write-Host "  - $Issue" -ForegroundColor Yellow
     }
-    Write-Host "Start these databases/brokers locally if the services need them. This script will not start containers." -ForegroundColor Yellow
+    Write-Host "Start these databases/brokers locally if the services need them. This script does not use Docker." -ForegroundColor Yellow
 }
 
 $ServicesToStart = @($Services | Where-Object {
@@ -244,7 +238,7 @@ $RegistryDirectory = Split-Path -Parent $RegistryPath
 New-Item -ItemType Directory -Path $RegistryDirectory -Force | Out-Null
 $StartedProcesses = @()
 
-Write-Host "`nOpening one PowerShell window per backend service..." -ForegroundColor Cyan
+Write-Host "`nOpening one PowerShell window per active backend process..." -ForegroundColor Cyan
 foreach ($Service in $ServicesToStart) {
     $ServicePath = Join-Path $ServicesDir $Service.Name
     if (-not (Test-Path -LiteralPath $ServicePath -PathType Container)) {

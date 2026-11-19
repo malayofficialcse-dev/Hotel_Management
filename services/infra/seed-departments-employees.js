@@ -1,6 +1,6 @@
-/**
+﻿/**
  * StayEase Enterprise Hotel Platform - Departments & Employees Seeder
- * 
+ *
  * Dynamically queries all active hotels from MongoDB (hotel_catalog.hotels)
  * For each hotel:
  *   1. Inserts standard departments in MongoDB (hotel_departments.departments)
@@ -14,8 +14,8 @@
 
 const crypto = require('crypto');
 const path = require('path');
-const mongoose = require(path.resolve(__dirname, '../hotel-service/node_modules/mongoose'));
-const { PrismaClient } = require(path.resolve(__dirname, '../employee-service/node_modules/@prisma/client'));
+const mongoose = require(path.resolve(__dirname, '../operations-service/node_modules/mongoose'));
+const { PrismaClient } = require(path.resolve(__dirname, '../operations-service/node_modules/@prisma/client'));
 
 const MONGO_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017';
 const POSTGRES_URL = process.env.DATABASE_URL || 'postgresql://postgres:postgrespassword@localhost:55432/hotel_operations_db?schema=public';
@@ -128,14 +128,14 @@ function pickName(nameList, hotelIndex, employeeIndex) {
 
 async function seedDepartmentsAndEmployees() {
   console.log('='.repeat(70));
-  console.log('🏨 StayEase Master Seeder: Departments & Employees across Hotels');
+  console.log('ðŸ¨ StayEase Master Seeder: Departments & Employees across Hotels');
   console.log('='.repeat(70));
 
   // 1. Connect to MongoDB
   console.log('\n[1/5] Connecting to MongoDB databases...');
   const catalogConn = await mongoose.createConnection(`${MONGO_URI}/hotel_catalog`);
   const departmentsConn = await mongoose.createConnection(`${MONGO_URI}/hotel_departments`);
-  console.log('✅ Connected to MongoDB hotel_catalog & hotel_departments');
+  console.log('âœ… Connected to MongoDB hotel_catalog & hotel_departments');
 
   // 2. Connect to PostgreSQL via Prisma
   console.log('\n[2/5] Connecting to PostgreSQL hotel_operations_db via Prisma...');
@@ -145,7 +145,7 @@ async function seedDepartmentsAndEmployees() {
     }
   });
   await prisma.$connect();
-  console.log('✅ Connected to PostgreSQL hotel_operations_db');
+  console.log('âœ… Connected to PostgreSQL hotel_operations_db');
 
   // 3. Ensure PostgreSQL departments table exists with VARCHAR id
   await prisma.$executeRawUnsafe(`
@@ -169,7 +169,7 @@ async function seedDepartmentsAndEmployees() {
   console.log(`Found ${hotels.length} active hotels in catalog.`);
 
   if (hotels.length === 0) {
-    console.error('❌ No active hotels found in hotel_catalog. Please seed hotels first!');
+    console.error('âŒ No active hotels found in hotel_catalog. Please seed hotels first!');
     process.exit(1);
   }
 
@@ -186,7 +186,7 @@ async function seedDepartmentsAndEmployees() {
     const hotelSlug = hotel.slug || hotel.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
     const hotelShort = getHotelShortCode(hotel.name, hotelSlug);
 
-    console.log(`\n🏨 [${hIdx + 1}/${hotels.length}] Property: ${hotel.name} (${hotel.city}) [ID: ${hotelIdStr}] [Short: ${hotelShort}]`);
+    console.log(`\nðŸ¨ [${hIdx + 1}/${hotels.length}] Property: ${hotel.name} (${hotel.city}) [ID: ${hotelIdStr}] [Short: ${hotelShort}]`);
 
     let empSeqCounter = 1;
 
@@ -246,7 +246,7 @@ async function seedDepartmentsAndEmployees() {
         const fullName = `${firstName} ${lastName}`;
         const email = `${firstName.toLowerCase()}.${lastName.toLowerCase()}.${hotelShort.toLowerCase()}@stayease.com`;
         const phone = `+91 ${98000 + (hIdx * 10) + eIdx} ${String(10000 + (hIdx * 100) + (dIdx * 10) + eIdx).padStart(5, '0')}`;
-        
+
         const employeeId = createDeterministicUUID(`emp_${hotelIdStr}_${template.name}_${eIdx}`);
         const userId = createDeterministicUUID(`user_${hotelIdStr}_${template.name}_${eIdx}`);
         const employeeCode = `${hotelShort}/EMP/${String(empSeqCounter).padStart(4, '0')}`;
@@ -337,7 +337,7 @@ async function seedDepartmentsAndEmployees() {
       }
     }
 
-    console.log(`   ✨ Seeded ${DEPARTMENT_TEMPLATES.length} departments & ${empSeqCounter - 1} employees for ${hotel.name}`);
+    console.log(`   âœ¨ Seeded ${DEPARTMENT_TEMPLATES.length} departments & ${empSeqCounter - 1} employees for ${hotel.name}`);
   }
 
   // 6. Seed Operational Tasks for Staff
@@ -411,14 +411,14 @@ async function seedDepartmentsAndEmployees() {
   const totalSchedules = await prisma.schedule.count();
 
   console.log('\n' + '='.repeat(70));
-  console.log('🎉 SEEDING COMPLETED SUCCESSFULLY!');
+  console.log('ðŸŽ‰ SEEDING COMPLETED SUCCESSFULLY!');
   console.log('='.repeat(70));
-  console.log(`📊 Total Hotels Processed:                ${hotels.length}`);
-  console.log(`📊 Departments in MongoDB hotel_departments: ${totalMongoDepts}`);
-  console.log(`📊 Departments in PostgreSQL operations_db:  ${totalPgDepts[0].count}`);
-  console.log(`📊 Employees in PostgreSQL operations_db:    ${totalEmployees}`);
-  console.log(`📊 Tasks in PostgreSQL operations_db:        ${totalTasks}`);
-  console.log(`📊 Schedules in PostgreSQL operations_db:    ${totalSchedules}`);
+  console.log(`ðŸ“Š Total Hotels Processed:                ${hotels.length}`);
+  console.log(`ðŸ“Š Departments in MongoDB hotel_departments: ${totalMongoDepts}`);
+  console.log(`ðŸ“Š Departments in PostgreSQL operations_db:  ${totalPgDepts[0].count}`);
+  console.log(`ðŸ“Š Employees in PostgreSQL operations_db:    ${totalEmployees}`);
+  console.log(`ðŸ“Š Tasks in PostgreSQL operations_db:        ${totalTasks}`);
+  console.log(`ðŸ“Š Schedules in PostgreSQL operations_db:    ${totalSchedules}`);
   console.log('='.repeat(70));
 
   // Disconnect cleanly
@@ -428,6 +428,6 @@ async function seedDepartmentsAndEmployees() {
 }
 
 seedDepartmentsAndEmployees().catch((err) => {
-  console.error('\n❌ Seeding failed with error:', err);
+  console.error('\nâŒ Seeding failed with error:', err);
   process.exit(1);
 });

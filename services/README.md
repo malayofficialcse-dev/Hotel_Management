@@ -1,4 +1,4 @@
-# Hotel Management Platform — Microservices Architecture
+﻿# Hotel Management Platform â€” Microservices Architecture
 ## Production-Grade Polyglot Backend
 
 ---
@@ -7,36 +7,29 @@
 
 | # | Service | Tech | Port | Database | Responsibility |
 |---|---------|------|------|----------|----------------|
-| 0 | **API Gateway** | NestJS | 8000 | — | Single public entry point, rate limiting, reverse proxy |
+| 0 | **API Gateway** | NestJS | 8000 | â€” | Single public entry point, rate limiting, reverse proxy |
 | 1 | **Auth Service** | **NestJS + Prisma** | 8001 | PostgreSQL + Redis | Registration, login, JWT access/refresh tokens |
 | 2 | **User Service** | **NestJS + Prisma** | 8002 | PostgreSQL | User profiles, wishlist, preferences |
-| 3 | **Hotel Service** | Node.js + Express + Mongoose | 8003 / 50053 gRPC | MongoDB | Hotel catalog, search, and property management |
-| 4 | **Room Service** | Node.js + Express + Mongoose | 8004 / 50054 gRPC | MongoDB | Room types, inventory, and booking-backed availability |
+| 3â€“4, 7â€“9, 12 | **Operations Service** | Node.js + Express + Mongoose / Prisma | 8020 | Existing MongoDB databases + PostgreSQL | Hotels, rooms, departments, employees, housekeeping, and reviews |
 | 5 | **Booking Service** | Go + Chi | 8005 / 50051 gRPC | PostgreSQL + Redis | Reservations, 10-min hold, double-booking prevention |
 | 6 | **Payment Service** | NestJS + Prisma | 8006 | PostgreSQL | Stripe integration, webhooks, refunds |
-| 7 | **Employee Service** | Node.js + Express + Prisma | 8007 / 50057 gRPC | PostgreSQL | Employee records and department-aware staff directory |
-| 8 | **Housekeeping Service** | Node.js + Express + Mongoose | 8008 / 50058 gRPC | MongoDB | Room cleaning tasks, assignment, inspection, and status |
-| 9 | **Review Service** | NestJS + Mongoose | 8009 | MongoDB | Guest reviews, ratings, moderation |
 | 10 | **Notification Service** | Go | 8010 | PostgreSQL / MongoDB | Event notifications |
 | 11 | **Analytics Service** | Go | 8011 | PostgreSQL | Portfolio reporting |
-| 12 | **Department Service** | Node.js + Express + Mongoose | 8012 / 50059 gRPC | MongoDB | Property departments and the gRPC directory |
 
 ---
 
 ## Inter-Service Communication Map
 
-```
-API Gateway (8000)
-│
-├── POST /api/v1/auth/**        → Auth Service (8001)
-├── GET/PATCH /api/v1/users/**  → User Service (8002) [validates via Auth: 8001]
-├── GET /api/v1/hotels/**       → Hotel & Room Service (8003)
-├── GET /api/v1/rooms/**        → Room Service (8004) [availability via Booking: 8005]
-├── POST /api/v1/bookings/**    → Booking Service (8005) [inventory via Room: 8004]
-├── POST /api/v1/payments/**    → Payment Service (8006) [confirms booking via: 8005]
-├── /api/v1/employees/**        → Employee Service (8007) [department lookup via gRPC]
-├── /api/v1/housekeeping/**     → Housekeeping Service (8008) [employee validation via gRPC]
-└── /api/v1/departments/**      → Department Service (8012) [hotel lookup via gRPC]
+```text
+API Gateway (:8000)
+  /api/v1/auth/**, /api/v1/users/**       -> Auth / User services
+  /api/v1/hotels/**, /api/v1/offers/**    -> Operations Service (:8020)
+  /api/v1/rooms/**                        -> Operations Service (:8020)
+  /api/v1/employees/**                    -> Operations Service (:8020)
+  /api/v1/departments/**                  -> Operations Service (:8020)
+  /api/v1/housekeeping/**                 -> Operations Service (:8020)
+  /api/v1/reviews/**                      -> Operations Service (:8020)
+  /api/v1/bookings/**, /api/v1/payments/** -> Booking / Payment services
 ```
 
 ---
@@ -72,8 +65,8 @@ PowerShell scripts.
 
 ### Cloudinary hotel and room images
 
-Set the same Cloudinary API URL in both
-`services/hotel-service/.env` and `services/room-service/.env`:
+Set the Cloudinary API URL in
+`services/operations-service/.env`:
 
 ```env
 CLOUDINARY_URL=cloudinary://<api_key>:<api_secret>@<cloud_name>
@@ -84,13 +77,13 @@ into chat. Restart both services after setting it. The admin Hotel and Room
 forms can upload JPEG, PNG, WebP, or AVIF files up to 8 MB. Hotel uploads set
 the cover and gallery image URLs; room uploads set that room type's image URL.
 Customer hotel cards, hotel detail pages, and room selection read those URLs
-from the hotel and room services, with local fallback images when an image is
+from the operations service, with local fallback images when an image is
 not set.
 
 ### Seed hotels, rooms, departments, employees, reservations, and payments
 
-With the API Gateway, hotel, room, department, employee, booking, payment, and
-authentication services running, create or reactivate the three sample hotels,
+With the API Gateway, operations, booking, payment, and authentication services
+running, create or reactivate the three sample hotels,
 seed their room types, ensure ten standard departments per active hotel, and
 insert up to 20 linked employees, reservations, and matching payments. Redis
 must also be available to the Booking Service.
@@ -148,11 +141,11 @@ terminals after saving.
 ## Production Deployment (Render)
 
 1. Push repository to GitHub
-2. In Render dashboard: **New +** → **Blueprint**  
+2. In Render dashboard: **New +** â†’ **Blueprint**
 3. Select your repository. Render reads [`render.yaml`](./render.yaml) automatically.
 4. Set **secret** env vars manually in Render dashboard:
    - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` (Payment Service)
-   - `MONGODB_URI` (Review Service — use MongoDB Atlas)
+   - `MONGODB_URI` (Review Service â€” use MongoDB Atlas)
    - `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET` (Auth Service)
 5. After deploy, copy the API Gateway URL and set it in Vercel:
    - `NEXT_PUBLIC_API_URL=https://hotel-api-gateway.onrender.com/api/v1`
@@ -165,12 +158,12 @@ terminals after saving.
 # Development
 npm run dev        # http://localhost:3000
 
-# Production build (runs clean with ✓ 0 TypeScript errors)
+# Production build (runs clean with âœ“ 0 TypeScript errors)
 npm run build
 ```
 
 The Next.js app uses `lib/api-client.ts` for backend calls via the API Gateway.
-Public hotel browsing requires the hotel catalog API; operational admin screens show
+Public hotel browsing requires the Operations Service; operational admin screens show
 service errors instead of presenting failed requests as live data.
 
 ---
@@ -179,60 +172,51 @@ service errors instead of presenting failed requests as live data.
 
 ```
 services/
-├── api-gateway/           # NestJS — Port 8000
-│   ├── src/
-│   │   ├── config/
-│   │   ├── middleware/
-│   │   ├── proxy/
-│   │   ├── health/
-│   │   ├── app.module.ts
-│   │   └── main.ts
-│   └── Dockerfile
+â”œâ”€â”€ api-gateway/           # NestJS â€” Port 8000
+â”‚   â”œâ”€â”€ src/
+â”‚   â”‚   â”œâ”€â”€ config/
+â”‚   â”‚   â”œâ”€â”€ middleware/
+â”‚   â”‚   â”œâ”€â”€ proxy/
+â”‚   â”‚   â”œâ”€â”€ health/
+â”‚   â”‚   â”œâ”€â”€ app.module.ts
+â”‚   â”‚   â””â”€â”€ main.ts
+â”‚   â””â”€â”€ Dockerfile
+â”‚
+â”œâ”€â”€ auth-service/          # NestJS + Prisma â€” Port 8001
+â”‚   â”œâ”€â”€ config/
+â”‚   â”œâ”€â”€ prisma/
+â”‚   â”œâ”€â”€ src/
+â”‚   â””â”€â”€ Dockerfile
+â”‚
+â”œâ”€â”€ user-service/          # NestJS + Prisma â€” Port 8002
+â”‚   â”œâ”€â”€ prisma/
+â”‚   â”œâ”€â”€ src/
+â”‚   â””â”€â”€ Dockerfile
+â”‚
+â”‚
+├── operations-service/    # Unified Express API — REST :8020
+│   └── src/domains/{hotel,room,department,employee,housekeeping,review}/{config,models,repositories,services,controllers,routes,middleware,utils}
 │
-├── auth-service/          # NestJS + Prisma — Port 8001
-│   ├── config/
-│   ├── prisma/
-│   ├── src/
-│   └── Dockerfile
-│
-├── user-service/          # NestJS + Prisma — Port 8002
-│   ├── prisma/
-│   ├── src/
-│   └── Dockerfile
-│
-├── hotel-service/         # Express + Mongoose — REST 8003, gRPC 50053
-│   └── src/{config,models,repositories,services,controllers,routes,grpc}
-├── room-service/          # Express + Mongoose — REST 8004, gRPC 50054
-│   └── src/{config,models,repositories,services,controllers,routes,grpc}
-│
-├── booking-service/       # Go + Chi — HTTP 8005, gRPC 50051
-│   └── [same structure]
-│
-├── payment-service/       # NestJS + Prisma — Port 8006
-│   ├── prisma/
-│   ├── src/
-│   │   ├── config/
-│   │   ├── models/
-│   │   ├── repository/
-│   │   ├── services/
-│   │   ├── controllers/
-│   │   ├── middleware/
-│   │   └── modules/
-│   └── Dockerfile
-│
-├── review-service/        # NestJS + Mongoose — Port 8009
-│   └── [NestJS structure]
-│
-├── employee-service/      # Express + Prisma/PostgreSQL — REST 8007, gRPC 50057
-│   └── src/{config,models,repositories,services,controllers,routes,grpc}
-├── housekeeping-service/  # Express + Mongoose — REST 8008, gRPC 50058
-│   └── src/{config,models,repositories,services,controllers,routes,grpc}
-├── department-service/    # Express + Mongoose — REST 8012, gRPC 50059
-│   └── src/{config,models,repositories,services,controllers,routes,grpc}
-│
-├── infra/
-│   └── init-databases.sql # Creates all 6 PostgreSQL databases
-├── ../proto/              # Shared gRPC contracts
-├── docker-compose.yml
-└── render.yaml
+â”œâ”€â”€ booking-service/       # Go + Chi â€” HTTP 8005, gRPC 50051
+â”‚   â””â”€â”€ [same structure]
+â”‚
+â”œâ”€â”€ payment-service/       # NestJS + Prisma â€” Port 8006
+â”‚   â”œâ”€â”€ prisma/
+â”‚   â”œâ”€â”€ src/
+â”‚   â”‚   â”œâ”€â”€ config/
+â”‚   â”‚   â”œâ”€â”€ models/
+â”‚   â”‚   â”œâ”€â”€ repository/
+â”‚   â”‚   â”œâ”€â”€ services/
+â”‚   â”‚   â”œâ”€â”€ controllers/
+â”‚   â”‚   â”œâ”€â”€ middleware/
+â”‚   â”‚   â””â”€â”€ modules/
+â”‚   â””â”€â”€ Dockerfile
+â”‚
+â”‚
+â”‚
+â”œâ”€â”€ infra/
+â”‚   â””â”€â”€ init-databases.sql # Creates all 6 PostgreSQL databases
+â”œâ”€â”€ ../proto/              # Shared gRPC contracts
+â”œâ”€â”€ docker-compose.yml
+â””â”€â”€ render.yaml
 ```
