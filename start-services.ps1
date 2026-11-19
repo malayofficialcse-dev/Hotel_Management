@@ -25,6 +25,7 @@ $Services = @(
     @{ Name = "review-service";       Runtime = "Node"; Port = 8009; Script = "dev" },
     @{ Name = "notification-service"; Runtime = "Go";   Port = 8010; Script = $null },
     @{ Name = "analytics-service";    Runtime = "Go";   Port = 8011; Script = $null },
+    @{ Name = "ai-service";           Runtime = "Node"; Port = 8013; Script = "dev" },
     @{ Name = "api-gateway";          Runtime = "Node"; Port = 8000; Script = "dev" }
 )
 

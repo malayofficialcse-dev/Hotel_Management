@@ -1,0 +1,156 @@
+export interface CatalogHotel {
+  id: string;
+  name: string;
+  city: string;
+  location: string;
+  image: string;
+  price: number;
+  rating: string;
+  reviews: number;
+  description: string;
+  tag: string;
+  features: string[];
+  offer: string;
+  category: string;
+}
+
+export const defaultCatalogHotels: CatalogHotel[] = [
+  {
+    id: "goa-beach-villa",
+    name: "Candolim Beachfront Villa & Plunge Pool",
+    city: "Goa",
+    location: "Sinquerim Coastal Belt, North Goa",
+    image: "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=1200&q=80",
+    price: 9500,
+    rating: "4.9",
+    reviews: 182,
+    tag: "Quiet beachfront villa with private plunge pool",
+    features: ["Private Plunge Pool", "Direct Beach Access", "Butler Service", "Free Wi-Fi", "Daily Breakfast"],
+    offer: "Complimentary sunset cruise voucher",
+    category: "Villas & retreats",
+    description: "Ultra-private coastal villa featuring an exclusive private pool, sun deck, and direct sandy beach path.",
+  },
+  {
+    id: "palm-house",
+    name: "The Palm House",
+    city: "Goa",
+    location: "Candolim Beach Road, North Goa",
+    image: "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=1200&q=80",
+    price: 8000,
+    rating: "4.8",
+    reviews: 324,
+    tag: "Your coastal escape",
+    features: ["Free Wi-Fi", "Infinity Pool", "Complimentary Breakfast", "Spa & Wellness", "Beach Access"],
+    offer: "10% off your first stay",
+    category: "Beach resorts",
+    description: "Serene boutique resort set amongst coconut groves with direct access to Candolim beach.",
+  },
+  {
+    id: "haveli-and-co",
+    name: "Haveli & Co.",
+    city: "Jaipur",
+    location: "Civil Lines, Jaipur, Rajasthan",
+    image: "https://images.unsplash.com/photo-1582719508461-905c673771fd?auto=format&fit=crop&w=1200&q=80",
+    price: 6500,
+    rating: "4.7",
+    reviews: 218,
+    tag: "A royal Rajasthani welcome",
+    features: ["Free Wi-Fi", "Courtyard Dining", "Rooftop Pool", "Cultural Evenings"],
+    offer: "Complimentary dinner on 3+ nights",
+    category: "Heritage stays",
+    description: "Restored 19th-century haveli with frescoed archways and tranquil courtyards.",
+  },
+  {
+    id: "lakehouse-retreat",
+    name: "Lakehouse Retreat",
+    city: "Udaipur",
+    location: "Pichola Lake Road, Udaipur, Rajasthan",
+    image: "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1200&q=80",
+    price: 12400,
+    rating: "4.9",
+    reviews: 412,
+    tag: "Views that take your breath away",
+    features: ["Lake View Balcony", "Private Boat Transfer", "Fine Dining", "Butler Service"],
+    offer: "Sunset boat cruise included",
+    category: "Boutique hotels",
+    description: "Waterfront sanctuary on the eastern bank of Lake Pichola with sunset palace panoramas.",
+  },
+  {
+    id: "the-oberoi-udaivilas",
+    name: "The Oberoi Udaivilas",
+    city: "Udaipur",
+    location: "Haridas Ji Ki Magri, Udaipur, Rajasthan",
+    image: "https://images.unsplash.com/photo-1571896349842-33c89424de2d?auto=format&fit=crop&w=1200&q=80",
+    price: 26000,
+    rating: "4.9",
+    reviews: 640,
+    tag: "Palatial grandeur on Lake Pichola",
+    features: ["Private Pool", "Spa by Banyan Tree", "Heritage Courtyards", "Fine Dining by the Lake"],
+    offer: "Royal arrival ceremony with folk music",
+    category: "Boutique hotels",
+    description: "Consistently ranked among the finest luxury resorts globally, featuring private pools and dome architecture.",
+  },
+  {
+    id: "kumarakom-lake-resort",
+    name: "Kumarakom Lake Resort",
+    city: "Kumarakom",
+    location: "North Post, Kumarakom, Kottayam, Kerala",
+    image: "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=1200&q=80",
+    price: 13500,
+    rating: "4.9",
+    reviews: 380,
+    tag: "Luxury on the backwaters of Kerala",
+    features: ["Meandering Pool", "Ayurvedic Spa", "Houseboat Cruises", "Lake View Dining"],
+    offer: "Complimentary evening tea & canal cruise",
+    category: "Beach resorts",
+    description: "Heritage retreat on the shores of Vembanad Lake offering traditional Kerala villas.",
+  },
+  {
+    id: "jw-marriot",
+    name: "JW Marriott Hotel Kolkata",
+    city: "Kolkata",
+    location: "4A, J.B.S. Haldane Avenue, Topsia, Kolkata, West Bengal",
+    image: "https://res.cloudinary.com/wnc9d18t/image/upload/v1794739565/stayease/hotels/zvgkthqfcus25bfvdgsu.jpg",
+    price: 8000,
+    rating: "4.8",
+    reviews: 340,
+    tag: "Contemporary luxury in Kolkata",
+    features: ["Infinity Pool", "Spa by JW", "JW Kitchen", "Executive Lounge"],
+    offer: "10% off with breakfast buffet",
+    category: "City hotels",
+    description: "Sophisticated skyscraper hotel on the Eastern Metropolitan Bypass with world-class amenities.",
+  },
+  {
+    id: "the-taj-mahal-palace",
+    name: "The Taj Mahal Palace",
+    city: "Mumbai",
+    location: "Apollo Bunder, Colaba, Mumbai, Maharashtra",
+    image: "https://images.unsplash.com/photo-1582719508461-905c673771fd?auto=format&fit=crop&w=1200&q=80",
+    price: 18500,
+    rating: "4.9",
+    reviews: 890,
+    tag: "The grand dame of Mumbai harbour",
+    features: ["Harbour View", "Jiva Spa", "10 Iconic Restaurants", "Heritage Walk"],
+    offer: "Complimentary afternoon high tea",
+    category: "Heritage stays",
+    description: "Built in 1903 opposite the Gateway of India, an architectural marvel of Indo-Saracenic elegance.",
+  },
+  {
+    id: "monsoon-grove",
+    name: "Monsoon Grove Retreat",
+    city: "Munnar",
+    location: "Pallivasal Tea Estate, Munnar, Kerala",
+    image: "https://images.pexels.com/photos/258154/pexels-photo-258154.jpeg?auto=compress&cs=tinysrgb&w=1200",
+    price: 8800,
+    rating: "4.8",
+    reviews: 154,
+    tag: "A hideaway in the hills",
+    features: ["Free Wi-Fi", "Mountain View", "Breakfast Included", "Tea Garden Walks"],
+    offer: "Save 12% on a 2-night stay",
+    category: "Villas & retreats",
+    description: "Charming cottages nestled amid rolling mist-covered tea plantations in the Western Ghats.",
+  },
+];
+
+export const CATALOG_DATASET = defaultCatalogHotels;
+

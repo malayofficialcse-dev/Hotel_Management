@@ -19,6 +19,7 @@ export const env = {
   REVIEW_SERVICE_URL: process.env.REVIEW_SERVICE_URL || 'http://localhost:8009',
   NOTIFICATION_SERVICE_URL: process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:8010',
   ANALYTICS_SERVICE_URL: process.env.ANALYTICS_SERVICE_URL || 'http://localhost:8011',
+  AI_SERVICE_URL: process.env.AI_SERVICE_URL || 'http://localhost:8013',
 
   services: {
     auth: process.env.AUTH_SERVICE_URL || 'http://localhost:8001',
@@ -33,6 +34,7 @@ export const env = {
     review: process.env.REVIEW_SERVICE_URL || 'http://localhost:8009',
     notification: process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:8010',
     analytics: process.env.ANALYTICS_SERVICE_URL || 'http://localhost:8011',
+    ai: process.env.AI_SERVICE_URL || 'http://localhost:8013',
   },
 
   cors: {

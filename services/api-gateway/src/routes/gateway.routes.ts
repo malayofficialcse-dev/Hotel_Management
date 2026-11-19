@@ -13,6 +13,7 @@ export const GATEWAY_ROUTES = {
   REVIEWS: "/api/v1/reviews",
   NOTIFICATIONS: "/api/v1/notifications",
   ANALYTICS: "/api/v1/analytics",
+  AI: "/api/v1/ai",
 } as const;
 
 export type GatewayRoutes = typeof GATEWAY_ROUTES;

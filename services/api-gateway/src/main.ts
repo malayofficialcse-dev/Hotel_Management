@@ -21,6 +21,7 @@ const proxyRoutes = [
   { route: GATEWAY_ROUTES.REVIEWS, target: env.REVIEW_SERVICE_URL },
   { route: GATEWAY_ROUTES.NOTIFICATIONS, target: env.NOTIFICATION_SERVICE_URL },
   { route: GATEWAY_ROUTES.ANALYTICS, target: env.ANALYTICS_SERVICE_URL },
+  { route: GATEWAY_ROUTES.AI, target: env.AI_SERVICE_URL },
 ];
 
 async function bootstrap() {

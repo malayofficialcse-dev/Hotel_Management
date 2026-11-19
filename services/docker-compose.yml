@@ -314,6 +314,27 @@ services:
       postgres: { condition: service_healthy }
       rabbitmq: { condition: service_healthy }
 
+  # AI Concierge & Smart Guest Assistant Service [Pinecone + LangGraph + Gemini]
+  ai-service:
+    build: ./ai-service
+    container_name: hotel-ai-service
+    restart: always
+    ports:
+      - "8013:8013"
+    environment:
+      PORT: 8013
+      NODE_ENV: production
+      PINECONE_API_KEY: ${PINECONE_API_KEY}
+      PINECONE_INDEX: ${PINECONE_INDEX:-stayease-hotels}
+      PINECONE_HOST: ${PINECONE_HOST}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      LANGCHAIN_TRACING_V2: ${LANGCHAIN_TRACING_V2:-false}
+      LANGCHAIN_API_KEY: ${LANGCHAIN_API_KEY}
+      LANGCHAIN_PROJECT: ${LANGCHAIN_PROJECT:-stayease-ai-service}
+      HOTEL_SERVICE_URL: http://hotel-service:8003
+      HOUSEKEEPING_SERVICE_URL: http://housekeeping-service:8008
+      API_GATEWAY_URL: http://api-gateway:8000
+
 volumes:
   postgres_data:
   mongo_data:

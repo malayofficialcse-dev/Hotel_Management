@@ -10,3 +10,4 @@ pnpm-debug.log*
 assets
 public
 figma
+dist

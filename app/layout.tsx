@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { BookingProvider } from "@/components/booking-provider";
+import { AiConcierge } from "@/components/ai-concierge";
 
 export const metadata: Metadata = {
   title: "StayEase — Effortless getaways",
@@ -11,7 +12,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en" data-scroll-behavior="smooth">
       <body>
-        <BookingProvider>{children}</BookingProvider>
+        <BookingProvider>
+          {children}
+          <AiConcierge />
+        </BookingProvider>
       </body>
     </html>
   );
