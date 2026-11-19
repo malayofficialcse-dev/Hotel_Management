@@ -264,7 +264,9 @@ func (c *BookingController) ListAdminGuestServiceRequests(w http.ResponseWriter,
 		http.Error(w, `{"success":false,"message":"Your staff account is not assigned to a hotel"}`, http.StatusForbidden)
 		return
 	}
-	if role == "ADMIN" { hotelID = "" }
+	if role == "ADMIN" {
+		hotelID = ""
+	}
 	items, err := c.bookingService.ListAllGuestServiceRequests(r.Context(), hotelID)
 	if err != nil {
 		http.Error(w, `{"success":false,"message":"Could not load guest service requests"}`, http.StatusInternalServerError)
@@ -282,7 +284,9 @@ func (c *BookingController) UpdateGuestServiceRequestStatus(w http.ResponseWrite
 		return
 	}
 	id, err := uuid.Parse(chi.URLParam(r, "requestId"))
-	var payload struct { Status string `json:"status"` }
+	var payload struct {
+		Status string `json:"status"`
+	}
 	if err != nil || json.NewDecoder(r.Body).Decode(&payload) != nil {
 		http.Error(w, `{"success":false,"message":"Invalid request"}`, http.StatusBadRequest)
 		return
@@ -292,7 +296,9 @@ func (c *BookingController) UpdateGuestServiceRequestStatus(w http.ResponseWrite
 		http.Error(w, `{"success":false,"message":"Invalid request status"}`, http.StatusBadRequest)
 		return
 	}
-	if role == "ADMIN" { hotelID = "" }
+	if role == "ADMIN" {
+		hotelID = ""
+	}
 	item, err := c.bookingService.UpdateGuestServiceRequestStatus(r.Context(), id, payload.Status, hotelID)
 	if err != nil {
 		http.Error(w, `{"success":false,"message":"Request not found for your property"}`, http.StatusNotFound)

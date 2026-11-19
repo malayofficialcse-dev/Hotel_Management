@@ -55,8 +55,8 @@ export function GuestRequestsWorkspace() {
       <section className="admin-panel admin-table-panel">
         <div className="admin-table-tools">
           <div><strong>{visible.length}</strong> request{visible.length === 1 ? "" : "s"}</div>
-          <label className="admin-table-search">Status
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+          <label className="flex items-center text-[10px] font-medium text-muted">Status
+            <select className="admin-select-button ml-2" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
               <option value="OPEN">Open</option><option value="ACKNOWLEDGED">Acknowledged</option><option value="IN_PROGRESS">In progress</option><option value="COMPLETED">Completed</option><option value="DECLINED">Declined</option><option value="ALL">All requests</option>
             </select>
           </label>

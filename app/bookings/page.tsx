@@ -358,6 +358,14 @@ function BookingCard({
             <span>🔑 Digital Pass & QR</span>
             <span>→</span>
           </Link>
+          <Link
+            href={`/booking/bill?code=${encodeURIComponent(booking.booking_code)}`}
+            className="inline-flex items-center gap-1.5 rounded border border-line bg-white px-3 py-1.5 text-[11px] font-semibold text-forest transition-colors hover:bg-mist"
+            aria-label={`View bill for booking ${booking.booking_code}`}
+          >
+            <span>View bill</span>
+            <span aria-hidden="true">↗</span>
+          </Link>
         </div>
       </div>
       {group === "upcoming" && ["CONFIRMED", "CHECKED_IN"].includes(booking.status.toUpperCase()) && (

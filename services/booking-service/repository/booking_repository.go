@@ -121,13 +121,17 @@ func (r *BookingRepository) ListAllGuestServiceRequests(ctx context.Context, hot
 		b.hotel_id, b.hotel_name, b.booking_code, concat_ws(' ', b.guest_first_name, b.guest_last_name), b.guest_email, b.check_in_date, b.check_out_date
 		FROM guest_service_requests sr JOIN bookings b ON b.id = sr.booking_id
 		WHERE ($1 = '' OR b.hotel_id = $1) ORDER BY sr.created_at DESC`, hotelID)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	defer rows.Close()
 	requests := make([]*models.GuestServiceRequest, 0)
 	for rows.Next() {
 		item := &models.GuestServiceRequest{}
 		if err := rows.Scan(&item.ID, &item.BookingID, &item.UserID, &item.RequestType, &item.Details, &item.Status, &item.CreatedAt, &item.UpdatedAt,
-			&item.HotelID, &item.HotelName, &item.BookingCode, &item.GuestName, &item.GuestEmail, &item.CheckIn, &item.CheckOut); err != nil { return nil, err }
+			&item.HotelID, &item.HotelName, &item.BookingCode, &item.GuestName, &item.GuestEmail, &item.CheckIn, &item.CheckOut); err != nil {
+			return nil, err
+		}
 		requests = append(requests, item)
 	}
 	return requests, rows.Err()
@@ -139,7 +143,9 @@ func (r *BookingRepository) UpdateGuestServiceRequestStatus(ctx context.Context,
 		FROM bookings b WHERE sr.id = $1 AND b.id = sr.booking_id AND ($3 = '' OR b.hotel_id = $3)
 		RETURNING sr.id, sr.booking_id, sr.user_id, sr.request_type, sr.details, sr.status, sr.created_at, sr.updated_at`, id, status, hotelID).
 		Scan(&item.ID, &item.BookingID, &item.UserID, &item.RequestType, &item.Details, &item.Status, &item.CreatedAt, &item.UpdatedAt)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	return item, nil
 }
 
