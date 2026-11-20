@@ -63,6 +63,174 @@ Check logs in each service window. The API Gateway is available at
 `npm run services:up` and `npm run services:down` are aliases for these
 PowerShell scripts.
 
+## Booking and Payment: Docker Compose
+
+The booking and payment services have separate Docker images. To run them
+together with the PostgreSQL databases they need, plus Redis and RabbitMQ, run
+these commands from the repository root in PowerShell:
+
+```powershell
+docker compose -f services/docker-compose.booking-payment.yml up --build -d
+docker compose -f services/docker-compose.booking-payment.yml ps
+docker compose -f services/docker-compose.booking-payment.yml logs -f booking-service payment-service
+```
+
+The first startup initializes `hotel_bookings_db` and `hotel_payments_db` using
+`services/infra/init-databases.sql`. Wait for both app containers to be running,
+then check their health endpoints:
+
+```powershell
+Invoke-RestMethod http://localhost:8005/health
+Invoke-RestMethod http://localhost:8006/api/v1/payments/health
+```
+
+The services are published on ports 8005 and 8006. PostgreSQL is published on
+55432, Redis on 16379, and RabbitMQ on 5673 (management UI: 15673). The local
+Compose file uses development-only credentials; replace them before sharing
+this setup. Booking calls the auth and operations services on the Windows host
+at ports 8001 and 8020. Those services must be running for authenticated booking
+and room availability flows. Stop the stack with:
+
+```powershell
+docker compose -f services/docker-compose.booking-payment.yml down
+```
+
+This preserves the local database volume. To erase the local database and start
+from scratch, run `docker compose -f services/docker-compose.booking-payment.yml down -v`.
+
+## Build and deploy the two images to Kubernetes
+
+The focused Kubernetes resources are in `k8s/booking-payment.yaml`. They create
+two replicas each and internal `ClusterIP` services. PostgreSQL, Redis,
+RabbitMQ, the auth service, and the hotel/room operations service are expected
+to be reachable already; this manifest does not create stateful databases.
+Provision the booking and payment schemas first using
+`services/booking-service/sql/schema.sql` and
+`services/payment-service/sql/schema.sql` if your database provider has not
+already applied them. Keep the two `DATABASE_URL`s pointed at their respective
+databases. URL-encode reserved characters in database passwords.
+
+### Quick local deployment on Docker Desktop Kubernetes
+
+For a local demo, `k8s/local-infra.yaml` also creates PostgreSQL, Redis, and
+RabbitMQ. From **Command Prompt** at the repository root, build the two images
+into Docker Desktop's local image store:
+
+```cmd
+docker build -t hotel-booking-service:local -f services/booking-service/Dockerfile services/booking-service
+docker build -t hotel-payment-service:local -f services/payment-service/Dockerfile services/payment-service
+```
+
+Create the namespace and ConfigMap for PostgreSQL's existing database bootstrap
+script, then start the local dependencies:
+
+```cmd
+kubectl apply -f k8s/namespace.yaml
+kubectl create configmap postgres-init --from-file=01-init-databases.sql=services/infra/init-databases.sql --namespace hotel-platform --dry-run=client -o yaml | kubectl apply -f -
+kubectl apply -f k8s/local-infra.yaml
+kubectl wait --for=condition=Available deployment/postgres deployment/redis deployment/rabbitmq --namespace hotel-platform --timeout=180s
+```
+
+Create a local-only Secret with URLs that use Kubernetes service DNS names:
+
+```cmd
+kubectl create secret generic booking-payment-secrets --namespace hotel-platform --from-literal=BOOKING_DATABASE_URL=postgres://hotel:local_only_change_me@postgres:5432/hotel_bookings_db?sslmode=disable --from-literal=PAYMENT_DATABASE_URL=postgres://hotel:local_only_change_me@postgres:5432/hotel_payments_db?sslmode=disable --from-literal=REDIS_URL=redis://redis:6379 --from-literal=RABBITMQ_URL=amqp://hotel_local:local_only_change_me@rabbitmq:5672 --from-literal=AUTH_SERVICE_URL=http://auth-service:8001 --from-literal=HOTEL_SERVICE_URL=http://operations-service:8020 --from-literal=STRIPE_SECRET_KEY=sk_test_local_dummy --from-literal=STRIPE_WEBHOOK_SECRET=whsec_local_dummy --dry-run=client -o yaml | kubectl apply -f -
+```
+
+The dummy credentials are for this local demo only. Deploy booking and payment,
+then check their rollout and pod states:
+
+```cmd
+kubectl apply -f k8s/booking-payment.yaml
+kubectl rollout status deployment/booking-service --namespace hotel-platform --timeout=180s
+kubectl rollout status deployment/payment-service --namespace hotel-platform --timeout=180s
+kubectl get deployments,services,pods -n hotel-platform -o wide
+```
+
+The `hotel-platform` pods are the Kubernetes workloads. To call their health
+endpoints without changing your Compose containers' ports, run each command in
+a separate Command Prompt window:
+
+```cmd
+kubectl port-forward -n hotel-platform service/booking-service 18005:8005
+```
+
+```cmd
+kubectl port-forward -n hotel-platform service/payment-service 18006:8006
+```
+
+In a third window, check the responses:
+
+```cmd
+curl.exe http://localhost:18005/health
+curl.exe http://localhost:18006/api/v1/payments/health
+```
+
+To inspect a failing pod, use `kubectl get pods -n hotel-platform` to find its
+name, then run `kubectl logs -n hotel-platform POD_NAME` or
+`kubectl describe pod -n hotel-platform POD_NAME`. The auth and operations
+services are not included in this local demo; booking health should work, but
+authenticated booking and room availability require those services too. The
+payment code currently returns mock intents, so this setup does not process real
+payments. The local images are referenced directly by the manifests; for a
+remote cluster, push them to a registry and update the image names.
+
+Build and push from the repository root. Substitute a registry/repository that
+your Kubernetes nodes can pull from:
+
+```powershell
+$env:REGISTRY = "ghcr.io/YOUR_GITHUB_USER"
+$env:TAG = "booking-payment-v1"
+docker login ghcr.io
+docker build -t "$env:REGISTRY/hotel-booking-service:$env:TAG" -f services/booking-service/Dockerfile services/booking-service
+docker build -t "$env:REGISTRY/hotel-payment-service:$env:TAG" -f services/payment-service/Dockerfile services/payment-service
+docker push "$env:REGISTRY/hotel-booking-service:$env:TAG"
+docker push "$env:REGISTRY/hotel-payment-service:$env:TAG"
+```
+
+Create the namespace and a local, ignored environment file for Kubernetes
+credentials. Edit the copied file with the real database, Redis, RabbitMQ,
+auth/operations URLs and Stripe values; do not commit it:
+
+```powershell
+kubectl apply -f k8s/namespace.yaml
+Copy-Item k8s/booking-payment-secrets.example k8s/booking-payment-secrets.env
+notepad k8s/booking-payment-secrets.env
+kubectl create secret generic booking-payment-secrets --namespace hotel-platform --from-env-file=k8s/booking-payment-secrets.env --dry-run=client -o yaml | kubectl apply -f -
+kubectl apply -f k8s/booking-payment.yaml
+kubectl set image deployment/booking-service booking-service="$env:REGISTRY/hotel-booking-service:$env:TAG" -n hotel-platform
+kubectl set image deployment/payment-service payment-service="$env:REGISTRY/hotel-payment-service:$env:TAG" -n hotel-platform
+kubectl rollout status deployment/booking-service -n hotel-platform
+kubectl rollout status deployment/payment-service -n hotel-platform
+```
+
+The sample Secret file contains placeholders and must be edited before applying.
+If the image repository is private, configure an `imagePullSecret` for the
+namespace. For a local cluster such as minikube, you can instead build/load the
+images into that cluster and set the two deployment images to those local image
+tags. These services stay internal to Kubernetes; reach them temporarily for
+checks with:
+
+```powershell
+kubectl port-forward -n hotel-platform service/booking-service 8005:8005
+kubectl port-forward -n hotel-platform service/payment-service 8006:8006
+```
+
+Run each port-forward command in its own terminal, then call the same health
+URLs at `localhost`. In the full app, route traffic
+through the API Gateway and its Ingress; do not expose the service pods directly
+to the public internet. View logs with
+`kubectl logs -n hotel-platform deployment/booking-service` and
+`kubectl logs -n hotel-platform deployment/payment-service`.
+
+Deployment packages the current application behavior as-is. In particular,
+`PaymentService.createIntent()` currently creates a mock payment intent, and
+the controller confirmation endpoint is not a substitute for a verified Stripe
+webhook. Configure Stripe credentials and implement/verify the real payment
+flow before accepting real payments. Also, booking currently serves HTTP only;
+the configured gRPC port is not started by `main.go` and is intentionally not
+exposed by these manifests.
+
 ### Cloudinary hotel and room images
 
 Set the Cloudinary API URL in

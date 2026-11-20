@@ -1,0 +1,5 @@
+.env
+.git
+*.exe
+*.out
+**/*_test.go

@@ -7,6 +7,7 @@ yarn-debug.log*
 pnpm-debug.log*
 .env*
 !.env.example
+k8s/booking-payment-secrets.env
 assets
 public
 figma

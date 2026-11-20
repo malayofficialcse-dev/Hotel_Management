@@ -1,0 +1,94 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: hotel
+      POSTGRES_PASSWORD: local_only_change_me
+      POSTGRES_DB: postgres
+    ports:
+      - "55432:5432"
+    volumes:
+      - booking_payment_postgres:/var/lib/postgresql/data
+      - ./infra/init-databases.sql:/docker-entrypoint-initdb.d/01-init-databases.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hotel"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "16379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: hotel_local
+      RABBITMQ_DEFAULT_PASS: local_only_change_me
+    ports:
+      - "5673:5672"
+      - "15673:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+  booking-service:
+    build:
+      context: ./booking-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      PORT: "8005"
+      DATABASE_URL: postgres://hotel:local_only_change_me@postgres:5432/hotel_bookings_db?sslmode=disable
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://hotel_local:local_only_change_me@rabbitmq:5672
+      AUTH_SERVICE_URL: http://host.docker.internal:8001
+      HOTEL_SERVICE_URL: http://host.docker.internal:8020
+      ROOM_SERVICE_URL: http://host.docker.internal:8020
+      PAYMENT_SERVICE_URL: http://payment-service:8006
+    ports:
+      - "8005:8005"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  payment-service:
+    build:
+      context: ./payment-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      booking-service:
+        condition: service_started
+    environment:
+      PORT: "8006"
+      DATABASE_URL: postgres://hotel:local_only_change_me@postgres:5432/hotel_payments_db?sslmode=disable
+      RABBITMQ_URL: amqp://hotel_local:local_only_change_me@rabbitmq:5672
+      BOOKING_SERVICE_URL: http://booking-service:8005
+      AUTH_SERVICE_URL: http://host.docker.internal:8001
+      STRIPE_SECRET_KEY: sk_test_replace_with_your_test_key
+      STRIPE_WEBHOOK_SECRET: whsec_replace_with_your_test_secret
+      FRONTEND_URL: http://localhost:3000
+    ports:
+      - "8006:8006"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+volumes:
+  booking_payment_postgres:
