@@ -9,6 +9,7 @@ FROM alpine:3.19
 RUN apk --no-cache add ca-certificates tzdata
 WORKDIR /root/
 COPY --from=builder /booking-service .
+COPY --from=builder /app/sql ./sql
 EXPOSE 8005 50051
 CMD ["./booking-service"]
 

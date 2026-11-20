@@ -116,12 +116,12 @@ export default function BillPage() {
           meta.invoiceNumber ||
           `${hotelShort}/BILL/${year}/0001`;
 
-        const total = paymentData?.amount || bookingData?.total_price || 0;
+        const total = bookingData?.total_price ?? paymentData?.amount ?? 0;
         const nights = bookingData?.total_nights || meta.totalNights || 1;
         const rooms = bookingData?.room_count || meta.roomCount || 1;
         const pricePerNight = bookingData?.room_price_per_night || Math.round((total / 1.12) / (nights * rooms));
         const subtotal = bookingData ? bookingData.room_price_per_night * nights * rooms : Math.round(total / 1.12);
-        const taxes = bookingData?.taxes_and_fees || (total - subtotal);
+        const taxes = bookingData?.taxes_and_fees ?? (total - subtotal);
 
         setBill({
           billNumber,

@@ -54,3 +54,15 @@ CREATE TABLE IF NOT EXISTS guest_service_requests (
 );
 CREATE INDEX IF NOT EXISTS idx_guest_requests_booking ON guest_service_requests (booking_id, created_at DESC);
 
+CREATE TABLE IF NOT EXISTS guest_notifications (
+    id UUID PRIMARY KEY,
+    user_id UUID NOT NULL,
+    booking_id UUID,
+    event_type VARCHAR(40) NOT NULL,
+    title VARCHAR(120) NOT NULL,
+    message VARCHAR(500) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    read_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_guest_notifications_user ON guest_notifications (user_id, created_at DESC);
+

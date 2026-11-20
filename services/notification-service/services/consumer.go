@@ -22,6 +22,7 @@ type EventPayload struct {
 	Amount      float64                `json:"amount,omitempty"`
 	TotalPrice  float64                `json:"total_price,omitempty"`
 	Status      string                 `json:"status,omitempty"`
+	Message     string                 `json:"message,omitempty"`
 	Extra       map[string]interface{} `json:"extra,omitempty"`
 }
 
@@ -74,6 +75,8 @@ func StartRabbitMQConsumer(rabbitURL string, notifService *NotificationService) 
 	routingKeys := []string{
 		"booking.confirmed",
 		"booking.held",
+		"booking.updated",
+		"booking.cancelled",
 		"payment.succeeded",
 		"room.cleaned",
 		"notification.dispatch",
@@ -117,6 +120,21 @@ func StartRabbitMQConsumer(rabbitURL string, notifService *NotificationService) 
 			log.Printf("📥 [Notification Service] Received event %s (routing key: %s)", event.EventType, d.RoutingKey)
 
 			switch d.RoutingKey {
+			case "booking.updated", "booking.cancelled":
+				if event.GuestEmail == "" {
+					continue
+				}
+				template := "BOOKING_UPDATED"
+				if d.RoutingKey == "booking.cancelled" {
+					template = "BOOKING_CANCELLED"
+				}
+				_, _ = notifService.Send(&models.SendRequest{
+					Recipient:  event.GuestEmail,
+					Channel:    "EMAIL",
+					Template:   template,
+					Parameters: map[string]interface{}{"guestName": event.GuestName, "bookingCode": event.BookingCode, "hotelName": event.HotelName, "message": event.Message, "status": event.Status},
+				})
+
 			case "booking.confirmed":
 				recipient := event.GuestEmail
 				if recipient == "" {
@@ -164,4 +182,3 @@ func StartRabbitMQConsumer(rabbitURL string, notifService *NotificationService) 
 		}
 	}()
 }
-

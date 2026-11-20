@@ -100,11 +100,28 @@ export default function BookingsPage() {
         if (!active) return;
         setHotelImageNotice("Some property photos are currently unavailable.");
       });
+
     }
 
     void loadBookings();
+    const syncBookings = async () => {
+      if (!api.getToken()) return;
+      try {
+        const result = await api.getMyBookings();
+        if (active) setBookings(result.bookings);
+      } catch { /* Keep the last confirmed snapshot while the network is unavailable. */ }
+    };
+    const refreshTimer = window.setInterval(() => void syncBookings(), 5000);
+    window.addEventListener("focus", syncBookings);
+    window.addEventListener("stayease-reservations-updated", syncBookings);
+    const handleStorage = (event: StorageEvent) => { if (event.key === "stayease-reservations-updated-at") void syncBookings(); };
+    window.addEventListener("storage", handleStorage);
     return () => {
       active = false;
+      window.clearInterval(refreshTimer);
+      window.removeEventListener("focus", syncBookings);
+      window.removeEventListener("stayease-reservations-updated", syncBookings);
+      window.removeEventListener("storage", handleStorage);
     };
   }, [router]);
 
@@ -220,6 +237,7 @@ export default function BookingsPage() {
                       booking={booking}
                       hotel={findHotel(booking, hotelsByKey)}
                       group={tab}
+                      onBookingUpdated={(updated) => setBookings((current) => current.map((item) => item.id === updated.id ? updated : item))}
                     />
                   ))}
                 </div>
@@ -268,10 +286,12 @@ function BookingCard({
   booking,
   hotel,
   group,
+  onBookingUpdated,
 }: {
   booking: UserBooking;
   hotel?: Hotel;
   group: BookingGroup;
+  onBookingUpdated: (booking: UserBooking) => void;
 }) {
   const [requestsOpen, setRequestsOpen] = useState(false);
   const [requests, setRequests] = useState<GuestServiceRequest[]>([]);
@@ -279,6 +299,59 @@ function BookingCard({
   const [requestDetails, setRequestDetails] = useState("");
   const [requestBusy, setRequestBusy] = useState(false);
   const [requestMessage, setRequestMessage] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [editBusy, setEditBusy] = useState(false);
+  const [editMessage, setEditMessage] = useState("");
+  const [availabilityPreview, setAvailabilityPreview] = useState<{ state: "checking" | "available" | "unavailable" | "error"; message: string } | null>(null);
+  const [editForm, setEditForm] = useState({ checkInDate: dateOnly(booking.check_in_date), checkOutDate: dateOnly(booking.check_out_date), roomCount: booking.room_count, guestsCount: booking.guests_count, specialRequests: booking.special_requests || "" });
+  const [cancelBusy, setCancelBusy] = useState(false);
+
+  useEffect(() => {
+    if (editing) return;
+    setEditForm({ checkInDate: dateOnly(booking.check_in_date), checkOutDate: dateOnly(booking.check_out_date), roomCount: booking.room_count, guestsCount: booking.guests_count, specialRequests: booking.special_requests || "" });
+  }, [booking, editing]);
+
+  useEffect(() => {
+    if (!editing) {
+      setAvailabilityPreview(null);
+      return;
+    }
+
+    const start = Date.parse(`${editForm.checkInDate}T00:00:00Z`);
+    const end = Date.parse(`${editForm.checkOutDate}T00:00:00Z`);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start || end - start > 62 * 24 * 60 * 60 * 1000 || editForm.roomCount < 1) {
+      setAvailabilityPreview({ state: "error", message: "Enter a valid date range and room count to check availability." });
+      return;
+    }
+
+    setAvailabilityPreview({ state: "checking", message: "Checking availability for your dates…" });
+    let active = true;
+    const timer = window.setTimeout(async () => {
+      try {
+        const calendar = await api.getRoomAvailabilityCalendar(booking.room_type_id, editForm.checkInDate, editForm.checkOutDate);
+        if (!active) return;
+        const nights = calendar.days.filter((day) => day.date >= editForm.checkInDate && day.date < editForm.checkOutDate);
+        if (!nights.length) throw new Error("No nightly availability data was returned.");
+
+        const originalCheckIn = dateOnly(booking.check_in_date);
+        const originalCheckOut = dateOnly(booking.check_out_date);
+        const leastAvailable = Math.min(...nights.map((day) => {
+          const currentBookingOccupiesNight = day.date >= originalCheckIn && day.date < originalCheckOut;
+          return day.availableInventory + (currentBookingOccupiesNight ? booking.room_count : 0);
+        }));
+        setAvailabilityPreview(leastAvailable >= editForm.roomCount
+          ? { state: "available", message: `Available: at least ${leastAvailable} room${leastAvailable === 1 ? "" : "s"} for every night. Availability is checked again when you save.` }
+          : { state: "unavailable", message: `Only ${Math.max(0, leastAvailable)} room${leastAvailable === 1 ? " is" : "s are"} available for at least one night; you selected ${editForm.roomCount}. Try different dates or fewer rooms.` });
+      } catch {
+        if (active) setAvailabilityPreview({ state: "error", message: "Availability could not be checked right now. Saving will recheck the dates before changing your reservation." });
+      }
+    }, 350);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [booking, editForm.checkInDate, editForm.checkOutDate, editForm.roomCount, editing]);
 
   async function toggleRequests() {
     const open = !requestsOpen;
@@ -302,6 +375,38 @@ function BookingCard({
     } catch (error) {
       setRequestMessage(error instanceof Error ? error.message : "Could not send your request.");
     } finally { setRequestBusy(false); }
+  }
+
+  async function saveReservation(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setEditBusy(true);
+    setEditMessage("");
+    try {
+      const updated = await api.updateMyBooking(booking.id, editForm);
+      onBookingUpdated(updated);
+      setEditing(false);
+      setEditMessage("Reservation updated. Availability has been recalculated.");
+      window.dispatchEvent(new Event("stayease-reservations-updated"));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not update reservation.";
+      setEditMessage(message.includes("(405)") || message.includes("Method Not Allowed")
+        ? "The booking service currently running does not have reservation updates enabled. Restart or rebuild the booking-service, then try again."
+        : message);
+    }
+    finally { setEditBusy(false); }
+  }
+
+  async function cancelReservation() {
+    if (!window.confirm(`Cancel reservation ${booking.booking_code}? The dates will be released for other guests.`)) return;
+    setCancelBusy(true);
+    setEditMessage("");
+    try {
+      const result = await api.cancelBooking(booking.id);
+      onBookingUpdated(result);
+      setEditMessage("Reservation cancelled. The room inventory is available again.");
+      window.dispatchEvent(new Event("stayease-reservations-updated"));
+    } catch (error) { setEditMessage(error instanceof Error ? error.message : "Could not cancel reservation."); }
+    finally { setCancelBusy(false); }
   }
 
   const statusStyle = group === "cancelled"
@@ -394,6 +499,22 @@ function BookingCard({
               </li>)}</ul> : <p className="mt-2 text-[10px] text-muted">No requests yet.</p>}
             </div>
           </div>}
+        </div>
+      )}
+      {group === "upcoming" && ["CONFIRMED", "PENDING_PAYMENT"].includes(booking.status.toUpperCase()) && (
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          {booking.status.toUpperCase() === "CONFIRMED" && <button type="button" onClick={() => { setEditing((value) => !value); setEditMessage(""); }} className="text-[11px] font-semibold text-forest hover:underline">{editing ? "Close edit" : "Update reservation"}</button>}
+          <button type="button" onClick={() => void cancelReservation()} disabled={cancelBusy} className="text-[11px] font-semibold text-red-700 hover:underline disabled:opacity-50">{cancelBusy ? "Cancelling…" : "Cancel reservation"}</button>
+          {editMessage && <p role="status" className="basis-full text-[10px] text-muted">{editMessage}</p>}
+          {editing && <form onSubmit={(event) => void saveReservation(event)} className="grid w-full gap-3 rounded border border-line bg-mist/50 p-3 sm:grid-cols-2">
+            <label className="text-[10px] font-semibold">Check in<input type="date" required value={editForm.checkInDate} onChange={(event) => setEditForm((form) => ({ ...form, checkInDate: event.target.value }))} className="mt-1 block h-9 w-full rounded border border-line bg-white px-2 text-xs font-normal" /></label>
+            <label className="text-[10px] font-semibold">Check out<input type="date" required min={editForm.checkInDate} value={editForm.checkOutDate} onChange={(event) => setEditForm((form) => ({ ...form, checkOutDate: event.target.value }))} className="mt-1 block h-9 w-full rounded border border-line bg-white px-2 text-xs font-normal" /></label>
+            <label className="text-[10px] font-semibold">Rooms<input type="number" required min={1} max={20} value={editForm.roomCount} onChange={(event) => setEditForm((form) => ({ ...form, roomCount: Number(event.target.value) }))} className="mt-1 block h-9 w-full rounded border border-line bg-white px-2 text-xs font-normal" /></label>
+            <label className="text-[10px] font-semibold">Guests<input type="number" required min={1} max={100} value={editForm.guestsCount} onChange={(event) => setEditForm((form) => ({ ...form, guestsCount: Number(event.target.value) }))} className="mt-1 block h-9 w-full rounded border border-line bg-white px-2 text-xs font-normal" /></label>
+            <label className="text-[10px] font-semibold sm:col-span-2">Special requests<textarea maxLength={2000} value={editForm.specialRequests} onChange={(event) => setEditForm((form) => ({ ...form, specialRequests: event.target.value }))} className="mt-1 block w-full rounded border border-line bg-white px-2 py-2 text-xs font-normal" /></label>
+            {availabilityPreview && <p role="status" aria-live="polite" className={`rounded px-3 py-2 text-[10px] sm:col-span-2 ${availabilityPreview.state === "available" ? "bg-mint text-forest" : availabilityPreview.state === "unavailable" ? "bg-rose-50 text-rose-700" : "bg-white text-muted"}`}>{availabilityPreview.message}</p>}
+            <div className="flex items-center gap-3 sm:col-span-2"><button disabled={editBusy || availabilityPreview?.state === "unavailable"} className="rounded bg-forest px-3 py-2 text-[10px] font-semibold text-white disabled:opacity-50">{editBusy ? "Saving…" : availabilityPreview?.state === "checking" ? "Checking availability…" : "Save reservation"}</button><span className="text-[10px] text-muted">Availability is rechecked atomically when you save.</span></div>
+          </form>}
         </div>
       )}
     </Surface>

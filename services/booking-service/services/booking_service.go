@@ -28,9 +28,9 @@ const bookingCodeChars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 // Sentinel errors exposed to the controller layer.
 var (
 	ErrLockUnavailable = errors.New("room is being booked by another request, please retry")
-	ErrNoRoomsLeft     = errors.New("no rooms available for the requested dates and count")
 	ErrBookingNotFound = errors.New("booking not found")
 	ErrNotAuthorized   = errors.New("not authorised to perform this action")
+	ErrNoRoomsLeft     = repository.ErrNoRoomsLeft
 )
 
 type AvailabilityCalendarDay struct {
@@ -80,6 +80,28 @@ func NewBookingService(
 		hotelServiceURL: hotelServiceURL,
 		logger:          logger,
 	}
+}
+
+func (s *BookingService) recordBookingChange(ctx context.Context, eventType, title, message string, booking *models.Booking) {
+	if booking.UserID != nil {
+		if err := s.repo.CreateGuestNotification(ctx, *booking.UserID, &booking.ID, eventType, title, message); err != nil {
+			s.logger.Error("could not persist guest booking notification", "bookingID", booking.ID, "error", err)
+		}
+	}
+	if s.publisher == nil {
+		return
+	}
+	userID := ""
+	if booking.UserID != nil {
+		userID = booking.UserID.String()
+	}
+	event := BookingEvent{
+		EventType: eventType, BookingID: booking.ID.String(), BookingCode: booking.BookingCode, UserID: userID,
+		GuestEmail: booking.GuestEmail, GuestName: strings.TrimSpace(booking.GuestFirstName + " " + booking.GuestLastName),
+		HotelName: booking.HotelName, RoomType: booking.RoomTypeName, CheckIn: booking.CheckInDate.Format("2006-01-02"),
+		CheckOut: booking.CheckOutDate.Format("2006-01-02"), TotalPrice: booking.TotalPrice, Status: string(booking.Status), Message: message,
+	}
+	go func() { _ = s.publisher.Publish(context.Background(), eventType, event) }()
 }
 
 // HoldRoom serializes inventory decisions for a room type in PostgreSQL,
@@ -270,6 +292,7 @@ func (s *BookingService) HoldRoom(ctx context.Context, req *models.HoldBookingRe
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("commit transaction: %w", err)
 	}
+	s.recordBookingChange(ctx, "booking.held", "Reservation created", fmt.Sprintf("Your reservation %s was created and is awaiting payment.", booking.BookingCode), booking)
 
 	// Redis stores a convenience TTL; the PostgreSQL expiry timestamp remains authoritative.
 	if s.lock != nil {
@@ -278,30 +301,6 @@ func (s *BookingService) HoldRoom(ctx context.Context, req *models.HoldBookingRe
 			// Non-fatal: the DB record is authoritative; the hold is a convenience TTL.
 		}
 	}
-
-	// Step 4 — Publish booking.held event to RabbitMQ
-	if s.publisher != nil {
-		userIDStr := ""
-		if booking.UserID != nil {
-			userIDStr = booking.UserID.String()
-		}
-		go func() {
-			_ = s.publisher.Publish(context.Background(), "booking.held", BookingEvent{
-				EventType:   "booking.held",
-				BookingID:   booking.ID.String(),
-				BookingCode: booking.BookingCode,
-				UserID:      userIDStr,
-				GuestEmail:  booking.GuestEmail,
-				GuestName:   fmt.Sprintf("%s %s", booking.GuestFirstName, booking.GuestLastName),
-				HotelName:   booking.HotelName,
-				RoomType:    booking.RoomTypeName,
-				CheckIn:     booking.CheckInDate.Format("2006-01-02"),
-				CheckOut:    booking.CheckOutDate.Format("2006-01-02"),
-				TotalPrice:  booking.TotalPrice,
-			})
-		}()
-	}
-
 	remaining := int(time.Until(booking.ExpiresAt).Seconds())
 	return &models.HoldBookingResponse{
 		Booking:          booking,
@@ -409,62 +408,125 @@ func (s *BookingService) ConfirmBooking(ctx context.Context, bookingID uuid.UUID
 	}
 
 	booking.Status = models.StatusConfirmed
-
-	// Publish booking.confirmed event to RabbitMQ
-	if s.publisher != nil {
-		userIDStr := ""
-		if booking.UserID != nil {
-			userIDStr = booking.UserID.String()
-		}
-		go func() {
-			_ = s.publisher.Publish(context.Background(), "booking.confirmed", BookingEvent{
-				EventType:   "booking.confirmed",
-				BookingID:   booking.ID.String(),
-				BookingCode: booking.BookingCode,
-				UserID:      userIDStr,
-				GuestEmail:  booking.GuestEmail,
-				GuestName:   fmt.Sprintf("%s %s", booking.GuestFirstName, booking.GuestLastName),
-				HotelName:   booking.HotelName,
-				RoomType:    booking.RoomTypeName,
-				CheckIn:     booking.CheckInDate.Format("2006-01-02"),
-				CheckOut:    booking.CheckOutDate.Format("2006-01-02"),
-				TotalPrice:  booking.TotalPrice,
-			})
-		}()
-	}
+	s.recordBookingChange(ctx, "booking.confirmed", "Reservation confirmed", fmt.Sprintf("Your reservation %s is confirmed.", booking.BookingCode), booking)
 
 	return booking, nil
 }
 
 // CancelBooking transitions a booking to CANCELLED.
 // requesterID must match booking.UserID unless it is nil (guest checkout).
-func (s *BookingService) CancelBooking(ctx context.Context, bookingID uuid.UUID, requesterID *uuid.UUID) error {
+func (s *BookingService) CancelBooking(ctx context.Context, bookingID uuid.UUID, requesterID *uuid.UUID, hotelScope string, isStaff bool) (*models.Booking, error) {
 	booking, err := s.repo.GetBookingByID(ctx, bookingID)
 	if err != nil {
 		if errors.Is(err, repository.ErrBookingNotFound) {
-			return ErrBookingNotFound
+			return nil, ErrBookingNotFound
 		}
-		return err
+		return nil, err
 	}
 
-	// Authorisation: registered-user bookings can only be cancelled by the owner.
-	if booking.UserID != nil && requesterID != nil && *booking.UserID != *requesterID {
-		return ErrNotAuthorized
+	if isStaff {
+		if hotelScope != "" && booking.HotelID != hotelScope {
+			return nil, ErrNotAuthorized
+		}
+	} else if requesterID == nil || booking.UserID == nil || *booking.UserID != *requesterID {
+		return nil, ErrNotAuthorized
 	}
 
 	switch booking.Status {
 	case models.StatusCancelled, models.StatusExpired, models.StatusCheckedOut:
-		return fmt.Errorf("booking with status %q cannot be cancelled", booking.Status)
+		return nil, fmt.Errorf("booking with status %q cannot be cancelled", booking.Status)
 	case models.StatusCheckedIn:
-		return fmt.Errorf("cannot cancel a booking that is already checked-in")
+		return nil, fmt.Errorf("cannot cancel a booking that is already checked-in")
 	}
 
-	if err := s.repo.UpdateStatus(ctx, bookingID, models.StatusCancelled); err != nil {
-		return err
+	var owner *uuid.UUID
+	if !isStaff {
+		owner = requesterID
+	}
+	booking, err = s.repo.CancelBooking(ctx, bookingID, owner, hotelScope)
+	if err != nil {
+		if errors.Is(err, repository.ErrBookingNotFound) {
+			return nil, ErrBookingNotFound
+		}
+		return nil, err
 	}
 
-	_ = s.lock.RemoveHold(ctx, bookingID.String())
-	return nil
+	if s.lock != nil {
+		_ = s.lock.RemoveHold(ctx, bookingID.String())
+	}
+	s.recordBookingChange(ctx, "booking.cancelled", "Reservation cancelled", fmt.Sprintf("Your reservation %s has been cancelled.", booking.BookingCode), booking)
+	return booking, nil
+}
+
+func (s *BookingService) UpdateGuestBooking(ctx context.Context, bookingID, requesterID uuid.UUID, input *models.UpdateBookingRequest) (*models.Booking, error) {
+	booking, err := s.repo.GetBookingByID(ctx, bookingID)
+	if err != nil {
+		return nil, ErrBookingNotFound
+	}
+	if booking.UserID == nil || *booking.UserID != requesterID {
+		return nil, ErrNotAuthorized
+	}
+	if booking.Status != models.StatusConfirmed {
+		return nil, fmt.Errorf("only confirmed reservations can be updated")
+	}
+	if input.CheckInDate != nil {
+		booking.CheckInDate, err = time.Parse("2006-01-02", strings.TrimSpace(*input.CheckInDate))
+		if err != nil {
+			return nil, fmt.Errorf("checkInDate must use YYYY-MM-DD")
+		}
+	}
+	if input.CheckOutDate != nil {
+		booking.CheckOutDate, err = time.Parse("2006-01-02", strings.TrimSpace(*input.CheckOutDate))
+		if err != nil {
+			return nil, fmt.Errorf("checkOutDate must use YYYY-MM-DD")
+		}
+	}
+	if !booking.CheckOutDate.After(booking.CheckInDate) || booking.CheckOutDate.Sub(booking.CheckInDate) > 365*24*time.Hour {
+		return nil, fmt.Errorf("stay dates must be valid and no longer than 365 nights")
+	}
+	if input.RoomCount != nil {
+		booking.RoomCount = *input.RoomCount
+	}
+	if input.GuestsCount != nil {
+		booking.GuestsCount = *input.GuestsCount
+	}
+	if booking.RoomCount < 1 || booking.RoomCount > 20 || booking.GuestsCount < 1 || booking.GuestsCount > 100 {
+		return nil, fmt.Errorf("room or guest count is outside the supported range")
+	}
+	if input.GuestFirstName != nil {
+		booking.GuestFirstName = strings.TrimSpace(*input.GuestFirstName)
+	}
+	if input.GuestLastName != nil {
+		booking.GuestLastName = strings.TrimSpace(*input.GuestLastName)
+	}
+	if input.GuestPhone != nil {
+		booking.GuestPhone = strings.TrimSpace(*input.GuestPhone)
+	}
+	if input.SpecialRequests != nil {
+		booking.SpecialRequests = strings.TrimSpace(*input.SpecialRequests)
+	}
+	if len(booking.GuestFirstName) > 64 || len(booking.GuestLastName) > 64 || len(booking.GuestPhone) > 32 || len(booking.SpecialRequests) > 2000 {
+		return nil, fmt.Errorf("one or more reservation fields are too long")
+	}
+	nights := int(booking.CheckOutDate.Sub(booking.CheckInDate).Hours() / 24)
+	booking.TotalNights = nights
+	inventory, _, capacity, err := s.fetchInventory(ctx, booking.RoomTypeID)
+	if err != nil {
+		return nil, fmt.Errorf("inventory check: %w", err)
+	}
+	if capacity > 0 && booking.GuestsCount > capacity*booking.RoomCount {
+		return nil, fmt.Errorf("guest count exceeds this room's capacity")
+	}
+	booking.TaxesAndFees = math.Round(booking.RoomPricePerNight*float64(nights)*float64(booking.RoomCount)*0.12*100) / 100
+	booking.TotalPrice = booking.RoomPricePerNight*float64(nights)*float64(booking.RoomCount) + booking.TaxesAndFees
+	if err := s.repo.UpdateGuestBooking(ctx, booking, requesterID, inventory); err != nil {
+		if errors.Is(err, repository.ErrNoRoomsLeft) {
+			return nil, ErrNoRoomsLeft
+		}
+		return nil, err
+	}
+	s.recordBookingChange(ctx, "booking.updated", "Reservation updated", fmt.Sprintf("Your reservation %s was updated to %s – %s.", booking.BookingCode, booking.CheckInDate.Format("2 Jan 2006"), booking.CheckOutDate.Format("2 Jan 2006")), booking)
+	return booking, nil
 }
 
 // ExpireStaleBookings is meant to be called on a periodic schedule (e.g. every minute).
@@ -558,6 +620,14 @@ func (s *BookingService) ListAllGuestServiceRequests(ctx context.Context, hotelI
 
 func (s *BookingService) UpdateGuestServiceRequestStatus(ctx context.Context, id uuid.UUID, status, hotelID string) (*models.GuestServiceRequest, error) {
 	return s.repo.UpdateGuestServiceRequestStatus(ctx, id, status, hotelID)
+}
+
+func (s *BookingService) GetGuestNotifications(ctx context.Context, userID uuid.UUID) ([]*models.GuestNotification, error) {
+	return s.repo.ListGuestNotifications(ctx, userID)
+}
+
+func (s *BookingService) MarkGuestNotificationRead(ctx context.Context, id, userID uuid.UUID) error {
+	return s.repo.MarkGuestNotificationRead(ctx, id, userID)
 }
 
 func (s *BookingService) GetUserBookings(ctx context.Context, userID uuid.UUID) ([]*models.Booking, error) {

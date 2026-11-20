@@ -111,16 +111,88 @@ func (c *BookingController) CancelBooking(w http.ResponseWriter, r *http.Request
 			requesterID = &uid
 		}
 	}
-
-	if err := c.bookingService.CancelBooking(r.Context(), bookingID, requesterID); err != nil {
+	role, _ := r.Context().Value(middleware.UserRoleKey).(string)
+	hotelScope, _ := r.Context().Value(middleware.UserHotelIDKey).(string)
+	if role != "CUSTOMER" && role != "ADMIN" && hotelScope == "" {
+		http.Error(w, `{"success":false,"message":"Your staff account is not assigned to a hotel"}`, http.StatusForbidden)
+		return
+	}
+	booking, err := c.bookingService.CancelBooking(r.Context(), bookingID, requesterID, hotelScope, role != "CUSTOMER")
+	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
+		status := http.StatusBadRequest
+		if errors.Is(err, services.ErrNotAuthorized) {
+			status = http.StatusForbidden
+		}
+		if errors.Is(err, services.ErrBookingNotFound) {
+			status = http.StatusNotFound
+		}
+		w.WriteHeader(status)
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "message": err.Error()})
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "message": "Booking cancelled successfully"})
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "message": "Booking cancelled successfully", "data": booking})
+}
+
+func (c *BookingController) UpdateMyBooking(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(uuid.UUID)
+	bookingID, err := uuid.Parse(chi.URLParam(r, "id"))
+	var input models.UpdateBookingRequest
+	if !ok || err != nil || json.NewDecoder(r.Body).Decode(&input) != nil {
+		http.Error(w, `{"success":false,"message":"Invalid reservation update"}`, http.StatusBadRequest)
+		return
+	}
+	booking, err := c.bookingService.UpdateGuestBooking(r.Context(), bookingID, userID, &input)
+	if err != nil {
+		status := http.StatusBadRequest
+		if errors.Is(err, services.ErrNoRoomsLeft) {
+			status = http.StatusConflict
+		}
+		if errors.Is(err, services.ErrNotAuthorized) {
+			status = http.StatusForbidden
+		}
+		if errors.Is(err, services.ErrBookingNotFound) {
+			status = http.StatusNotFound
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(status)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "message": err.Error()})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "data": booking})
+}
+
+func (c *BookingController) ListMyNotifications(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(uuid.UUID)
+	if !ok {
+		http.Error(w, `{"success":false,"message":"Authentication required"}`, http.StatusUnauthorized)
+		return
+	}
+	items, err := c.bookingService.GetGuestNotifications(r.Context(), userID)
+	if err != nil {
+		http.Error(w, `{"success":false,"message":"Could not load notifications"}`, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "data": items})
+}
+
+func (c *BookingController) MarkMyNotificationRead(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(uuid.UUID)
+	notificationID, err := uuid.Parse(chi.URLParam(r, "notificationId"))
+	if !ok || err != nil {
+		http.Error(w, `{"success":false,"message":"Invalid notification"}`, http.StatusBadRequest)
+		return
+	}
+	if err := c.bookingService.MarkGuestNotificationRead(r.Context(), notificationID, userID); err != nil {
+		http.Error(w, `{"success":false,"message":"Could not update notification"}`, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
 func (c *BookingController) GetBookingByID(w http.ResponseWriter, r *http.Request) {

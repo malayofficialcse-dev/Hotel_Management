@@ -64,6 +64,27 @@ type GuestServiceRequest struct {
 	CheckOut    time.Time `json:"checkOut,omitempty"`
 }
 
+type UpdateBookingRequest struct {
+	CheckInDate     *string `json:"checkInDate"`
+	CheckOutDate    *string `json:"checkOutDate"`
+	GuestsCount     *int    `json:"guestsCount"`
+	RoomCount       *int    `json:"roomCount"`
+	GuestFirstName  *string `json:"guestFirstName"`
+	GuestLastName   *string `json:"guestLastName"`
+	GuestPhone      *string `json:"guestPhone"`
+	SpecialRequests *string `json:"specialRequests"`
+}
+
+type GuestNotification struct {
+	ID        uuid.UUID  `json:"id"`
+	BookingID *uuid.UUID `json:"bookingId,omitempty"`
+	EventType string     `json:"eventType"`
+	Title     string     `json:"title"`
+	Message   string     `json:"message"`
+	CreatedAt time.Time  `json:"createdAt"`
+	ReadAt    *time.Time `json:"readAt,omitempty"`
+}
+
 // HoldBookingRequest is the inbound payload for the hold-room endpoint.
 type HoldBookingRequest struct {
 	HotelID            string  `json:"hotel_id"`

@@ -6,6 +6,10 @@ import (
 
 func RenderTemplate(templateName string, params map[string]interface{}) (string, string) {
 	switch templateName {
+	case "BOOKING_UPDATED":
+		return "StayEase Reservation Updated", fmt.Sprintf("Dear %v, reservation %v at %v has changed. %v", params["guestName"], params["bookingCode"], params["hotelName"], params["message"])
+	case "BOOKING_CANCELLED":
+		return "StayEase Reservation Cancelled", fmt.Sprintf("Dear %v, reservation %v at %v has been cancelled. %v", params["guestName"], params["bookingCode"], params["hotelName"], params["message"])
 	case "BOOKING_CONFIRMED":
 		subject := "StayEase Booking Confirmation"
 		body := fmt.Sprintf("Dear %v, your booking (%v) for %v is confirmed! Check-in: %v. Total: ₹%v.",
@@ -25,4 +29,3 @@ func RenderTemplate(templateName string, params map[string]interface{}) (string,
 		return "StayEase Notification", fmt.Sprintf("Notification: %v", params)
 	}
 }
-

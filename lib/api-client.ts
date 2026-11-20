@@ -154,6 +154,7 @@ export interface UserBooking {
   room_count: number;
   total_price: number;
   status: string;
+  special_requests?: string;
   created_at: string;
 }
 
@@ -172,6 +173,16 @@ export interface GuestServiceRequest {
   guestEmail?: string;
   checkIn?: string;
   checkOut?: string;
+}
+
+export interface UserNotification {
+  id: string;
+  bookingId?: string;
+  eventType: string;
+  title: string;
+  message: string;
+  createdAt: string;
+  readAt?: string | null;
 }
 
 export interface AdminOffer {
@@ -296,6 +307,12 @@ function getUser(): UserSession | null {
   } catch {
     return null;
   }
+}
+
+function publishReservationChange() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event("stayease-reservations-updated"));
+  try { window.localStorage.setItem("stayease-reservations-updated-at", String(Date.now())); } catch { /* The focused tab still refreshes from the custom event. */ }
 }
 
 function getAdminDataScope() {
@@ -593,6 +610,7 @@ export const api = {
           special_requests: payload.specialRequests,
         }),
       });
+      publishReservationChange();
       return {
         success: true as const,
         data: {
@@ -607,7 +625,7 @@ export const api = {
       return { success: false as const, message: error instanceof Error ? error.message : "Booking request failed" };
     }
   },
-  confirmBooking(bookingId: string) { return request<{ success: boolean }>(`/bookings/${bookingId}/confirm`, { method: "POST" }).then(() => true).catch(() => false); },
+  confirmBooking(bookingId: string) { return request<{ success: boolean }>(`/bookings/${bookingId}/confirm`, { method: "POST" }).then(() => { publishReservationChange(); return true; }).catch(() => false); },
   async getBookingByCode(code: string) {
     try {
       const res = await request<any>(`/bookings/code?code=${encodeURIComponent(code)}`);
@@ -624,6 +642,10 @@ export const api = {
   getMyBookings() {
     return request<{ bookings: UserBooking[]; total: number }>("/bookings/mine");
   },
+  async updateMyBooking(bookingId: string, data: Record<string, unknown>) { const result = await request<UserBooking>(`/bookings/${encodeURIComponent(bookingId)}`, { method: "PATCH", body: JSON.stringify(data) }); publishReservationChange(); return result; },
+  async cancelBooking(bookingId: string) { const result = await request<UserBooking>(`/bookings/${encodeURIComponent(bookingId)}/cancel`, { method: "POST", body: JSON.stringify({}) }); publishReservationChange(); return result; },
+  getMyNotifications() { return request<UserNotification[]>("/bookings/notifications/mine"); },
+  markNotificationRead(notificationId: string) { return request<{ success: boolean }>(`/bookings/notifications/${encodeURIComponent(notificationId)}/read`, { method: "PATCH", body: JSON.stringify({}) }); },
   getPaymentByBookingCode(code: string) {
     return request<any>(`/payments/lookup?code=${encodeURIComponent(code)}`);
   },

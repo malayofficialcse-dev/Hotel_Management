@@ -30,6 +30,8 @@ type BookingEvent struct {
 	CheckIn     string    `json:"check_in"`
 	CheckOut    string    `json:"check_out"`
 	TotalPrice  float64   `json:"total_price"`
+	Status      string    `json:"status,omitempty"`
+	Message     string    `json:"message,omitempty"`
 	Timestamp   time.Time `json:"timestamp"`
 }
 
@@ -114,4 +116,3 @@ func (p *RabbitMQPublisher) Close() {
 		p.conn.Close()
 	}
 }
-

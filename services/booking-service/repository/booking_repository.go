@@ -15,6 +15,7 @@ import (
 
 // ErrBookingNotFound is returned when a lookup yields no rows.
 var ErrBookingNotFound = errors.New("booking not found")
+var ErrNoRoomsLeft = errors.New("no rooms available for the requested dates and count")
 
 // BookingRepository handles all PostgreSQL operations for the bookings table.
 type BookingRepository struct {
@@ -242,6 +243,90 @@ func (r *BookingRepository) GetOverlappingCount(
 		err = r.db.QueryRow(ctx, q, roomTypeID, checkIn, checkOut).Scan(&count)
 	}
 	return count, err
+}
+
+func (r *BookingRepository) GetOverlappingCountExcluding(ctx context.Context, tx pgx.Tx, roomTypeID string, checkIn, checkOut time.Time, excludeID uuid.UUID) (int, error) {
+	const q = `SELECT COALESCE(MAX(booked), 0) FROM (
+		SELECT day::date, COALESCE(SUM(b.room_count), 0)::int AS booked
+		FROM generate_series($2::date, $3::date - 1, interval '1 day') AS dates(day)
+		LEFT JOIN bookings b ON b.room_type_id = $1 AND b.id <> $4
+		AND b.check_in_date <= day::date AND b.check_out_date > day::date
+		AND (b.status IN ('CONFIRMED','CHECKED_IN') OR (b.status = 'PENDING_PAYMENT' AND b.expires_at > NOW()))
+		GROUP BY day::date) nightly_inventory`
+	var count int
+	if err := tx.QueryRow(ctx, q, roomTypeID, checkIn, checkOut, excludeID).Scan(&count); err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+func (r *BookingRepository) UpdateGuestBooking(ctx context.Context, booking *models.Booking, userID uuid.UUID, inventory int) error {
+	tx, err := r.BeginTx(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if err := r.LockRoomType(ctx, tx, booking.RoomTypeID); err != nil {
+		return err
+	}
+	overlap, err := r.GetOverlappingCountExcluding(ctx, tx, booking.RoomTypeID, booking.CheckInDate, booking.CheckOutDate, booking.ID)
+	if err != nil {
+		return err
+	}
+	if inventory-overlap < booking.RoomCount {
+		return ErrNoRoomsLeft
+	}
+	command, err := tx.Exec(ctx, `UPDATE bookings SET check_in_date=$1, check_out_date=$2, total_nights=$3, guests_count=$4, room_count=$5,
+		guest_first_name=$6, guest_last_name=$7, guest_phone=$8, special_requests=$9,
+		room_price_per_night=$10, taxes_and_fees=$11, total_price=$12, updated_at=NOW()
+		WHERE id=$13 AND user_id=$14 AND status='CONFIRMED'`, booking.CheckInDate, booking.CheckOutDate, booking.TotalNights,
+		booking.GuestsCount, booking.RoomCount, booking.GuestFirstName, booking.GuestLastName, booking.GuestPhone,
+		booking.SpecialRequests, booking.RoomPricePerNight, booking.TaxesAndFees, booking.TotalPrice, booking.ID, userID)
+	if err != nil {
+		return err
+	}
+	if command.RowsAffected() == 0 {
+		return ErrBookingNotFound
+	}
+	return tx.Commit(ctx)
+}
+
+func (r *BookingRepository) CancelBooking(ctx context.Context, id uuid.UUID, userID *uuid.UUID, hotelID string) (*models.Booking, error) {
+	whereOwner := userID != nil
+	query := `UPDATE bookings SET status='CANCELLED', updated_at=NOW() WHERE id=$1
+		AND status IN ('PENDING_PAYMENT','CONFIRMED') AND ($2::uuid IS NULL OR user_id=$2)
+		AND ($3='' OR hotel_id=$3) RETURNING ` + bookingColumns
+	if whereOwner {
+		return scanBooking(r.db.QueryRow(ctx, query, id, *userID, hotelID))
+	}
+	return scanBooking(r.db.QueryRow(ctx, query, id, nil, hotelID))
+}
+
+func (r *BookingRepository) CreateGuestNotification(ctx context.Context, userID uuid.UUID, bookingID *uuid.UUID, eventType, title, message string) error {
+	_, err := r.db.Exec(ctx, `INSERT INTO guest_notifications (id,user_id,booking_id,event_type,title,message) VALUES ($1,$2,$3,$4,$5,$6)`, uuid.New(), userID, bookingID, eventType, title, message)
+	return err
+}
+
+func (r *BookingRepository) ListGuestNotifications(ctx context.Context, userID uuid.UUID) ([]*models.GuestNotification, error) {
+	rows, err := r.db.Query(ctx, `SELECT id,booking_id,event_type,title,message,created_at,read_at FROM guest_notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 100`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := make([]*models.GuestNotification, 0)
+	for rows.Next() {
+		item := &models.GuestNotification{}
+		if err := rows.Scan(&item.ID, &item.BookingID, &item.EventType, &item.Title, &item.Message, &item.CreatedAt, &item.ReadAt); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
+func (r *BookingRepository) MarkGuestNotificationRead(ctx context.Context, id, userID uuid.UUID) error {
+	_, err := r.db.Exec(ctx, `UPDATE guest_notifications SET read_at=COALESCE(read_at,NOW()) WHERE id=$1 AND user_id=$2`, id, userID)
+	return err
 }
 
 // LockRoomType serializes inventory decisions for a room type across every

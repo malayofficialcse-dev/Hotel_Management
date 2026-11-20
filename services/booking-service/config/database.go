@@ -56,6 +56,22 @@ func InitDB(databaseURL string) (*pgxpool.Pool, error) {
 		`
 	}
 	_, _ = pool.Exec(ctx, schema)
+	if _, err := pool.Exec(ctx, `
+		CREATE TABLE IF NOT EXISTS guest_notifications (
+			id UUID PRIMARY KEY,
+			user_id UUID NOT NULL,
+			booking_id UUID,
+			event_type VARCHAR(40) NOT NULL,
+			title VARCHAR(120) NOT NULL,
+			message VARCHAR(500) NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			read_at TIMESTAMPTZ
+		);
+		CREATE INDEX IF NOT EXISTS idx_guest_notifications_user ON guest_notifications (user_id, created_at DESC);
+	`); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("initialize guest notifications schema: %w", err)
+	}
 
 	return pool, nil
 }

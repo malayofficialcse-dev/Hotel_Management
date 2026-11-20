@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FigmaIcon } from "@/components/figma-icon";
-import { api, type UserSession } from "@/lib/api-client";
+import { api, type UserNotification, type UserSession } from "@/lib/api-client";
 
 type SiteHeaderProps = {
   active?: "explore" | "bookings" | "wishlist";
@@ -20,6 +20,8 @@ const navItems = [
 export function SiteHeader({ active = "explore" }: SiteHeaderProps) {
   const router = useRouter();
   const [user, setUser] = useState<UserSession | null>(null);
+  const [notifications, setNotifications] = useState<UserNotification[]>([]);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
 
   useEffect(() => {
     const syncUser = () => {
@@ -29,6 +31,36 @@ export function SiteHeader({ active = "explore" }: SiteHeaderProps) {
     window.addEventListener("stayease-user-updated", syncUser);
     return () => window.removeEventListener("stayease-user-updated", syncUser);
   }, []);
+
+  useEffect(() => {
+    if (!user || !api.getToken()) { setNotifications([]); return; }
+    let active = true;
+    let notificationsRouteMissing = false;
+    const syncNotifications = async () => {
+      if (!active || notificationsRouteMissing) return;
+      try {
+        const rows = await api.getMyNotifications();
+        if (active) setNotifications(rows);
+      } catch (error) {
+        // An older running booking-service may not have the notifications route yet.
+        // Stop hammering that known-missing route until the page is reloaded after deployment.
+        if (error instanceof Error && error.message.includes("(404)")) notificationsRouteMissing = true;
+      }
+    };
+    void syncNotifications();
+    const timer = window.setInterval(() => void syncNotifications(), 5000);
+    window.addEventListener("focus", syncNotifications);
+    window.addEventListener("stayease-reservations-updated", syncNotifications);
+    const handleStorage = (event: StorageEvent) => { if (event.key === "stayease-reservations-updated-at") void syncNotifications(); };
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", syncNotifications);
+      window.removeEventListener("stayease-reservations-updated", syncNotifications);
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, [user]);
 
   function handleLogout() {
     api.logout();
@@ -77,9 +109,20 @@ export function SiteHeader({ active = "explore" }: SiteHeaderProps) {
           <button type="button" className="hidden sm:block text-muted hover:text-ink">
             INR ₹
           </button>
-          <button type="button" aria-label="Notifications" className="hidden sm:block text-muted hover:text-ink">
-            <FigmaIcon name="bell" className="h-[17px] w-[17px]" />
-          </button>
+          {user && <div className="relative hidden sm:block">
+            <button type="button" aria-label="Notifications" aria-expanded={notificationsOpen} onClick={() => setNotificationsOpen((open) => !open)} className="relative text-muted hover:text-ink">
+              <FigmaIcon name="bell" className="h-[17px] w-[17px]" />
+              {notifications.some((item) => !item.readAt) && <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-forest px-1 text-[9px] font-bold text-white">{notifications.filter((item) => !item.readAt).length}</span>}
+            </button>
+            {notificationsOpen && <div className="absolute right-0 top-8 z-50 w-[min(360px,90vw)] overflow-hidden rounded-lg border border-line bg-white shadow-xl">
+              <div className="flex items-center justify-between border-b border-line px-4 py-3"><strong className="text-xs">Notifications</strong><button type="button" onClick={() => setNotificationsOpen(false)} className="text-[10px] text-muted hover:text-forest">Close</button></div>
+              <div className="max-h-80 overflow-y-auto">
+                {notifications.length ? notifications.map((item) => <button key={item.id} type="button" onClick={async () => { if (!item.readAt) { await api.markNotificationRead(item.id).catch(() => undefined); setNotifications((rows) => rows.map((row) => row.id === item.id ? { ...row, readAt: new Date().toISOString() } : row)); } setNotificationsOpen(false); router.push("/bookings"); }} className={`block w-full border-b border-line px-4 py-3 text-left hover:bg-mist ${item.readAt ? "bg-white" : "bg-mint/30"}`}>
+                  <span className="block text-xs font-semibold text-charcoal">{item.title}</span><span className="mt-1 block text-[10px] leading-4 text-muted">{item.message}</span><span className="mt-1 block text-[9px] text-muted">{new Date(item.createdAt).toLocaleString("en-IN")}</span>
+                </button>) : <p className="px-4 py-6 text-center text-xs text-muted">You’re all caught up.</p>}
+              </div>
+            </div>}
+          </div>}
 
           {user ? (
             <div className="flex items-center gap-2 pl-2">

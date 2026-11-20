@@ -88,6 +88,8 @@ export default function HomePage() {
   const [checkOutDate, setCheckOutDate] = useState("");
   const [minimumDate, setMinimumDate] = useState("");
   const [searchedDates, setSearchedDates] = useState<{ checkIn: string; checkOut: string } | null>(null);
+  const [searchedRoomCount, setSearchedRoomCount] = useState(1);
+  const [searchedGuestCount, setSearchedGuestCount] = useState(2);
   const [guestCount, setGuestCount] = useState(2);
   const [roomCount, setRoomCount] = useState(1);
   const [sort, setSort] = useState("Recommended");
@@ -242,30 +244,37 @@ export default function HomePage() {
     return result;
   }, [catalog, searched, sort, minimumPrice, maximumPrice, priceBounds, rating, selectedAmenities, selectedCategories, availabilityByHotel]);
 
-  async function handleSearch(event: FormEvent<HTMLFormElement>) {
+  async function handleSearch(event: FormEvent<HTMLFormElement>, silentRefresh = false) {
     event.preventDefault();
-    if (!checkInDate || !checkOutDate || checkOutDate <= checkInDate) {
+    const requestedCheckIn = silentRefresh ? searchedDates?.checkIn || checkInDate : checkInDate;
+    const requestedCheckOut = silentRefresh ? searchedDates?.checkOut || checkOutDate : checkOutDate;
+    const roomsNeeded = silentRefresh ? searchedRoomCount : roomCount;
+    const totalGuests = silentRefresh ? searchedGuestCount : guestCount;
+    if (!requestedCheckIn || !requestedCheckOut || requestedCheckOut <= requestedCheckIn) {
       setSearchError("Choose a check-out date after check-in.");
       return;
     }
 
     const requestId = ++searchRequestId.current;
-    setSearched(query.trim());
-    setSearchedDates({ checkIn: checkInDate, checkOut: checkOutDate });
-    setAvailabilityByHotel(null);
+    if (!silentRefresh) {
+      setSearched(query.trim());
+      setSearchedDates({ checkIn: requestedCheckIn, checkOut: requestedCheckOut });
+      setSearchedRoomCount(roomsNeeded);
+      setSearchedGuestCount(totalGuests);
+      setAvailabilityByHotel(null);
+      document.getElementById("stays")?.scrollIntoView({ behavior: "smooth" });
+      setAvailabilityLoading(true);
+    }
     setAvailabilityError("");
     setSearchError("");
-    setAvailabilityLoading(true);
-    document.getElementById("stays")?.scrollIntoView({ behavior: "smooth" });
 
-    const roomsNeeded = roomCount;
-    const guestsPerRoom = Math.ceil(guestCount / roomsNeeded);
+    const guestsPerRoom = Math.ceil(totalGuests / roomsNeeded);
     try {
       const results = await Promise.allSettled(catalog.map(async (hotel) => {
         const rooms = await api.getRoomsForHotel(hotel.id);
         const suitableRooms = rooms.filter((room) => room.isActive && room.capacity >= guestsPerRoom);
         const checks = await Promise.allSettled(suitableRooms.map((room) =>
-          api.getRoomAvailability(room._id, checkInDate, checkOutDate, roomsNeeded),
+          api.getRoomAvailability(room._id, requestedCheckIn, requestedCheckOut, roomsNeeded),
         ));
         if (checks.some((check) => check.status === "fulfilled" && check.value.isAvailable)) return true;
         if (checks.some((check) => check.status === "rejected")) {
@@ -291,9 +300,27 @@ export default function HomePage() {
         setAvailabilityError(error instanceof Error ? error.message : "Could not check room availability.");
       }
     } finally {
-      if (requestId === searchRequestId.current) setAvailabilityLoading(false);
+      if (!silentRefresh && requestId === searchRequestId.current) setAvailabilityLoading(false);
     }
   }
+
+  useEffect(() => {
+    if (!searchedDates) return;
+    const refreshAvailability = () => {
+      void handleSearch({ preventDefault() {} } as FormEvent<HTMLFormElement>, true);
+    };
+    const storageSync = (event: StorageEvent) => {
+      if (event.key === "stayease-reservations-updated-at") refreshAvailability();
+    };
+    const timer = window.setInterval(refreshAvailability, 10000);
+    window.addEventListener("stayease-reservations-updated", refreshAvailability);
+    window.addEventListener("storage", storageSync);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("stayease-reservations-updated", refreshAvailability);
+      window.removeEventListener("storage", storageSync);
+    };
+  }, [searchedDates, searchedRoomCount, searchedGuestCount, catalog]);
 
   function resetAll() {
     searchRequestId.current++;

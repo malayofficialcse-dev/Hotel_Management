@@ -264,6 +264,29 @@ export function AdminWorkspace({ section }: { section: AdminSection }) {
     return () => { active = false; };
   }, [section, live, content.title]);
 
+  useEffect(() => {
+    if (!live || section === "reservations") return;
+    let active = true;
+    const syncSection = async () => {
+      try {
+        const rows = await loadLiveRecords(section);
+        if (active && rows) setRecords(rows);
+      } catch { /* Preserve the current rows if a background refresh fails. */ }
+    };
+    const timer = window.setInterval(() => void syncSection(), 5000);
+    window.addEventListener("focus", syncSection);
+    window.addEventListener("stayease-reservations-updated", syncSection);
+    const handleStorage = (event: StorageEvent) => { if (event.key === "stayease-reservations-updated-at") void syncSection(); };
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", syncSection);
+      window.removeEventListener("stayease-reservations-updated", syncSection);
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, [section, live]);
+
   const filtered = useMemo(
     () => records.filter((row) => `${row.id} ${row.name} ${row.detail} ${row.status}`.toLowerCase().includes(query.toLowerCase())),
     [records, query],
@@ -1323,25 +1346,28 @@ function Dashboard() {
 
   useEffect(() => {
     let active = true;
-    Promise.allSettled([
-      api.getAdminHotels(),
-      api.getAdminRooms(),
-      api.getAdminEmployees(),
-      api.getAdminHousekeepingTasks(),
-      api.getAdminReservations(),
-    ]).then(([hotelResult, roomResult, employeeResult, taskResult, reservationResult]) => {
-      if (!active) return;
-      const failures = [hotelResult, roomResult, employeeResult, taskResult, reservationResult].filter((result) => result.status === "rejected");
-      setOverview({
-        hotels: hotelResult.status === "fulfilled" ? hotelResult.value : null,
-        rooms: roomResult.status === "fulfilled" ? roomResult.value : null,
-        employees: employeeResult.status === "fulfilled" ? employeeResult.value : null,
-        tasks: taskResult.status === "fulfilled" ? taskResult.value : null,
-        reservations: reservationResult.status === "fulfilled" ? reservationResult.value.bookings : null,
+    const refreshOverview = () => {
+      void Promise.allSettled([
+        api.getAdminHotels(), api.getAdminRooms(), api.getAdminEmployees(),
+        api.getAdminHousekeepingTasks(), api.getAdminReservations(),
+      ]).then(([hotelResult, roomResult, employeeResult, taskResult, reservationResult]) => {
+        if (!active) return;
+        const failures = [hotelResult, roomResult, employeeResult, taskResult, reservationResult].filter((result) => result.status === "rejected");
+        setOverview({
+          hotels: hotelResult.status === "fulfilled" ? hotelResult.value : null,
+          rooms: roomResult.status === "fulfilled" ? roomResult.value : null,
+          employees: employeeResult.status === "fulfilled" ? employeeResult.value : null,
+          tasks: taskResult.status === "fulfilled" ? taskResult.value : null,
+          reservations: reservationResult.status === "fulfilled" ? reservationResult.value.bookings : null,
+        });
+        if (failures.length) setNotice(`${failures.length} dashboard service${failures.length === 1 ? "" : "s"} could not be reached.`);
       });
-      if (failures.length) setNotice(`${failures.length} dashboard service${failures.length === 1 ? "" : "s"} could not be reached.`);
-    });
-    return () => { active = false; };
+    };
+    refreshOverview();
+    const timer = window.setInterval(refreshOverview, 5000);
+    window.addEventListener("focus", refreshOverview);
+    window.addEventListener("stayease-reservations-updated", refreshOverview);
+    return () => { active = false; window.clearInterval(timer); window.removeEventListener("focus", refreshOverview); window.removeEventListener("stayease-reservations-updated", refreshOverview); };
   }, []);
 
   const dashboardCards = [

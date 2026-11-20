@@ -38,6 +38,7 @@ export function ReservationsWorkspace() {
   const [loadFailed, setLoadFailed] = useState(false);
   const [notice, setNotice] = useState("");
   const [selectedCodes, setSelectedCodes] = useState<Set<string>>(new Set());
+  const [cancellingCode, setCancellingCode] = useState("");
 
   // Filter States (All Multiple Selection)
   const [searchQuery, setSearchQuery] = useState("");
@@ -134,6 +135,42 @@ export function ReservationsWorkspace() {
   useEffect(() => {
     void loadData();
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    const syncReservations = async () => {
+      try {
+        const result = await api.getAdminReservations();
+        if (active) setBookings(result.bookings || []);
+      } catch { /* Keep the last loaded list while the booking service is unavailable. */ }
+    };
+    const timer = window.setInterval(() => void syncReservations(), 5000);
+    window.addEventListener("focus", syncReservations);
+    window.addEventListener("stayease-reservations-updated", syncReservations);
+    const handleStorage = (event: StorageEvent) => { if (event.key === "stayease-reservations-updated-at") void syncReservations(); };
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", syncReservations);
+      window.removeEventListener("stayease-reservations-updated", syncReservations);
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, []);
+
+  async function cancelReservation(row: AdminBooking) {
+    if (!window.confirm(`Cancel reservation ${row.booking_code}? Its dates will be released from inventory.`)) return;
+    setCancellingCode(row.booking_code);
+    setNotice("");
+    try {
+      await api.cancelBooking(row.id);
+      await loadData();
+      setNotice(`Reservation ${row.booking_code} cancelled and inventory released.`);
+      window.dispatchEvent(new Event("stayease-reservations-updated"));
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not cancel reservation.");
+    } finally { setCancellingCode(""); }
+  }
 
   // Distinct Filter Option Lists
   const distinctHotels = useMemo(() => {
@@ -1335,6 +1372,7 @@ export function ReservationsWorkspace() {
                               <span>Bill</span>
                             </Link>
                           )}
+                          {!isCancelled && (isConfirmed || isPending) && <button type="button" disabled={cancellingCode === row.booking_code} onClick={() => void cancelReservation(row)} className="admin-secondary-button" style={{ fontSize: "10px", padding: "4px 8px", color: "#b91c1c", whiteSpace: "nowrap" }}>{cancellingCode === row.booking_code ? "Cancelling…" : "Cancel"}</button>}
                         </div>
                       </td>
                     </tr>
