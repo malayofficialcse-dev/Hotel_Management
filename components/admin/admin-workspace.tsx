@@ -1342,6 +1342,7 @@ function Dashboard() {
     employees: AdminEmployee[] | null;
     tasks: HousekeepingTask[] | null;
     reservations: AdminBooking[] | null;
+    payments: AdminPayment[] | null;
   } | null>(null);
 
   useEffect(() => {
@@ -1349,16 +1350,17 @@ function Dashboard() {
     const refreshOverview = () => {
       void Promise.allSettled([
         api.getAdminHotels(), api.getAdminRooms(), api.getAdminEmployees(),
-        api.getAdminHousekeepingTasks(), api.getAdminReservations(),
-      ]).then(([hotelResult, roomResult, employeeResult, taskResult, reservationResult]) => {
+        api.getAdminHousekeepingTasks(), api.getAdminReservations(), api.getAdminPayments(),
+      ]).then(([hotelResult, roomResult, employeeResult, taskResult, reservationResult, paymentResult]) => {
         if (!active) return;
-        const failures = [hotelResult, roomResult, employeeResult, taskResult, reservationResult].filter((result) => result.status === "rejected");
+        const failures = [hotelResult, roomResult, employeeResult, taskResult, reservationResult, paymentResult].filter((result) => result.status === "rejected");
         setOverview({
           hotels: hotelResult.status === "fulfilled" ? hotelResult.value : null,
           rooms: roomResult.status === "fulfilled" ? roomResult.value : null,
           employees: employeeResult.status === "fulfilled" ? employeeResult.value : null,
           tasks: taskResult.status === "fulfilled" ? taskResult.value : null,
           reservations: reservationResult.status === "fulfilled" ? reservationResult.value.bookings : null,
+          payments: paymentResult.status === "fulfilled" ? paymentResult.value : null,
         });
         if (failures.length) setNotice(`${failures.length} dashboard service${failures.length === 1 ? "" : "s"} could not be reached.`);
       });
@@ -1369,6 +1371,25 @@ function Dashboard() {
     window.addEventListener("stayease-reservations-updated", refreshOverview);
     return () => { active = false; window.clearInterval(timer); window.removeEventListener("focus", refreshOverview); window.removeEventListener("stayease-reservations-updated", refreshOverview); };
   }, []);
+
+  const revenueData = useMemo(() => {
+    const now = new Date();
+    const days = Array.from({ length: 30 }, (_, index) => {
+      const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29 + index);
+      return {
+        key: reportDateKey(date),
+        label: date.toLocaleDateString("en-IN", { day: "numeric", month: "short" }),
+      };
+    });
+    const dayIndex = new Map(days.map((day, index) => [day.key, index]));
+    const rows = days.map((day) => ({ ...day, bookings: 0, revenue: 0 }));
+    for (const payment of overview?.payments || []) {
+      const index = dayIndex.get(reportDateKey(payment.createdAt));
+      if (index !== undefined) rows[index].revenue += netCollectedPayment(payment);
+    }
+    return rows;
+  }, [overview?.payments]);
+  const revenueTotal = revenueData.reduce((sum, month) => sum + month.revenue, 0);
 
   const dashboardCards = [
     { label: "Properties", value: overview?.hotels ? formatNumber(overview.hotels.length) : overview ? "Unavailable" : "Loading…", note: "Hotel database" },
@@ -1460,8 +1481,13 @@ function Dashboard() {
       <Stats section="dashboard" cards={dashboardCards} />
       <div className="admin-dashboard-grid">
         <section className="admin-panel admin-chart-panel">
-          <div className="admin-panel-heading"><div><h2>Revenue overview</h2><p>Calculated from persisted payments.</p></div></div>
-          <div className="admin-empty">No live revenue report is connected yet. No sample totals are displayed.</div>
+          <div className="admin-panel-heading"><div><h2>Revenue overview</h2><p>Daily net revenue · last 30 days</p></div></div>
+          {overview?.payments
+            ? <>
+                <RevenueAreaChart data={revenueData} labelInterval={5} />
+                <div className="admin-chart-total"><strong>{formatReportCurrency(revenueTotal)}</strong><span>Net collected in the last 30 days</span></div>
+              </>
+            : <div className="admin-empty">{overview ? "Payment data is unavailable." : "Loading payment data…"}</div>}
         </section>
         <section className="admin-panel admin-occupancy-panel">
           <div className="admin-panel-heading"><div><h2>Room inventory by property</h2><p>Counts from the room database</p></div></div>
@@ -1696,6 +1722,13 @@ function reportMonthKey(value: string) {
   return Number.isNaN(date.getTime()) ? "" : `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
+function reportDateKey(value: string | Date) {
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime())
+    ? ""
+    : `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
 function netCollectedPayment(payment: AdminPayment) {
   const status = payment.status.toUpperCase();
   if (status !== "SUCCESS" && status !== "REFUNDED") return 0;
@@ -1741,7 +1774,7 @@ type ReportMonthlyDatum = { key: string; label: string; bookings: number; revenu
 type ReportSegment = { label: string; value: number; color: string };
 type ReportBarItem = { label: string; value: number };
 
-function RevenueAreaChart({ data }: { data: ReportMonthlyDatum[] }) {
+function RevenueAreaChart({ data, labelInterval = 1 }: { data: ReportMonthlyDatum[]; labelInterval?: number }) {
   const width = 720;
   const height = 250;
   const left = 54;
@@ -1761,7 +1794,7 @@ function RevenueAreaChart({ data }: { data: ReportMonthlyDatum[] }) {
 
   return (
     <div className="reports-area-chart">
-      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Monthly net collected revenue">
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Net collected revenue trend">
         <defs>
           <linearGradient id="reports-revenue-fill" x1="0" x2="0" y1="0" y2="1">
             <stop offset="0%" stopColor="#176b58" stopOpacity=".24" />
@@ -1781,11 +1814,13 @@ function RevenueAreaChart({ data }: { data: ReportMonthlyDatum[] }) {
         })}
         <path d={areaPath} fill="url(#reports-revenue-fill)" />
         <path d={linePath} fill="none" stroke="#176b58" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-        {points.map((point) => (
+        {points.map((point, index) => (
           <g key={point.key}>
             <circle cx={point.x} cy={point.y} r="4" fill="#fff" stroke="#176b58" strokeWidth="2" />
             <title>{point.label}: {formatReportCurrency(point.revenue)}</title>
-            <text x={point.x} y={height - 8} textAnchor="middle" className="reports-axis-label">{point.label}</text>
+            <text x={point.x} y={height - 8} textAnchor="middle" className="reports-axis-label">
+              {index % labelInterval === 0 || index === points.length - 1 ? point.label : ""}
+            </text>
           </g>
         ))}
       </svg>
