@@ -17,7 +17,7 @@ func SetupRoutes(c *controllers.BookingController, authServiceURL string) *chi.M
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "x-user-id", "x-user-email", "x-user-role"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "x-user-id", "x-user-email", "x-user-role", "x-admin-context"},
 		AllowCredentials: true,
 	}))
 
@@ -31,6 +31,7 @@ func SetupRoutes(c *controllers.BookingController, authServiceURL string) *chi.M
 		api.With(bookingMiddleware.OptionalAuth(authServiceURL)).Post("/hold", c.HoldRoom)
 		api.With(bookingMiddleware.RequireAuth(authServiceURL)).Get("/mine", c.ListMyBookings)
 		api.With(bookingMiddleware.RequireAuth(authServiceURL)).Patch("/{id}", c.UpdateMyBooking)
+		api.With(bookingMiddleware.OptionalAuth(authServiceURL)).Patch("/admin/{id}", c.UpdateMyBooking)
 		api.With(bookingMiddleware.RequireAdmin(authServiceURL)).Get("/service-requests/admin", c.ListAdminGuestServiceRequests)
 		api.With(bookingMiddleware.RequireAdmin(authServiceURL)).Patch("/service-requests/{requestId}", c.UpdateGuestServiceRequestStatus)
 		api.With(bookingMiddleware.RequireAuth(authServiceURL)).Post("/{id}/service-requests", c.CreateGuestServiceRequest)

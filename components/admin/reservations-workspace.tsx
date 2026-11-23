@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useRef } from "react";
 import Link from "next/link";
+import { QRCodeSVG } from "qrcode.react";
 import {
   api,
   type AdminBooking,
@@ -79,6 +80,132 @@ export function ReservationsWorkspace() {
     guestPhone: "",
     specialRequests: "",
   });
+
+  // Room Modification Dialog State
+  const [roomEditOpen, setRoomEditOpen] = useState(false);
+  const [roomEditBooking, setRoomEditBooking] = useState<AdminBooking | null>(null);
+  const [roomEditNewCount, setRoomEditNewCount] = useState(1);
+  const [roomEditPaymentMethod, setRoomEditPaymentMethod] = useState<"Instant UPI QR" | "Credit / Debit card" | "Cash at Front Desk" | "Bank Transfer">("Instant UPI QR");
+  const [roomEditProcessing, setRoomEditProcessing] = useState(false);
+  const [roomEditSuccess, setRoomEditSuccess] = useState<{ message: string; billNumber?: string } | null>(null);
+  const [roomEditError, setRoomEditError] = useState("");
+
+  // Transaction input details
+  const [cardDetails, setCardDetails] = useState({
+    cardNumber: "",
+    cardHolder: "",
+    expiry: "",
+    cvv: "",
+    authCode: "",
+  });
+  const [bankDetails, setBankDetails] = useState({
+    bankName: "HDFC Bank",
+    accountNumber: "",
+    utrNumber: "",
+    transferDate: new Date().toISOString().split("T")[0],
+  });
+  const [cashDetails, setCashDetails] = useState({
+    receiptNumber: "",
+    collectedBy: "",
+  });
+  const [upiDetails, setUpiDetails] = useState({
+    upiRefNumber: "",
+  });
+
+  const roomEditFinancials = useMemo(() => {
+    if (!roomEditBooking) return null;
+    const nights = roomEditBooking.total_nights || 1;
+    const oldCount = roomEditBooking.room_count || 1;
+    const oldTotal = roomEditBooking.total_price || 0;
+    const rate = roomEditBooking.room_price_per_night || (nights > 0 && oldCount > 0 ? (oldTotal / 1.12) / (nights * oldCount) : 0);
+    const newCount = Math.max(1, roomEditNewCount);
+    const newSubtotal = Math.round(rate * nights * newCount * 100) / 100;
+    const newTaxes = Math.round(newSubtotal * 0.12 * 100) / 100;
+    const newTotal = Math.round((newSubtotal + newTaxes) * 100) / 100;
+    const diff = Math.round((newTotal - oldTotal) * 100) / 100;
+    return { nights, rate, oldCount, oldTotal, newCount, newSubtotal, newTaxes, newTotal, diff };
+  }, [roomEditBooking, roomEditNewCount]);
+
+  async function handleExecuteRoomModification() {
+    if (!roomEditBooking || !roomEditFinancials) return;
+    setRoomEditProcessing(true);
+    setRoomEditError("");
+    setRoomEditSuccess(null);
+    try {
+      let billNum = "";
+      let effectivePaymentMethod = roomEditPaymentMethod as string;
+      if (roomEditPaymentMethod === "Credit / Debit card") {
+        const cleanCard = cardDetails.cardNumber.replace(/\s+/g, "");
+        const last4 = cleanCard ? cleanCard.slice(-4) : "4242";
+        const auth = cardDetails.authCode ? ` (Auth: ${cardDetails.authCode})` : "";
+        effectivePaymentMethod = `Card ending in ${last4}${auth}`;
+      } else if (roomEditPaymentMethod === "Bank Transfer") {
+        const utr = bankDetails.utrNumber ? ` (UTR: ${bankDetails.utrNumber})` : "";
+        effectivePaymentMethod = `Bank Transfer ${bankDetails.bankName}${utr}`;
+      } else if (roomEditPaymentMethod === "Instant UPI QR") {
+        const ref = upiDetails.upiRefNumber ? ` (Ref: ${upiDetails.upiRefNumber})` : "";
+        effectivePaymentMethod = `UPI Payment${ref}`;
+      } else if (roomEditPaymentMethod === "Cash at Front Desk") {
+        const rec = cashDetails.receiptNumber ? ` (Receipt: ${cashDetails.receiptNumber})` : "";
+        effectivePaymentMethod = `Cash at Desk${rec}`;
+      }
+
+      if (roomEditFinancials.diff > 0) {
+        const intentRes = await api.createPaymentIntent(
+          roomEditBooking.id,
+          roomEditBooking.booking_code,
+          roomEditFinancials.diff,
+          effectivePaymentMethod
+        );
+        const confirmRes = await api.confirmPaymentIntent({
+          paymentId: intentRes.paymentId,
+          paymentMethod: effectivePaymentMethod,
+          hotelName: roomEditBooking.hotel_name,
+          roomTypeName: roomEditBooking.room_type_name,
+          guestName: `${roomEditBooking.guest_first_name} ${roomEditBooking.guest_last_name}`.trim(),
+          guestEmail: roomEditBooking.guest_email,
+          guestPhone: roomEditBooking.guest_phone,
+          checkInDate: roomEditBooking.check_in_date,
+          checkOutDate: roomEditBooking.check_out_date,
+          totalNights: roomEditFinancials.nights,
+          roomCount: roomEditFinancials.newCount,
+          subtotal: roomEditFinancials.newSubtotal,
+          taxesAndFees: roomEditFinancials.newTaxes,
+          totalAmount: roomEditFinancials.newTotal,
+        });
+        billNum = confirmRes?.billNumber || "";
+      } else if (roomEditFinancials.diff < 0) {
+        const refundAmount = Math.abs(roomEditFinancials.diff);
+        try {
+          const paymentRecord = await api.getPaymentByBookingCode(roomEditBooking.booking_code);
+          if (paymentRecord?.id) {
+            await api.refundPayment(paymentRecord.id, refundAmount, `Admin room reduction from ${roomEditFinancials.oldCount} to ${roomEditFinancials.newCount}`);
+          }
+        } catch {
+          // ignore payment record error
+        }
+      }
+
+      await api.updateAdminBooking(roomEditBooking.id, {
+        roomCount: roomEditFinancials.newCount,
+      });
+
+      setRoomEditSuccess({
+        message: roomEditFinancials.diff > 0
+          ? `Payment of ₹${roomEditFinancials.diff.toLocaleString("en-IN")} recorded! Room count updated to ${roomEditFinancials.newCount}.`
+          : roomEditFinancials.diff < 0
+            ? `Refund of ₹${Math.abs(roomEditFinancials.diff).toLocaleString("en-IN")} processed! Room count updated to ${roomEditFinancials.newCount}.`
+            : `Reservation updated to ${roomEditFinancials.newCount} room(s).`,
+        billNumber: billNum,
+      });
+
+      await loadData();
+    } catch (err: any) {
+      setRoomEditError(err.message || "Failed to update reservation rooms.");
+    } finally {
+      setRoomEditProcessing(false);
+    }
+  }
 
   // Close popovers on click outside
   useEffect(() => {
@@ -1372,6 +1499,26 @@ export function ReservationsWorkspace() {
                               <span>Bill</span>
                             </Link>
                           )}
+                          {(isConfirmed || row.status?.toUpperCase().includes("CHECKED_IN")) && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setRoomEditBooking(row);
+                                setRoomEditNewCount(row.room_count || 1);
+                                setRoomEditSuccess(null);
+                                setRoomEditError("");
+                                setRoomEditOpen(true);
+                              }}
+                              className="admin-secondary-button"
+                              style={{
+                                fontSize: "10px",
+                                padding: "4px 8px",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              Edit Rooms
+                            </button>
+                          )}
                           {!isCancelled && (isConfirmed || isPending) && <button type="button" disabled={cancellingCode === row.booking_code} onClick={() => void cancelReservation(row)} className="admin-secondary-button" style={{ fontSize: "10px", padding: "4px 8px", color: "#b91c1c", whiteSpace: "nowrap" }}>{cancellingCode === row.booking_code ? "Cancelling…" : "Cancel"}</button>}
                         </div>
                       </td>
@@ -1673,6 +1820,425 @@ export function ReservationsWorkspace() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* Room Modification Dialog */}
+      {roomEditOpen && roomEditBooking && roomEditFinancials && (
+        <div className="admin-dialog-backdrop">
+          <div className="admin-dialog" style={{ maxWidth: "560px" }}>
+            <div className="admin-dialog-header">
+              <div>
+                <h3 className="admin-dialog-title">Modify Reservation Rooms</h3>
+                <p className="admin-dialog-subtitle">Booking Code: {roomEditBooking.booking_code}</p>
+              </div>
+              <button
+                type="button"
+                className="admin-dialog-close"
+                onClick={() => setRoomEditOpen(false)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginTop: "16px" }}>
+              {/* Booking Details Preview */}
+              <div style={{ padding: "12px", background: "#f6f7f5", borderRadius: "6px", fontSize: "11px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                <div>
+                  <span style={{ color: "#8a968f", display: "block" }}>Guest</span>
+                  <strong>{roomEditBooking.guest_first_name} {roomEditBooking.guest_last_name}</strong>
+                </div>
+                <div>
+                  <span style={{ color: "#8a968f", display: "block" }}>Hotel</span>
+                  <strong>{roomEditBooking.hotel_name}</strong>
+                </div>
+                <div>
+                  <span style={{ color: "#8a968f", display: "block" }}>Room Type</span>
+                  <strong>{roomEditBooking.room_type_name}</strong>
+                </div>
+                <div>
+                  <span style={{ color: "#8a968f", display: "block" }}>Stay Duration</span>
+                  <strong>{roomEditFinancials.nights} night{roomEditFinancials.nights > 1 ? "s" : ""}</strong>
+                </div>
+              </div>
+
+              {/* Room Count Stepper */}
+              <div style={{ padding: "16px", border: "1px solid #e2e8e4", borderRadius: "6px" }}>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#1a2e26", marginBottom: "8px" }}>
+                  Adjust Number of Rooms
+                </label>
+                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                  <button
+                    type="button"
+                    onClick={() => setRoomEditNewCount((prev) => Math.max(1, prev - 1))}
+                    disabled={roomEditNewCount <= 1 || roomEditProcessing}
+                    className="admin-secondary-button"
+                    style={{ fontSize: "16px", width: "36px", height: "36px", padding: 0 }}
+                  >
+                    –
+                  </button>
+                  <span style={{ fontSize: "16px", fontWeight: 700, minWidth: "40px", textAlign: "center" }}>
+                    {roomEditNewCount}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setRoomEditNewCount((prev) => Math.min(20, prev + 1))}
+                    disabled={roomEditNewCount >= 20 || roomEditProcessing}
+                    className="admin-secondary-button"
+                    style={{ fontSize: "16px", width: "36px", height: "36px", padding: 0 }}
+                  >
+                    +
+                  </button>
+                  <span style={{ fontSize: "11px", color: "#8a968f", marginLeft: "8px" }}>
+                    (Currently: {roomEditFinancials.oldCount} room{roomEditFinancials.oldCount > 1 ? "s" : ""})
+                  </span>
+                </div>
+              </div>
+
+              {/* Financial Calculation Notice */}
+              {roomEditFinancials.diff > 0 && (
+                <div style={{ padding: "12px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "6px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <p style={{ fontSize: "12px", fontWeight: 600, color: "#166534" }}>
+                        Additional Room Charge (+{roomEditFinancials.newCount - roomEditFinancials.oldCount} room{roomEditFinancials.newCount - roomEditFinancials.oldCount > 1 ? "s" : ""})
+                      </p>
+                      <p style={{ fontSize: "10px", color: "#4b5563" }}>
+                        Revised Total: ₹{roomEditFinancials.newTotal.toLocaleString("en-IN")} · Previous: ₹{roomEditFinancials.oldTotal.toLocaleString("en-IN")}
+                      </p>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <span style={{ fontSize: "10px", color: "#4b5563" }}>Balance Due:</span>
+                      <p style={{ fontSize: "14px", fontWeight: 700, color: "#166534" }}>
+                        ₹{roomEditFinancials.diff.toLocaleString("en-IN")}
+                      </p>
+                    </div>
+                  </div>
+                  <p style={{ fontSize: "10px", color: "#15803d", marginTop: "6px" }}>
+                    Before saving the updated room count, payment of the remaining amount must be recorded. A new bill will be generated automatically.
+                  </p>
+
+                  {/* Payment Method Selector */}
+                  <div style={{ marginTop: "12px" }}>
+                    <label style={{ display: "block", fontSize: "10px", fontWeight: 600, color: "#374151", marginBottom: "6px" }}>
+                      Payment Collection Method
+                    </label>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
+                      {(["Instant UPI QR", "Credit / Debit card", "Cash at Front Desk", "Bank Transfer"] as const).map((method) => (
+                        <button
+                          key={method}
+                          type="button"
+                          onClick={() => setRoomEditPaymentMethod(method)}
+                          style={{
+                            padding: "6px 8px",
+                            fontSize: "10px",
+                            borderRadius: "4px",
+                            border: roomEditPaymentMethod === method ? "1.5px solid #166534" : "1px solid #d1d5db",
+                            background: roomEditPaymentMethod === method ? "#dcfce7" : "#ffffff",
+                            fontWeight: roomEditPaymentMethod === method ? 600 : 400,
+                            color: roomEditPaymentMethod === method ? "#166534" : "#374151",
+                            cursor: "pointer",
+                          }}
+                        >
+                          {method}
+                        </button>
+                      ))}
+                    </div>
+
+                    {roomEditPaymentMethod === "Instant UPI QR" && (
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "12px", background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: "6px", marginTop: "8px" }}>
+                        <p style={{ fontSize: "10px", color: "#6b7280", marginBottom: "6px" }}>Scan to Collect via UPI (GPay / PhonePe / Paytm)</p>
+                        <QRCodeSVG
+                          value={`upi://pay?pa=stayease@okhdfcbank&pn=StayEase+Hotels&am=${roomEditFinancials.diff}&cu=INR&tn=Admin+Room+Upgrade+${encodeURIComponent(roomEditBooking.booking_code)}`}
+                          size={110}
+                          level="M"
+                        />
+                        <p style={{ fontSize: "9px", fontFamily: "monospace", color: "#9ca3af", marginTop: "4px" }}>stayease@okhdfcbank</p>
+                        <div style={{ width: "100%", marginTop: "10px" }}>
+                          <label style={{ display: "block", fontSize: "10px", fontWeight: 600, color: "#374151", marginBottom: "4px" }}>
+                            UPI UTR / Reference Number (optional)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Enter 12-digit UPI UTR (e.g. 438291028371)"
+                            value={upiDetails.upiRefNumber}
+                            onChange={(e) => setUpiDetails({ upiRefNumber: e.target.value.trim() })}
+                            style={{ width: "100%", height: "30px", border: "1px solid #d1d5db", borderRadius: "4px", padding: "0 8px", fontSize: "11px", fontFamily: "monospace" }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {roomEditPaymentMethod === "Credit / Debit card" && (
+                      <div style={{ padding: "12px", background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: "6px", marginTop: "8px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                        <p style={{ fontSize: "11px", fontWeight: 600, color: "#1f2937" }}>Card Transaction Details</p>
+                        <div>
+                          <label style={{ display: "block", fontSize: "10px", fontWeight: 600, color: "#4b5563", marginBottom: "3px" }}>
+                            Card Number (16 digits)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="4532 0000 0000 8892"
+                            maxLength={19}
+                            value={cardDetails.cardNumber}
+                            onChange={(e) => {
+                              const raw = e.target.value.replace(/\D/g, "").slice(0, 16);
+                              const formatted = raw.match(/.{1,4}/g)?.join(" ") || raw;
+                              setCardDetails((prev) => ({ ...prev, cardNumber: formatted }));
+                            }}
+                            style={{ width: "100%", height: "32px", border: "1px solid #d1d5db", borderRadius: "4px", padding: "0 8px", fontSize: "12px", fontFamily: "monospace" }}
+                          />
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                          <div>
+                            <label style={{ display: "block", fontSize: "10px", fontWeight: 600, color: "#4b5563", marginBottom: "3px" }}>
+                              Cardholder Name
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="Name on card"
+                              value={cardDetails.cardHolder}
+                              onChange={(e) => setCardDetails((prev) => ({ ...prev, cardHolder: e.target.value }))}
+                              style={{ width: "100%", height: "30px", border: "1px solid #d1d5db", borderRadius: "4px", padding: "0 8px", fontSize: "11px" }}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ display: "block", fontSize: "10px", fontWeight: 600, color: "#4b5563", marginBottom: "3px" }}>
+                              POS / Terminal Auth Code
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="e.g. AUTH-9281"
+                              value={cardDetails.authCode}
+                              onChange={(e) => setCardDetails((prev) => ({ ...prev, authCode: e.target.value }))}
+                              style={{ width: "100%", height: "30px", border: "1px solid #d1d5db", borderRadius: "4px", padding: "0 8px", fontSize: "11px", fontFamily: "monospace" }}
+                            />
+                          </div>
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                          <div>
+                            <label style={{ display: "block", fontSize: "10px", fontWeight: 600, color: "#4b5563", marginBottom: "3px" }}>
+                              Expiry (MM/YY)
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="12/28"
+                              maxLength={5}
+                              value={cardDetails.expiry}
+                              onChange={(e) => {
+                                let val = e.target.value.replace(/\D/g, "").slice(0, 4);
+                                if (val.length >= 3) val = val.slice(0, 2) + "/" + val.slice(2);
+                                setCardDetails((prev) => ({ ...prev, expiry: val }));
+                              }}
+                              style={{ width: "100%", height: "30px", border: "1px solid #d1d5db", borderRadius: "4px", padding: "0 8px", fontSize: "11px", fontFamily: "monospace" }}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ display: "block", fontSize: "10px", fontWeight: 600, color: "#4b5563", marginBottom: "3px" }}>
+                              CVV
+                            </label>
+                            <input
+                              type="password"
+                              placeholder="•••"
+                              maxLength={4}
+                              value={cardDetails.cvv}
+                              onChange={(e) => setCardDetails((prev) => ({ ...prev, cvv: e.target.value.replace(/\D/g, "").slice(0, 4) }))}
+                              style={{ width: "100%", height: "30px", border: "1px solid #d1d5db", borderRadius: "4px", padding: "0 8px", fontSize: "11px", fontFamily: "monospace" }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {roomEditPaymentMethod === "Bank Transfer" && (
+                      <div style={{ padding: "12px", background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: "6px", marginTop: "8px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                        <p style={{ fontSize: "11px", fontWeight: 600, color: "#1f2937" }}>Bank Transfer / NEFT / RTGS Details</p>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                          <div>
+                            <label style={{ display: "block", fontSize: "10px", fontWeight: 600, color: "#4b5563", marginBottom: "3px" }}>
+                              Originating / Deposited Bank
+                            </label>
+                            <select
+                              value={bankDetails.bankName}
+                              onChange={(e) => setBankDetails((prev) => ({ ...prev, bankName: e.target.value }))}
+                              style={{ width: "100%", height: "30px", border: "1px solid #d1d5db", borderRadius: "4px", padding: "0 6px", fontSize: "11px" }}
+                            >
+                              <option value="HDFC Bank">HDFC Bank</option>
+                              <option value="ICICI Bank">ICICI Bank</option>
+                              <option value="State Bank of India">State Bank of India</option>
+                              <option value="Axis Bank">Axis Bank</option>
+                              <option value="Kotak Mahindra Bank">Kotak Mahindra Bank</option>
+                              <option value="Punjab National Bank">Punjab National Bank</option>
+                              <option value="Other Bank">Other Bank</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label style={{ display: "block", fontSize: "10px", fontWeight: 600, color: "#4b5563", marginBottom: "3px" }}>
+                              Bank Account Number
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="Enter account digits"
+                              maxLength={18}
+                              value={bankDetails.accountNumber}
+                              onChange={(e) => setBankDetails((prev) => ({ ...prev, accountNumber: e.target.value.replace(/\D/g, "") }))}
+                              style={{ width: "100%", height: "30px", border: "1px solid #d1d5db", borderRadius: "4px", padding: "0 8px", fontSize: "11px", fontFamily: "monospace" }}
+                            />
+                          </div>
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                          <div>
+                            <label style={{ display: "block", fontSize: "10px", fontWeight: 600, color: "#4b5563", marginBottom: "3px" }}>
+                              UTR / Transaction Ref Number
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="e.g. UTR202611239842"
+                              value={bankDetails.utrNumber}
+                              onChange={(e) => setBankDetails((prev) => ({ ...prev, utrNumber: e.target.value.trim().toUpperCase() }))}
+                              style={{ width: "100%", height: "30px", border: "1px solid #d1d5db", borderRadius: "4px", padding: "0 8px", fontSize: "11px", fontFamily: "monospace" }}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ display: "block", fontSize: "10px", fontWeight: 600, color: "#4b5563", marginBottom: "3px" }}>
+                              Transfer Date
+                            </label>
+                            <input
+                              type="date"
+                              value={bankDetails.transferDate}
+                              onChange={(e) => setBankDetails((prev) => ({ ...prev, transferDate: e.target.value }))}
+                              style={{ width: "100%", height: "30px", border: "1px solid #d1d5db", borderRadius: "4px", padding: "0 8px", fontSize: "11px" }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {roomEditPaymentMethod === "Cash at Front Desk" && (
+                      <div style={{ padding: "12px", background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: "6px", marginTop: "8px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                        <p style={{ fontSize: "11px", fontWeight: 600, color: "#1f2937" }}>Front Desk Cash Collection Details</p>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                          <div>
+                            <label style={{ display: "block", fontSize: "10px", fontWeight: 600, color: "#4b5563", marginBottom: "3px" }}>
+                              Cash Receipt / Voucher #
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="e.g. REC-8921"
+                              value={cashDetails.receiptNumber}
+                              onChange={(e) => setCashDetails((prev) => ({ ...prev, receiptNumber: e.target.value.trim().toUpperCase() }))}
+                              style={{ width: "100%", height: "30px", border: "1px solid #d1d5db", borderRadius: "4px", padding: "0 8px", fontSize: "11px", fontFamily: "monospace" }}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ display: "block", fontSize: "10px", fontWeight: 600, color: "#4b5563", marginBottom: "3px" }}>
+                              Cashier / Staff Name
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="e.g. Malay Maity (Front Desk)"
+                              value={cashDetails.collectedBy}
+                              onChange={(e) => setCashDetails((prev) => ({ ...prev, collectedBy: e.target.value }))}
+                              style={{ width: "100%", height: "30px", border: "1px solid #d1d5db", borderRadius: "4px", padding: "0 8px", fontSize: "11px" }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {roomEditFinancials.diff < 0 && (
+                <div style={{ padding: "12px", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: "6px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <p style={{ fontSize: "12px", fontWeight: 600, color: "#92400e" }}>
+                        Room Reduction Refund (-{roomEditFinancials.oldCount - roomEditFinancials.newCount} room{roomEditFinancials.oldCount - roomEditFinancials.newCount > 1 ? "s" : ""})
+                      </p>
+                      <p style={{ fontSize: "10px", color: "#4b5563" }}>
+                        Revised Total: ₹{roomEditFinancials.newTotal.toLocaleString("en-IN")} · Previous: ₹{roomEditFinancials.oldTotal.toLocaleString("en-IN")}
+                      </p>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <span style={{ fontSize: "10px", color: "#4b5563" }}>Refund Amount:</span>
+                      <p style={{ fontSize: "14px", fontWeight: 700, color: "#b45309" }}>
+                        ₹{Math.abs(roomEditFinancials.diff).toLocaleString("en-IN")}
+                      </p>
+                    </div>
+                  </div>
+                  <p style={{ fontSize: "10px", color: "#b45309", marginTop: "6px" }}>
+                    A refund of ₹{Math.abs(roomEditFinancials.diff).toLocaleString("en-IN")} will be processed to the guest, and an updated bill will be generated.
+                  </p>
+                </div>
+              )}
+
+              {roomEditFinancials.diff === 0 && (
+                <p style={{ fontSize: "11px", color: "#6b7280" }}>
+                  Room count remains unchanged. No billing adjustment required.
+                </p>
+              )}
+
+              {roomEditError && (
+                <div style={{ padding: "8px 12px", background: "#fee2e2", color: "#991b1b", borderRadius: "4px", fontSize: "11px" }}>
+                  {roomEditError}
+                </div>
+              )}
+
+              {roomEditSuccess && (
+                <div style={{ padding: "10px 12px", background: "#f0fdf4", color: "#166534", borderRadius: "4px", fontSize: "11px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span>{roomEditSuccess.message}</span>
+                  <Link
+                    href={`/booking/bill?code=${encodeURIComponent(roomEditBooking.booking_code)}`}
+                    style={{ fontWeight: 600, color: "#166534", textDecoration: "underline", marginLeft: "8px" }}
+                  >
+                    View Bill ↗
+                  </Link>
+                </div>
+              )}
+            </div>
+
+            <div className="admin-dialog-actions" style={{ marginTop: "20px" }}>
+              <button
+                type="button"
+                className="admin-secondary-button"
+                onClick={() => setRoomEditOpen(false)}
+                disabled={roomEditProcessing}
+              >
+                Close
+              </button>
+
+              {roomEditFinancials.diff > 0 ? (
+                <button
+                  type="button"
+                  className="admin-primary-button"
+                  onClick={() => void handleExecuteRoomModification()}
+                  disabled={roomEditProcessing}
+                >
+                  {roomEditProcessing ? "Processing & Generating Bill…" : `Pay ₹${roomEditFinancials.diff.toLocaleString("en-IN")} & Save`}
+                </button>
+              ) : roomEditFinancials.diff < 0 ? (
+                <button
+                  type="button"
+                  className="admin-primary-button"
+                  onClick={() => void handleExecuteRoomModification()}
+                  disabled={roomEditProcessing}
+                  style={{ background: "#92400e" }}
+                >
+                  {roomEditProcessing ? "Processing Refund…" : `Process Refund of ₹${Math.abs(roomEditFinancials.diff).toLocaleString("en-IN")} & Save`}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="admin-primary-button"
+                  onClick={() => void handleExecuteRoomModification()}
+                  disabled={roomEditProcessing}
+                >
+                  Save Changes
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

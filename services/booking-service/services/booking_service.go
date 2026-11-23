@@ -458,16 +458,23 @@ func (s *BookingService) CancelBooking(ctx context.Context, bookingID uuid.UUID,
 	return booking, nil
 }
 
-func (s *BookingService) UpdateGuestBooking(ctx context.Context, bookingID, requesterID uuid.UUID, input *models.UpdateBookingRequest) (*models.Booking, error) {
+func (s *BookingService) UpdateGuestBooking(ctx context.Context, bookingID, requesterID uuid.UUID, isStaff, isAdmin bool, hotelScope string, input *models.UpdateBookingRequest) (*models.Booking, error) {
 	booking, err := s.repo.GetBookingByID(ctx, bookingID)
 	if err != nil {
 		return nil, ErrBookingNotFound
 	}
-	if booking.UserID == nil || *booking.UserID != requesterID {
+	if isAdmin {
+		// System administrators have full portfolio access to modify any reservation.
+	} else if isStaff {
+		// Hotel staff/managers are scoped to their assigned hotel if hotelScope is set.
+		if hotelScope != "" && booking.HotelID != hotelScope {
+			return nil, ErrNotAuthorized
+		}
+	} else if booking.UserID == nil || *booking.UserID != requesterID {
 		return nil, ErrNotAuthorized
 	}
-	if booking.Status != models.StatusConfirmed {
-		return nil, fmt.Errorf("only confirmed reservations can be updated")
+	if booking.Status != models.StatusConfirmed && booking.Status != models.StatusCheckedIn {
+		return nil, fmt.Errorf("only confirmed or checked-in reservations can be updated")
 	}
 	if input.CheckInDate != nil {
 		booking.CheckInDate, err = time.Parse("2006-01-02", strings.TrimSpace(*input.CheckInDate))
@@ -519,7 +526,7 @@ func (s *BookingService) UpdateGuestBooking(ctx context.Context, bookingID, requ
 	}
 	booking.TaxesAndFees = math.Round(booking.RoomPricePerNight*float64(nights)*float64(booking.RoomCount)*0.12*100) / 100
 	booking.TotalPrice = booking.RoomPricePerNight*float64(nights)*float64(booking.RoomCount) + booking.TaxesAndFees
-	if err := s.repo.UpdateGuestBooking(ctx, booking, requesterID, inventory); err != nil {
+	if err := s.repo.UpdateGuestBooking(ctx, booking, requesterID, isStaff, inventory); err != nil {
 		if errors.Is(err, repository.ErrNoRoomsLeft) {
 			return nil, ErrNoRoomsLeft
 		}

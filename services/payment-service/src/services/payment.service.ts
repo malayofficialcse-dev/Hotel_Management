@@ -15,14 +15,51 @@ export class PaymentService {
 
   async createIntent(dto: CreatePaymentIntentDto) {
     const mockIntentId = `pi_mock_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    const payment = await this.repo.createPayment({
-      bookingId: dto.bookingId,
-      bookingCode: dto.bookingCode,
-      amount: dto.amount,
-      currency: dto.currency || "INR",
-      userId: dto.userId,
-      stripeIntentId: mockIntentId,
-    });
+
+    let existing = null;
+    if (dto.bookingId) {
+      existing = await this.repo.findByBookingId(dto.bookingId);
+    }
+    if (!existing && dto.bookingCode) {
+      existing = await this.repo.findByBookingCode(dto.bookingCode);
+    }
+
+    let payment;
+    if (existing) {
+      const existingMeta = (existing.metadata || {}) as Record<string, unknown>;
+      const history = Array.isArray(existingMeta.paymentHistory) ? [...existingMeta.paymentHistory] : [];
+      if (existing.status === PaymentStatus.SUCCESS) {
+        history.push({
+          amount: existing.amount,
+          billNumber: existingMeta.billNumber,
+          transactionId: existingMeta.transactionId,
+          date: existing.updatedAt || new Date().toISOString(),
+          paymentMethod: existing.paymentMethod,
+        });
+      }
+
+      payment = await this.repo.updatePaymentIntent(existing.id, {
+        amount: dto.amount,
+        stripeIntentId: mockIntentId,
+        paymentMethod: dto.paymentMethod,
+        status: PaymentStatus.PENDING,
+        metadata: {
+          ...existingMeta,
+          paymentHistory: history,
+          additionalCharge: dto.amount,
+          lastIntentId: mockIntentId,
+        },
+      });
+    } else {
+      payment = await this.repo.createPayment({
+        bookingId: dto.bookingId,
+        bookingCode: dto.bookingCode,
+        amount: dto.amount,
+        currency: dto.currency || "INR",
+        userId: dto.userId,
+        stripeIntentId: mockIntentId,
+      });
+    }
 
     const clientSecret = `pi_mock_${payment.id}_secret_${Date.now()}`;
     return {
@@ -118,6 +155,7 @@ export class PaymentService {
 
     const updatedPayment = await this.repo.updateStatus(payment.id, {
       status: PaymentStatus.SUCCESS,
+      amount: dto.totalAmount || payment.amount,
       paymentMethod: dto.paymentMethod || "Credit / Debit card",
       receiptUrl,
       metadata,
@@ -149,12 +187,34 @@ export class PaymentService {
   }
 
   async processRefund(dto: RefundDto) {
+    const payment = await this.repo.findById(dto.paymentId);
     const refund = await this.repo.createRefund({
       paymentId: dto.paymentId,
       amount: dto.amount || 0,
       reason: dto.reason || "Customer refund request",
     });
-    await this.repo.updateStatus(dto.paymentId, { status: PaymentStatus.REFUNDED });
+
+    const isFullRefund = !payment || !dto.amount || dto.amount >= payment.amount;
+    const newStatus = isFullRefund ? PaymentStatus.REFUNDED : PaymentStatus.SUCCESS;
+    const meta = (payment?.metadata || {}) as Record<string, unknown>;
+    const history = Array.isArray(meta.refundHistory) ? [...meta.refundHistory] : [];
+    history.push({
+      amount: dto.amount,
+      reason: dto.reason,
+      date: new Date().toISOString(),
+    });
+
+    const remainingAmount = payment ? Math.max(0, payment.amount - (dto.amount || 0)) : undefined;
+
+    await this.repo.updateStatus(dto.paymentId, {
+      status: newStatus,
+      amount: remainingAmount,
+      metadata: {
+        ...meta,
+        refundHistory: history,
+        lastRefundAmount: dto.amount,
+      },
+    });
 
     return { success: true, message: "Refund processed successfully", refund };
   }

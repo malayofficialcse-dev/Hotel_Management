@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"booking-service/models"
@@ -260,7 +261,7 @@ func (r *BookingRepository) GetOverlappingCountExcluding(ctx context.Context, tx
 	return count, nil
 }
 
-func (r *BookingRepository) UpdateGuestBooking(ctx context.Context, booking *models.Booking, userID uuid.UUID, inventory int) error {
+func (r *BookingRepository) UpdateGuestBooking(ctx context.Context, booking *models.Booking, userID uuid.UUID, isStaff bool, inventory int) error {
 	tx, err := r.BeginTx(ctx)
 	if err != nil {
 		return err
@@ -276,12 +277,22 @@ func (r *BookingRepository) UpdateGuestBooking(ctx context.Context, booking *mod
 	if inventory-overlap < booking.RoomCount {
 		return ErrNoRoomsLeft
 	}
-	command, err := tx.Exec(ctx, `UPDATE bookings SET check_in_date=$1, check_out_date=$2, total_nights=$3, guests_count=$4, room_count=$5,
-		guest_first_name=$6, guest_last_name=$7, guest_phone=$8, special_requests=$9,
-		room_price_per_night=$10, taxes_and_fees=$11, total_price=$12, updated_at=NOW()
-		WHERE id=$13 AND user_id=$14 AND status='CONFIRMED'`, booking.CheckInDate, booking.CheckOutDate, booking.TotalNights,
-		booking.GuestsCount, booking.RoomCount, booking.GuestFirstName, booking.GuestLastName, booking.GuestPhone,
-		booking.SpecialRequests, booking.RoomPricePerNight, booking.TaxesAndFees, booking.TotalPrice, booking.ID, userID)
+	var command pgconn.CommandTag
+	if isStaff {
+		command, err = tx.Exec(ctx, `UPDATE bookings SET check_in_date=$1, check_out_date=$2, total_nights=$3, guests_count=$4, room_count=$5,
+			guest_first_name=$6, guest_last_name=$7, guest_phone=$8, special_requests=$9,
+			room_price_per_night=$10, taxes_and_fees=$11, total_price=$12, updated_at=NOW()
+			WHERE id=$13 AND status IN ('CONFIRMED','CHECKED_IN')`, booking.CheckInDate, booking.CheckOutDate, booking.TotalNights,
+			booking.GuestsCount, booking.RoomCount, booking.GuestFirstName, booking.GuestLastName, booking.GuestPhone,
+			booking.SpecialRequests, booking.RoomPricePerNight, booking.TaxesAndFees, booking.TotalPrice, booking.ID)
+	} else {
+		command, err = tx.Exec(ctx, `UPDATE bookings SET check_in_date=$1, check_out_date=$2, total_nights=$3, guests_count=$4, room_count=$5,
+			guest_first_name=$6, guest_last_name=$7, guest_phone=$8, special_requests=$9,
+			room_price_per_night=$10, taxes_and_fees=$11, total_price=$12, updated_at=NOW()
+			WHERE id=$13 AND user_id=$14 AND status IN ('CONFIRMED','CHECKED_IN')`, booking.CheckInDate, booking.CheckOutDate, booking.TotalNights,
+			booking.GuestsCount, booking.RoomCount, booking.GuestFirstName, booking.GuestLastName, booking.GuestPhone,
+			booking.SpecialRequests, booking.RoomPricePerNight, booking.TaxesAndFees, booking.TotalPrice, booking.ID, userID)
+	}
 	if err != nil {
 		return err
 	}

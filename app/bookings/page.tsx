@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { QRCodeSVG } from "qrcode.react";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { Button, PageHeading, Surface } from "@/components/ui";
@@ -302,13 +303,38 @@ function BookingCard({
   const [editing, setEditing] = useState(false);
   const [editBusy, setEditBusy] = useState(false);
   const [editMessage, setEditMessage] = useState("");
+  const [successInfo, setSuccessInfo] = useState<{ message: string; billNumber?: string } | null>(null);
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<"UPI" | "CARD" | "NETBANKING">("UPI");
+  const [paymentProcessing, setPaymentProcessing] = useState(false);
+  const [refundProcessing, setRefundProcessing] = useState(false);
   const [availabilityPreview, setAvailabilityPreview] = useState<{ state: "checking" | "available" | "unavailable" | "error"; message: string } | null>(null);
   const [editForm, setEditForm] = useState({ checkInDate: dateOnly(booking.check_in_date), checkOutDate: dateOnly(booking.check_out_date), roomCount: booking.room_count, guestsCount: booking.guests_count, specialRequests: booking.special_requests || "" });
   const [cancelBusy, setCancelBusy] = useState(false);
+  const [guestCardDigits, setGuestCardDigits] = useState({ number: "", expiry: "", cvv: "", name: "" });
+  const [guestBankDetails, setGuestBankDetails] = useState({ bankName: "HDFC Bank", accountNumber: "", utr: "" });
+  const [guestUpiRef, setGuestUpiRef] = useState("");
+
+  const calculatedFinancials = useMemo(() => {
+    const start = Date.parse(`${editForm.checkInDate}T00:00:00Z`);
+    const end = Date.parse(`${editForm.checkOutDate}T00:00:00Z`);
+    const nights = Number.isFinite(start) && Number.isFinite(end) && end > start
+      ? Math.round((end - start) / (24 * 60 * 60 * 1000))
+      : (booking.total_nights || 1);
+    const rate = booking.room_price_per_night || (nights > 0 && (booking.room_count || 1) > 0 ? Math.round((booking.total_price / 1.12) / (nights * (booking.room_count || 1))) : 0);
+    const count = editForm.roomCount || 1;
+    const subtotal = rate * nights * count;
+    const taxes = Math.round(subtotal * 0.12 * 100) / 100;
+    const newTotal = Math.round((subtotal + taxes) * 100) / 100;
+    const oldTotal = booking.total_price || 0;
+    const diff = Math.round((newTotal - oldTotal) * 100) / 100;
+    return { nights, rate, count, subtotal, taxes, newTotal, oldTotal, diff };
+  }, [booking, editForm.checkInDate, editForm.checkOutDate, editForm.roomCount]);
 
   useEffect(() => {
     if (editing) return;
     setEditForm({ checkInDate: dateOnly(booking.check_in_date), checkOutDate: dateOnly(booking.check_out_date), roomCount: booking.room_count, guestsCount: booking.guests_count, specialRequests: booking.special_requests || "" });
+    setSuccessInfo(null);
   }, [booking, editing]);
 
   useEffect(() => {
@@ -379,13 +405,21 @@ function BookingCard({
 
   async function saveReservation(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (calculatedFinancials.diff > 0) {
+      setPaymentModalOpen(true);
+      return;
+    }
+    if (calculatedFinancials.diff < 0) {
+      await handleRefundAndSave();
+      return;
+    }
     setEditBusy(true);
     setEditMessage("");
     try {
       const updated = await api.updateMyBooking(booking.id, editForm);
       onBookingUpdated(updated);
       setEditing(false);
-      setEditMessage("Reservation updated. Availability has been recalculated.");
+      setSuccessInfo({ message: "Reservation updated successfully. Availability has been recalculated." });
       window.dispatchEvent(new Event("stayease-reservations-updated"));
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not update reservation.";
@@ -394,6 +428,90 @@ function BookingCard({
         : message);
     }
     finally { setEditBusy(false); }
+  }
+
+  async function handlePaymentAndSave() {
+    setPaymentProcessing(true);
+    setEditMessage("");
+    try {
+      let paymentMethodLabel = "Instant Payment";
+      if (paymentMethod === "UPI") {
+        const ref = guestUpiRef ? ` (Ref: ${guestUpiRef})` : "";
+        paymentMethodLabel = `UPI Payment${ref}`;
+      } else if (paymentMethod === "CARD") {
+        const last4 = guestCardDigits.number.replace(/\D/g, "").slice(-4) || "4242";
+        paymentMethodLabel = `Card ending in ${last4}`;
+      } else if (paymentMethod === "NETBANKING") {
+        const utr = guestBankDetails.utr ? ` (UTR: ${guestBankDetails.utr})` : "";
+        paymentMethodLabel = `Net Banking ${guestBankDetails.bankName}${utr}`;
+      }
+
+      const intentRes = await api.createPaymentIntent(booking.id, booking.booking_code, calculatedFinancials.diff, paymentMethodLabel);
+      const confirmRes = await api.confirmPaymentIntent({
+        paymentId: intentRes.paymentId,
+        paymentMethod: paymentMethodLabel,
+        hotelName: booking.hotel_name,
+        roomTypeName: booking.room_type_name,
+        guestName: `${booking.guest_first_name || ""} ${booking.guest_last_name || ""}`.trim() || "Guest",
+        guestEmail: booking.guest_email || "",
+        guestPhone: booking.guest_phone || "",
+        checkInDate: editForm.checkInDate,
+        checkOutDate: editForm.checkOutDate,
+        totalNights: calculatedFinancials.nights,
+        roomCount: editForm.roomCount,
+        subtotal: calculatedFinancials.subtotal,
+        taxesAndFees: calculatedFinancials.taxes,
+        totalAmount: calculatedFinancials.newTotal,
+      });
+
+      const updated = await api.updateMyBooking(booking.id, editForm);
+      onBookingUpdated(updated);
+      setPaymentModalOpen(false);
+      setEditing(false);
+      setSuccessInfo({
+        message: `Payment of ₹${calculatedFinancials.diff.toLocaleString("en-IN")} received! Reservation upgraded to ${editForm.roomCount} room${editForm.roomCount > 1 ? "s" : ""}.`,
+        billNumber: confirmRes?.billNumber,
+      });
+      window.dispatchEvent(new Event("stayease-reservations-updated"));
+    } catch (error) {
+      setEditMessage(error instanceof Error ? error.message : "Payment processing failed. Please try again.");
+    } finally {
+      setPaymentProcessing(false);
+    }
+  }
+
+  async function handleRefundAndSave() {
+    setRefundProcessing(true);
+    setEditMessage("");
+    const refundAmount = Math.abs(calculatedFinancials.diff);
+    try {
+      let paymentRecord: any = null;
+      try {
+        paymentRecord = await api.getPaymentByBookingCode(booking.booking_code);
+      } catch {
+        // Continue if payment record lookup fails
+      }
+
+      if (paymentRecord && paymentRecord.id) {
+        try {
+          await api.refundPayment(paymentRecord.id, refundAmount, `Reduced rooms from ${booking.room_count} to ${editForm.roomCount}`);
+        } catch {
+          // Fallback if partial refund endpoint error
+        }
+      }
+
+      const updated = await api.updateMyBooking(booking.id, editForm);
+      onBookingUpdated(updated);
+      setEditing(false);
+      setSuccessInfo({
+        message: `Refund of ₹${refundAmount.toLocaleString("en-IN")} processed! Reservation updated to ${editForm.roomCount} room${editForm.roomCount > 1 ? "s" : ""}.`,
+      });
+      window.dispatchEvent(new Event("stayease-reservations-updated"));
+    } catch (error) {
+      setEditMessage(error instanceof Error ? error.message : "Could not process room reduction.");
+    } finally {
+      setRefundProcessing(false);
+    }
   }
 
   async function cancelReservation() {
@@ -505,6 +623,14 @@ function BookingCard({
         <div className="mt-3 flex flex-wrap items-center gap-3">
           {booking.status.toUpperCase() === "CONFIRMED" && <button type="button" onClick={() => { setEditing((value) => !value); setEditMessage(""); }} className="text-[11px] font-semibold text-forest hover:underline">{editing ? "Close edit" : "Update reservation"}</button>}
           <button type="button" onClick={() => void cancelReservation()} disabled={cancelBusy} className="text-[11px] font-semibold text-red-700 hover:underline disabled:opacity-50">{cancelBusy ? "Cancelling…" : "Cancel reservation"}</button>
+          {successInfo && (
+            <div className="basis-full rounded bg-mint p-3 text-[11px] text-forest flex items-center justify-between">
+              <span>{successInfo.message}</span>
+              <Link href={`/booking/bill?code=${encodeURIComponent(booking.booking_code)}`} className="font-bold underline hover:text-charcoal ml-2">
+                View Updated Bill ↗
+              </Link>
+            </div>
+          )}
           {editMessage && <p role="status" className="basis-full text-[10px] text-muted">{editMessage}</p>}
           {editing && <form onSubmit={(event) => void saveReservation(event)} className="grid w-full gap-3 rounded border border-line bg-mist/50 p-3 sm:grid-cols-2">
             <label className="text-[10px] font-semibold">Check in<input type="date" required value={editForm.checkInDate} onChange={(event) => setEditForm((form) => ({ ...form, checkInDate: event.target.value }))} className="mt-1 block h-9 w-full rounded border border-line bg-white px-2 text-xs font-normal" /></label>
@@ -512,9 +638,292 @@ function BookingCard({
             <label className="text-[10px] font-semibold">Rooms<input type="number" required min={1} max={20} value={editForm.roomCount} onChange={(event) => setEditForm((form) => ({ ...form, roomCount: Number(event.target.value) }))} className="mt-1 block h-9 w-full rounded border border-line bg-white px-2 text-xs font-normal" /></label>
             <label className="text-[10px] font-semibold">Guests<input type="number" required min={1} max={100} value={editForm.guestsCount} onChange={(event) => setEditForm((form) => ({ ...form, guestsCount: Number(event.target.value) }))} className="mt-1 block h-9 w-full rounded border border-line bg-white px-2 text-xs font-normal" /></label>
             <label className="text-[10px] font-semibold sm:col-span-2">Special requests<textarea maxLength={2000} value={editForm.specialRequests} onChange={(event) => setEditForm((form) => ({ ...form, specialRequests: event.target.value }))} className="mt-1 block w-full rounded border border-line bg-white px-2 py-2 text-xs font-normal" /></label>
+
+            {calculatedFinancials.diff > 0 && (
+              <div className="sm:col-span-2 rounded border border-forest/30 bg-mint/40 p-3">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <div>
+                    <p className="text-xs font-semibold text-charcoal">
+                      Room Count Increased ({booking.room_count} → {editForm.roomCount} room{editForm.roomCount > 1 ? "s" : ""})
+                    </p>
+                    <p className="text-[10px] text-muted">
+                      New Total: ₹{calculatedFinancials.newTotal.toLocaleString("en-IN")} · Previous Total: ₹{booking.total_price.toLocaleString("en-IN")}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] text-muted">Remaining Balance to Pay:</span>
+                    <p className="text-sm font-bold text-forest">₹{calculatedFinancials.diff.toLocaleString("en-IN")}</p>
+                  </div>
+                </div>
+                <p className="mt-1 text-[10px] text-muted">
+                  Before saving the updated room count, please pay the remaining amount. A new sequential bill will be generated.
+                </p>
+              </div>
+            )}
+
+            {calculatedFinancials.diff < 0 && (
+              <div className="sm:col-span-2 rounded border border-amber-300 bg-amber-50/70 p-3">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <div>
+                    <p className="text-xs font-semibold text-charcoal">
+                      Room Count Reduced ({booking.room_count} → {editForm.roomCount} room{editForm.roomCount > 1 ? "s" : ""})
+                    </p>
+                    <p className="text-[10px] text-muted">
+                      New Total: ₹{calculatedFinancials.newTotal.toLocaleString("en-IN")} · Previous Total: ₹{booking.total_price.toLocaleString("en-IN")}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] text-muted">Refund Amount:</span>
+                    <p className="text-sm font-bold text-amber-800">₹{Math.abs(calculatedFinancials.diff).toLocaleString("en-IN")}</p>
+                  </div>
+                </div>
+                <p className="mt-1 text-[10px] text-muted">
+                  A refund of ₹{Math.abs(calculatedFinancials.diff).toLocaleString("en-IN")} will be credited back, and an updated bill will be generated.
+                </p>
+              </div>
+            )}
+
             {availabilityPreview && <p role="status" aria-live="polite" className={`rounded px-3 py-2 text-[10px] sm:col-span-2 ${availabilityPreview.state === "available" ? "bg-mint text-forest" : availabilityPreview.state === "unavailable" ? "bg-rose-50 text-rose-700" : "bg-white text-muted"}`}>{availabilityPreview.message}</p>}
-            <div className="flex items-center gap-3 sm:col-span-2"><button disabled={editBusy || availabilityPreview?.state === "unavailable"} className="rounded bg-forest px-3 py-2 text-[10px] font-semibold text-white disabled:opacity-50">{editBusy ? "Saving…" : availabilityPreview?.state === "checking" ? "Checking availability…" : "Save reservation"}</button><span className="text-[10px] text-muted">Availability is rechecked atomically when you save.</span></div>
+
+            <div className="flex items-center gap-3 sm:col-span-2">
+              {calculatedFinancials.diff > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setPaymentModalOpen(true)}
+                  disabled={editBusy || availabilityPreview?.state === "unavailable"}
+                  className="rounded bg-forest px-4 py-2 text-[11px] font-semibold text-white shadow-xs hover:bg-[#344d40] transition-colors disabled:opacity-50"
+                >
+                  Pay Remaining ₹{calculatedFinancials.diff.toLocaleString("en-IN")} &amp; Save
+                </button>
+              ) : calculatedFinancials.diff < 0 ? (
+                <button
+                  type="button"
+                  onClick={() => void handleRefundAndSave()}
+                  disabled={refundProcessing || editBusy || availabilityPreview?.state === "unavailable"}
+                  className="rounded bg-forest px-4 py-2 text-[11px] font-semibold text-white shadow-xs hover:bg-[#344d40] transition-colors disabled:opacity-50"
+                >
+                  {refundProcessing ? "Processing refund…" : `Confirm Refund of ₹${Math.abs(calculatedFinancials.diff).toLocaleString("en-IN")} & Save`}
+                </button>
+              ) : (
+                <button
+                  disabled={editBusy || availabilityPreview?.state === "unavailable"}
+                  className="rounded bg-forest px-4 py-2 text-[11px] font-semibold text-white disabled:opacity-50"
+                >
+                  {editBusy ? "Saving…" : availabilityPreview?.state === "checking" ? "Checking availability…" : "Save reservation"}
+                </button>
+              )}
+              <span className="text-[10px] text-muted">Availability is rechecked atomically when you save.</span>
+            </div>
           </form>}
+
+          {/* Payment Modal for Remaining Balance */}
+          {paymentModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+              <div className="w-full max-w-md rounded-lg border border-line bg-white p-6 shadow-xl">
+                <div className="flex items-center justify-between border-b border-line pb-3">
+                  <div>
+                    <h3 className="text-sm font-bold text-charcoal">Pay Remaining Balance</h3>
+                    <p className="text-[10px] text-muted">Booking: {booking.booking_code}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentModalOpen(false)}
+                    className="text-xs text-muted hover:text-charcoal"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="mt-4 rounded bg-mist/50 p-3">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted">Updated room count:</span>
+                    <strong className="text-charcoal">{editForm.roomCount} room{editForm.roomCount > 1 ? "s" : ""}</strong>
+                  </div>
+                  <div className="mt-1 flex justify-between text-xs">
+                    <span className="text-muted">Stay duration:</span>
+                    <strong className="text-charcoal">{calculatedFinancials.nights} night{calculatedFinancials.nights > 1 ? "s" : ""}</strong>
+                  </div>
+                  <div className="mt-2 flex justify-between border-t border-line pt-2 text-xs font-semibold">
+                    <span>Remaining Amount to Pay:</span>
+                    <span className="text-forest text-sm">₹{calculatedFinancials.diff.toLocaleString("en-IN")}</span>
+                  </div>
+                </div>
+
+                {/* Payment Method Selector */}
+                <div className="mt-4">
+                  <label className="text-[10px] font-semibold text-muted block mb-2">Select Payment Method</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod("UPI")}
+                      className={`rounded border p-2 text-center text-[10px] font-medium transition-colors ${paymentMethod === "UPI" ? "border-forest bg-mint font-semibold text-forest" : "border-line bg-white text-muted hover:bg-mist"}`}
+                    >
+                      Instant UPI QR
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod("CARD")}
+                      className={`rounded border p-2 text-center text-[10px] font-medium transition-colors ${paymentMethod === "CARD" ? "border-forest bg-mint font-semibold text-forest" : "border-line bg-white text-muted hover:bg-mist"}`}
+                    >
+                      Card
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod("NETBANKING")}
+                      className={`rounded border p-2 text-center text-[10px] font-medium transition-colors ${paymentMethod === "NETBANKING" ? "border-forest bg-mint font-semibold text-forest" : "border-line bg-white text-muted hover:bg-mist"}`}
+                    >
+                      Net Banking
+                    </button>
+                  </div>
+                </div>
+
+                {paymentMethod === "UPI" && (
+                  <div className="mt-4 flex flex-col items-center rounded border border-line bg-[#fdfbf7] p-4 text-center">
+                    <p className="text-[10px] text-muted mb-2">Scan with GPay, PhonePe, Paytm or any UPI App</p>
+                    <QRCodeSVG
+                      value={`upi://pay?pa=stayease@okhdfcbank&pn=StayEase+Hotels&am=${calculatedFinancials.diff}&cu=INR&tn=Room+Upgrade+${encodeURIComponent(booking.booking_code)}`}
+                      size={130}
+                      level="M"
+                      className="rounded border border-line bg-white p-2 shadow-xs"
+                    />
+                    <p className="mt-2 text-[9px] font-mono text-muted">stayease@okhdfcbank</p>
+                    <div className="w-full mt-3 text-left">
+                      <label className="text-[10px] font-semibold text-charcoal block mb-1">
+                        UPI Transaction / UTR Ref (optional)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="12-digit UTR (e.g. 438291028371)"
+                        value={guestUpiRef}
+                        onChange={(e) => setGuestUpiRef(e.target.value.trim())}
+                        className="h-8 w-full rounded border border-line px-2 text-xs font-mono"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {paymentMethod === "CARD" && (
+                  <div className="mt-4 space-y-2 rounded border border-line bg-white p-3">
+                    <p className="text-[10px] font-semibold text-charcoal">Enter Card Details</p>
+                    <div>
+                      <label className="text-[10px] font-semibold text-muted block mb-1">Card Number (16 digits)</label>
+                      <input
+                        type="text"
+                        placeholder="4532 0000 0000 8892"
+                        maxLength={19}
+                        value={guestCardDigits.number}
+                        onChange={(e) => {
+                          const raw = e.target.value.replace(/\D/g, "").slice(0, 16);
+                          const fmt = raw.match(/.{1,4}/g)?.join(" ") || raw;
+                          setGuestCardDigits((prev) => ({ ...prev, number: fmt }));
+                        }}
+                        className="h-8 w-full rounded border border-line bg-white px-2 text-xs font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-muted block mb-1">Cardholder Name</label>
+                      <input
+                        type="text"
+                        placeholder="Name on Card"
+                        value={guestCardDigits.name}
+                        onChange={(e) => setGuestCardDigits((prev) => ({ ...prev, name: e.target.value }))}
+                        className="h-8 w-full rounded border border-line bg-white px-2 text-xs"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] font-semibold text-muted block mb-1">Expiry (MM/YY)</label>
+                        <input
+                          type="text"
+                          placeholder="12/28"
+                          maxLength={5}
+                          value={guestCardDigits.expiry}
+                          onChange={(e) => {
+                            let val = e.target.value.replace(/\D/g, "").slice(0, 4);
+                            if (val.length >= 3) val = val.slice(0, 2) + "/" + val.slice(2);
+                            setGuestCardDigits((prev) => ({ ...prev, expiry: val }));
+                          }}
+                          className="h-8 w-full rounded border border-line bg-white px-2 text-xs font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-semibold text-muted block mb-1">CVV</label>
+                        <input
+                          type="password"
+                          placeholder="•••"
+                          maxLength={4}
+                          value={guestCardDigits.cvv}
+                          onChange={(e) => setGuestCardDigits((prev) => ({ ...prev, cvv: e.target.value.replace(/\D/g, "").slice(0, 4) }))}
+                          className="h-8 w-full rounded border border-line bg-white px-2 text-xs font-mono"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {paymentMethod === "NETBANKING" && (
+                  <div className="mt-4 space-y-2 rounded border border-line bg-white p-3">
+                    <p className="text-[10px] font-semibold text-charcoal mb-1">Net Banking Settlement Details</p>
+                    <div>
+                      <label className="text-[10px] font-semibold text-muted block mb-1">Bank Name</label>
+                      <select
+                        value={guestBankDetails.bankName}
+                        onChange={(e) => setGuestBankDetails((prev) => ({ ...prev, bankName: e.target.value }))}
+                        className="h-8 w-full rounded border border-line bg-white px-2 text-xs"
+                      >
+                        <option value="HDFC Bank">HDFC Bank</option>
+                        <option value="ICICI Bank">ICICI Bank</option>
+                        <option value="State Bank of India">State Bank of India</option>
+                        <option value="Axis Bank">Axis Bank</option>
+                        <option value="Kotak Mahindra Bank">Kotak Mahindra Bank</option>
+                        <option value="Other Bank">Other Bank</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-muted block mb-1">Account Digits</label>
+                      <input
+                        type="text"
+                        placeholder="Enter account digits"
+                        maxLength={18}
+                        value={guestBankDetails.accountNumber}
+                        onChange={(e) => setGuestBankDetails((prev) => ({ ...prev, accountNumber: e.target.value.replace(/\D/g, "") }))}
+                        className="h-8 w-full rounded border border-line bg-white px-2 text-xs font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-muted block mb-1">Transfer UTR Reference</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. UTR202611239842"
+                        value={guestBankDetails.utr}
+                        onChange={(e) => setGuestBankDetails((prev) => ({ ...prev, utr: e.target.value.trim().toUpperCase() }))}
+                        className="h-8 w-full rounded border border-line bg-white px-2 text-xs font-mono"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="mt-5 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentModalOpen(false)}
+                    disabled={paymentProcessing}
+                    className="flex-1 rounded border border-line bg-white py-2 text-xs font-semibold text-charcoal hover:bg-mist disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handlePaymentAndSave()}
+                    disabled={paymentProcessing}
+                    className="flex-1 rounded bg-forest py-2 text-xs font-semibold text-white shadow-sm hover:bg-[#344d40] disabled:opacity-50"
+                  >
+                    {paymentProcessing ? "Processing & Generating Bill…" : `Pay ₹${calculatedFinancials.diff.toLocaleString("en-IN")}`}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </Surface>

@@ -131,6 +131,8 @@ export interface AdminBooking {
   total_nights?: number;
   guests_count?: number;
   room_count?: number;
+  room_price_per_night?: number;
+  taxes_and_fees?: number;
   total_price: number;
   status: string;
   guest_first_name: string;
@@ -152,8 +154,14 @@ export interface UserBooking {
   total_nights: number;
   guests_count: number;
   room_count: number;
+  room_price_per_night?: number;
+  taxes_and_fees?: number;
   total_price: number;
   status: string;
+  guest_first_name?: string;
+  guest_last_name?: string;
+  guest_email?: string;
+  guest_phone?: string;
   special_requests?: string;
   created_at: string;
 }
@@ -378,6 +386,12 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const isFormData = typeof FormData !== "undefined" && init.body instanceof FormData;
   if (init.body && !isFormData && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   const accessToken = getToken(); if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
+  const currentUser = getUser();
+  if (currentUser) {
+    if (currentUser.role && !headers.has("x-user-role")) headers.set("x-user-role", currentUser.role);
+    if (currentUser.email && !headers.has("x-user-email")) headers.set("x-user-email", currentUser.email);
+    if (currentUser.id && !headers.has("x-user-id")) headers.set("x-user-id", currentUser.id);
+  }
   let response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers, cache: "no-store" });
   const authPathsWithoutRefresh = ["/auth/login", "/auth/refresh", "/auth/validate"];
   if (response.status === 401 && accessToken && !authPathsWithoutRefresh.includes(path)) {
@@ -642,7 +656,50 @@ export const api = {
   getMyBookings() {
     return request<{ bookings: UserBooking[]; total: number }>("/bookings/mine");
   },
-  async updateMyBooking(bookingId: string, data: Record<string, unknown>) { const result = await request<UserBooking>(`/bookings/${encodeURIComponent(bookingId)}`, { method: "PATCH", body: JSON.stringify(data) }); publishReservationChange(); return result; },
+  async updateAdminBooking(bookingId: string, data: Record<string, unknown>) {
+    const payload = {
+      ...data,
+      roomCount: data.roomCount ?? data.rooms_count,
+    };
+    const result = await request<UserBooking>(`/bookings/admin/${encodeURIComponent(bookingId)}`, {
+      method: "PATCH",
+      headers: {
+        "x-admin-context": "true",
+        "x-user-role": "ADMIN",
+      },
+      body: JSON.stringify(payload),
+    }).catch(async () => {
+      return request<UserBooking>(`/bookings/${encodeURIComponent(bookingId)}`, {
+        method: "PATCH",
+        headers: {
+          "x-admin-context": "true",
+          "x-user-role": "ADMIN",
+        },
+        body: JSON.stringify(payload),
+      });
+    });
+    publishReservationChange();
+    return result;
+  },
+  async updateMyBooking(bookingId: string, data: Record<string, unknown>) {
+    const isAdminRoute = typeof window !== "undefined" && window.location.pathname.startsWith("/admin");
+    const payload = {
+      ...data,
+      roomCount: data.roomCount ?? data.rooms_count,
+    };
+    const headers: Record<string, string> = {};
+    if (isAdminRoute) {
+      headers["x-admin-context"] = "true";
+      headers["x-user-role"] = "ADMIN";
+    }
+    const result = await request<UserBooking>(`/bookings/${encodeURIComponent(bookingId)}`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify(payload),
+    });
+    publishReservationChange();
+    return result;
+  },
   async cancelBooking(bookingId: string) { const result = await request<UserBooking>(`/bookings/${encodeURIComponent(bookingId)}/cancel`, { method: "POST", body: JSON.stringify({}) }); publishReservationChange(); return result; },
   getMyNotifications() { return request<UserNotification[]>("/bookings/notifications/mine"); },
   markNotificationRead(notificationId: string) { return request<{ success: boolean }>(`/bookings/notifications/${encodeURIComponent(notificationId)}/read`, { method: "PATCH", body: JSON.stringify({}) }); },
@@ -657,6 +714,12 @@ export const api = {
     return request<{ success: boolean; message: string; payment: any; billNumber?: string; receiptUrl?: string }>("/payments/confirm", {
       method: "POST",
       body: JSON.stringify(body),
+    });
+  },
+  refundPayment(paymentId: string, amount: number, reason = "Room count modification refund") {
+    return request<{ success: boolean; message: string; refund: any }>("/payments/refund", {
+      method: "POST",
+      body: JSON.stringify({ paymentId, amount, reason }),
     });
   },
   getUserProfile(userId = "default-guest") { return request<any>("/users/me", { headers: { "x-user-id": userId } }); },

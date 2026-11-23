@@ -51,6 +51,7 @@ export interface CreatePaymentData {
 
 export interface UpdatePaymentStatusData {
   status: PaymentStatus;
+  amount?: number;
   paymentMethod?: string;
   receiptUrl?: string;
   metadata?: Record<string, unknown>;

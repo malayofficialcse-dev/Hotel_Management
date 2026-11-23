@@ -103,8 +103,23 @@ export class PaymentRepository extends PrismaClient implements OnModuleInit, OnM
       where: { id },
       data: {
         status: data.status,
+        ...(data.amount != null && { amount: data.amount }),
         ...(data.paymentMethod && { paymentMethod: data.paymentMethod }),
         ...(data.receiptUrl && { receiptUrl: data.receiptUrl }),
+        ...(data.metadata && { metadata: data.metadata as any }),
+      },
+      include: { refunds: true },
+    }) as Promise<PaymentEntity>;
+  }
+
+  async updatePaymentIntent(id: string, data: { amount: number; stripeIntentId: string; paymentMethod?: string; status: PaymentStatus; metadata?: Record<string, unknown> }): Promise<PaymentEntity> {
+    return this.payment.update({
+      where: { id },
+      data: {
+        amount: data.amount,
+        stripeIntentId: data.stripeIntentId,
+        ...(data.paymentMethod && { paymentMethod: data.paymentMethod }),
+        status: data.status,
         ...(data.metadata && { metadata: data.metadata as any }),
       },
       include: { refunds: true },
