@@ -52,10 +52,7 @@ export async function POST(req: Request) {
       itinerary: data.guide,
       trace: {
         traceId: data.traceId,
-        latencyMs: 110,
-        spansCount: 4,
-        hallucinationScore: 0,
-        groundedScore: 1,
+        ...data.trace,
       },
     });
   } catch (err: any) {

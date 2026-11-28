@@ -47,7 +47,13 @@ Estimated Fulfillment: ${state.serviceTicket.scheduledTime}`;
 - Insider Advice: ${g.tips.join(" | ")}`;
   }
 
-  // Attempt live Gemini 1.5 Flash API call
+  // Do not ask the LLM to claim a request succeeded when the real task could not be created.
+  if (state.intent === "IN_STAY_SERVICE" && state.serviceError) {
+    langsmith.endSpan(state.traceId, spanId, { replyLength: state.serviceError.length, model: "grounded-service-error" });
+    return { reply: state.serviceError };
+  }
+
+  // Attempt live Gemini API call
   let reply = "";
   if (env.GEMINI_API_KEY) {
     try {

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { api, type UserSession } from "@/lib/api-client";
+import { api, type UserBooking, type UserSession } from "@/lib/api-client";
 
 export interface HotelRecommendation {
   id: string;
@@ -61,6 +61,7 @@ const SUGGESTED_PROMPTS = [
 export function AiConcierge() {
   const [isOpen, setIsOpen] = useState(false);
   const [user, setUser] = useState<UserSession | null>(null);
+  const [activeBooking, setActiveBooking] = useState<UserBooking | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "welcome-1",
@@ -80,6 +81,21 @@ export function AiConcierge() {
     window.addEventListener("stayease-user-updated", syncUser);
     return () => window.removeEventListener("stayease-user-updated", syncUser);
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.getMyBookings().then(({ bookings }) => {
+      const today = new Date().toISOString().slice(0, 10);
+      const booking = bookings.find((item) =>
+        !/cancelled|expired|failed/i.test(item.status) &&
+        item.check_in_date <= today && item.check_out_date > today
+      );
+      if (!cancelled) setActiveBooking(booking || null);
+    }).catch(() => {
+      if (!cancelled) setActiveBooking(null);
+    });
+    return () => { cancelled = true; };
+  }, [user?.email]);
 
   useEffect(() => {
     if (isOpen) {
@@ -110,11 +126,10 @@ export function AiConcierge() {
           message: textToSend,
           history: messages.slice(-4).map((m) => ({ role: m.role, content: m.content })),
           context: {
-            guestName: user?.name || "Guest",
-            userEmail: user?.email || "guest@stayease.com",
-            currentCity: "Goa",
-            roomNumber: "204",
-            currentHotel: "palm-house",
+            guestName: user?.name,
+            userEmail: user?.email,
+            currentHotel: activeBooking?.hotel_id,
+            bookingCode: activeBooking?.booking_code,
           },
         }),
       });
@@ -211,9 +226,9 @@ export function AiConcierge() {
           {/* Connected Context Strip */}
           <div className="flex items-center justify-between border-b border-line/60 bg-[#f4f8f5] px-4 py-1.5 text-[10px] text-muted">
             <span className="flex items-center gap-1 text-forest font-medium">
-              <span>📍</span> Candolim, Goa · Room 204
+              <span>📍</span> {activeBooking ? `${activeBooking.hotel_name} · Active stay` : "StayEase guest support"}
             </span>
-            <span className="font-mono text-[9px]">LangSmith: ACTIVE</span>
+            <span className="font-mono text-[9px]">AI concierge</span>
           </div>
 
           {/* Messages Body */}

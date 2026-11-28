@@ -29,6 +29,16 @@ export class PineconeCloudClient {
     return res.ok;
   }
 
+  async delete(ids: string[]): Promise<boolean> {
+    if (!this.isConfigured() || ids.length === 0) return true;
+    const res = await fetch(`${this.host}/vectors/delete`, {
+      method: "POST",
+      headers: { "Api-Key": this.apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({ ids }),
+    });
+    return res.ok;
+  }
+
   async query(
     vector: number[],
     topK = 4,

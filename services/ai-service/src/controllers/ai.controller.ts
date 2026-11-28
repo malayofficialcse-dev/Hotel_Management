@@ -2,11 +2,9 @@ import type { Request, Response } from "express";
 import { executeLangGraphPipeline } from "../langgraph/workflow.js";
 import { pineconeClient } from "../vector/pinecone.client.js";
 import { localVectorStore } from "../vector/local-vector-store.js";
-import { CATALOG_DATASET } from "../vector/catalog-data.js";
-import { generateEmbedding } from "../vector/embedding.service.js";
 import { langsmith } from "../observability/langsmith.tracer.js";
 import { env } from "../config/env.js";
-import type { PineconeRecord } from "../config/pinecone.config.js";
+import { isPineconeCatalogSynced, refreshHotelCatalog } from "../vector/catalog-sync.service.js";
 
 export async function chatHandler(req: Request, res: Response) {
   try {
@@ -17,6 +15,7 @@ export async function chatHandler(req: Request, res: Response) {
     }
 
     const state = await executeLangGraphPipeline(message, history, context);
+    const trace = langsmith.getTrace(state.traceId);
 
     res.json({
       reply: state.reply,
@@ -25,17 +24,26 @@ export async function chatHandler(req: Request, res: Response) {
         id: h.id,
         score: Number(h.score.toFixed(3)),
         hotelId: h.metadata.id || h.metadata.hotelId,
-        hotelName: h.metadata.name || h.metadata.hotelName,
+        name: h.metadata.name || h.metadata.hotelName || "StayEase property",
         city: h.metadata.city,
+        location: h.metadata.location || h.metadata.city,
         price: h.metadata.price,
         rating: h.metadata.rating,
-        highlights: h.metadata.tag || h.metadata.highlights || h.metadata.description,
-        roomTypes: (h.metadata.roomTypes as string[]) || ["Deluxe Suite", "Executive Villa"],
-        amenities: (h.metadata.features as string[]) || (h.metadata.amenities as string[]) || [],
+        image: h.metadata.image,
+        tag: h.metadata.tag || h.metadata.highlights || "",
+        description: h.metadata.description || "",
+        features: (h.metadata.features as string[]) || (h.metadata.amenities as string[]) || [],
+        offer: h.metadata.offer || "",
       })),
       ticket: state.serviceTicket,
+      serviceError: state.serviceError,
       guide: state.destinationGuide,
       traceId: state.traceId,
+      trace: {
+        latencyMs: trace?.latencyMs,
+        spansCount: trace?.spans.length ?? 0,
+        langsmithConfigured: Boolean(env.LANGSMITH.API_KEY),
+      },
     });
   } catch (err: any) {
     res.status(500).json({
@@ -47,45 +55,16 @@ export async function chatHandler(req: Request, res: Response) {
 
 export async function syncVectorsHandler(_req: Request, res: Response) {
   try {
-    const vectors: PineconeRecord[] = [];
-    for (const item of CATALOG_DATASET) {
-      const textToEmbed = `${item.name} ${item.city} ${item.location} ${item.category} ${item.tag} ${item.description} ${item.features.join(" ")}`;
-      const values = await generateEmbedding(textToEmbed);
-      vectors.push({
-        id: `hotel_${item.id}`,
-        values,
-        metadata: {
-          id: item.id,
-          name: item.name,
-          city: item.city,
-          location: item.location,
-          price: item.price,
-          rating: parseFloat(item.rating) || 4.5,
-          reviews: item.reviews,
-          category: item.category,
-          tag: item.tag,
-          features: item.features,
-          description: item.description,
-          image: item.image,
-          offer: item.offer,
-        },
-      });
+    const refreshed = await refreshHotelCatalog(true);
+    if (!refreshed && localVectorStore.size() === 0) {
+      throw new Error("Hotel catalog is unavailable from the Operations Service.");
     }
-
-    // Always update local store
-    localVectorStore.load(vectors);
-
-    // If Pinecone is configured, upsert into Pinecone cloud
-    let pineconeUpserted = false;
-    if (pineconeClient.isConfigured()) {
-      pineconeUpserted = await pineconeClient.upsert(vectors);
-    }
-
     res.json({
-      status: "SUCCESS",
-      count: vectors.length,
+      status: refreshed ? "SUCCESS" : "DEGRADED",
+      count: localVectorStore.size(),
       localStoreReady: true,
-      pineconeCloudSynced: pineconeUpserted,
+      liveCatalogSynced: refreshed,
+      pineconeCloudSynced: isPineconeCatalogSynced(),
       pineconeConfigured: pineconeClient.isConfigured(),
     });
   } catch (err: any) {
@@ -97,6 +76,7 @@ export async function syncVectorsHandler(_req: Request, res: Response) {
 }
 
 export async function healthHandler(_req: Request, res: Response) {
+  const liveCatalogSynced = await refreshHotelCatalog();
   res.json({
     service: "ai-service",
     status: "HEALTHY",
@@ -105,6 +85,7 @@ export async function healthHandler(_req: Request, res: Response) {
     pinecone: {
       configured: pineconeClient.isConfigured(),
       localCatalogCount: localVectorStore.size(),
+      liveCatalogSynced,
     },
     gemini: {
       configured: Boolean(env.GEMINI_API_KEY),

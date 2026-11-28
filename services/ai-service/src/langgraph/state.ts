@@ -7,6 +7,7 @@ export interface GuestContext {
   roomNumber?: string;
   guestName?: string;
   userEmail?: string;
+  bookingCode?: string;
 }
 
 export interface ServiceTicket {
@@ -16,7 +17,7 @@ export interface ServiceTicket {
   serviceType: string;
   priority: "LOW" | "NORMAL" | "HIGH" | "URGENT";
   notes: string;
-  status: "DISPATCHED" | "QUEUED" | "IN_PROGRESS";
+  status: "DISPATCHED" | "QUEUED" | "IN_PROGRESS" | "FAILED";
   scheduledTime?: string;
   createdAt: string;
 }
@@ -37,6 +38,7 @@ export interface ConciergeState {
   };
   retrievedHotels: PineconeMatch[];
   serviceTicket?: ServiceTicket;
+  serviceError?: string;
   destinationGuide?: DestinationGuide;
   reply: string;
   traceId: string;

@@ -1,6 +1,22 @@
 ﻿# Hotel Management Platform â€” Microservices Architecture
 ## Production-Grade Polyglot Backend
 
+## AI Concierge
+
+The AI Service runs on port `8013`. It refreshes its hotel search catalog from
+active records at `HOTEL_SERVICE_URL/api/v1/hotels` on startup and every five
+minutes, then updates the local vector index and Pinecone when configured. If
+the Operations Service is unavailable, the bundled catalog remains as a local
+fallback; check `/api/v1/ai/health` and `liveCatalogSynced` to distinguish live
+data from fallback data. `POST /api/v1/ai/sync-vectors` forces a refresh.
+
+Set `HOTEL_SERVICE_URL` and `HOUSEKEEPING_SERVICE_URL` to the Operations Service
+base URL, `GEMINI_API_KEY` for Gemini generation and embeddings, and
+`PINECONE_API_KEY`, `PINECONE_HOST`, and `PINECONE_INDEX` for cloud vector
+storage. The local semantic encoder remains available without Gemini. Room
+service requests require an active booking context and a room number; the
+concierge confirms the request only after Operations Service saves the task.
+
 ---
 
 ## Service Map

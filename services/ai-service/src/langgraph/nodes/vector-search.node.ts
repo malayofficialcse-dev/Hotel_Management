@@ -1,8 +1,10 @@
 import { langsmith } from "../../observability/langsmith.tracer.js";
 import { searchHotelCatalogVectors } from "../../vector/pinecone.client.js";
 import type { ConciergeState } from "../state.js";
+import { refreshHotelCatalog } from "../../vector/catalog-sync.service.js";
 
 export async function vectorSearchNode(state: ConciergeState): Promise<Partial<ConciergeState>> {
+  await refreshHotelCatalog();
   const spanId = langsmith.startSpan(state.traceId, "pinecone_vector_retriever", "retriever", {
     query: state.query,
     filters: state.extractedEntities,

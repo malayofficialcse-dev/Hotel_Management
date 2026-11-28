@@ -1,6 +1,7 @@
 import { defaultCatalogHotels } from "./catalog-data.js";
 import { generateEmbedding, cosineSimilarity } from "./embedding.service.js";
 import type { HotelVectorMetadata, PineconeMatch, PineconeRecord } from "../config/pinecone.config.js";
+import type { CatalogHotel } from "./catalog-data.js";
 
 class LocalVectorDatabase {
   private records: PineconeRecord[] = [];
@@ -96,6 +97,34 @@ class LocalVectorDatabase {
   load(records: PineconeRecord[]): void {
     this.records = records;
     this.initialized = true;
+  }
+
+  async replaceHotels(hotels: CatalogHotel[]): Promise<PineconeRecord[]> {
+    const records: PineconeRecord[] = [];
+    for (const hotel of hotels) {
+      const text = [hotel.name, hotel.city, hotel.location, hotel.category, hotel.tag, hotel.description, hotel.features.join(" ")].join(" ");
+      records.push({
+        id: `hotel_${hotel.id}`,
+        values: await generateEmbedding(text),
+        metadata: {
+          id: hotel.id,
+          name: hotel.name,
+          city: hotel.city,
+          location: hotel.location,
+          price: hotel.price,
+          rating: Number(hotel.rating) || 0,
+          reviews: hotel.reviews,
+          category: hotel.category,
+          tag: hotel.tag,
+          features: hotel.features,
+          description: hotel.description,
+          image: hotel.image,
+          offer: hotel.offer,
+        },
+      });
+    }
+    this.load(records);
+    return records;
   }
 
   size(): number {
